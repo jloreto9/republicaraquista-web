@@ -118,6 +118,9 @@ export interface PitchingStats {
   kPer9: number;
   bbPer9: number;
   kToBb: number;
+  saves?: number;
+  wins?: number;
+  losses?: number;
 }
 
 export interface FieldingStats {

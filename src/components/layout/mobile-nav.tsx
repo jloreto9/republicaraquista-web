@@ -24,12 +24,12 @@ const navigationItems = [
   { name: "Centro de Mando", href: "/", icon: LayoutDashboard },
   { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
   { name: "Líderes Individuales", href: "/individuales", icon: Users },
-  { name: "Estadísticas Colectivas", href: "/colectivas", icon: BarChart3, badge: "Fase 4" },
-  { name: "Matchup 360 (H2H)", href: "/matchup", icon: GitCompare, badge: "Fase 3" },
+  { name: "Matchup 360 (H2H)", href: "/matchup", icon: GitCompare },
+  { name: "Estadísticas Colectivas", href: "/colectivas", icon: BarChart3 },
+  { name: "Bullpen & Lineups", href: "/bullpen", icon: Shield },
   { name: "Win Expectancy & WPA", href: "/wpa", icon: Activity, badge: "Fase 5" },
   { name: "Splits Situacionales", href: "/situacional", icon: PieChart, badge: "Fase 5" },
   { name: "Spray Charts", href: "/spray-charts", icon: Target, badge: "Fase 5" },
-  { name: "Bullpen & Lineups", href: "/bullpen", icon: Shield, badge: "Fase 4" },
 ];
 
 export function MobileNav() {
