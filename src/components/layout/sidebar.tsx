@@ -14,18 +14,26 @@ import {
   Shield,
   Activity,
 } from "lucide-react";
+import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navigationItems = [
+interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  badge?: string;
+}
+
+const navigationItems: NavItem[] = [
   { name: "Centro de Mando", href: "/", icon: LayoutDashboard },
   { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
   { name: "Líderes Individuales", href: "/individuales", icon: Users },
   { name: "Matchup 360 (H2H)", href: "/matchup", icon: GitCompare },
   { name: "Estadísticas Colectivas", href: "/colectivas", icon: BarChart3 },
   { name: "Bullpen & Lineups", href: "/bullpen", icon: Shield },
-  { name: "Win Expectancy & WPA", href: "/wpa", icon: Activity, badge: "Fase 5" },
-  { name: "Splits Situacionales", href: "/situacional", icon: PieChart, badge: "Fase 5" },
-  { name: "Spray Charts", href: "/spray-charts", icon: Target, badge: "Fase 5" },
+  { name: "Win Expectancy & WPA", href: "/wpa", icon: Activity },
+  { name: "Splits Situacionales", href: "/situacional", icon: PieChart },
+  { name: "Spray Charts", href: "/spray-charts", icon: Target },
 ];
 
 export function Sidebar() {
