@@ -66,4 +66,6 @@ export interface GameOption {
   opponent: string;
   score: string;
   result: "W" | "L";
+  gameNumber?: number;
 }
+

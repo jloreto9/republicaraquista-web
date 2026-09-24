@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { GameWpaData, SeasonWpaLeader } from "@/types/wpa";
+import { GameWpaData, SeasonWpaLeader, GameOption } from "@/types/wpa";
 import { WpaChart } from "./wpa-chart";
-import { LEONES_KEY_GAMES } from "@/lib/wpa-engine";
+import { LEONES_ALL_GAMES } from "@/lib/wpa-engine";
 import {
   Activity,
   Flame,
@@ -18,11 +18,17 @@ import {
 interface WpaViewProps {
   initialGameData: GameWpaData | null;
   seasonLeaders: SeasonWpaLeader[];
+  games?: GameOption[];
 }
 
-export function WpaView({ initialGameData, seasonLeaders }: WpaViewProps) {
+export function WpaView({
+  initialGameData,
+  seasonLeaders,
+  games = LEONES_ALL_GAMES,
+}: WpaViewProps) {
+  const gamesList = games && games.length > 0 ? games : LEONES_ALL_GAMES;
   const [selectedGameId, setSelectedGameId] = useState<number>(
-    initialGameData?.gameId || LEONES_KEY_GAMES[0].id
+    initialGameData?.gameId || gamesList[0]?.id || 829871
   );
   const [gameData, setGameData] = useState<GameWpaData | null>(initialGameData);
   const [loading, setLoading] = useState(false);
@@ -30,7 +36,12 @@ export function WpaView({ initialGameData, seasonLeaders }: WpaViewProps) {
   const [leaderTab, setLeaderTab] = useState<"batter" | "pitcher">("batter");
 
   useEffect(() => {
-    if (selectedGameId === initialGameData?.gameId) return;
+    if (selectedGameId === initialGameData?.gameId) {
+      if (initialGameData && gameData?.gameId !== initialGameData.gameId) {
+        setGameData(initialGameData);
+      }
+      return;
+    }
 
     let isMounted = true;
     async function loadGame() {
@@ -52,7 +63,7 @@ export function WpaView({ initialGameData, seasonLeaders }: WpaViewProps) {
     return () => {
       isMounted = false;
     };
-  }, [selectedGameId, initialGameData?.gameId]);
+  }, [selectedGameId, initialGameData]);
 
   const plays = gameData?.plays || [];
 
@@ -74,7 +85,7 @@ export function WpaView({ initialGameData, seasonLeaders }: WpaViewProps) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
           <Activity className="w-4 h-4 text-[#FDB827]" />
-          <span>Análisis de Probabilidad por Partido</span>
+          <span>Análisis de Probabilidad por Partido ({gamesList.length} juegos de la temporada)</span>
         </div>
 
         {/* Selector de Juego */}
@@ -82,15 +93,15 @@ export function WpaView({ initialGameData, seasonLeaders }: WpaViewProps) {
           <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider shrink-0">
             Partido:
           </label>
-          <div className="relative">
+          <div className="relative max-w-full sm:max-w-md">
             <select
               value={selectedGameId}
               onChange={(e) => setSelectedGameId(Number(e.target.value))}
-              className="appearance-none bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs font-medium rounded-lg px-3 py-2 pr-8 focus:outline-none focus:border-[#FDB827]/50"
+              className="appearance-none w-full bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs font-medium rounded-lg px-3 py-2 pr-8 focus:outline-none focus:border-[#FDB827]/50"
             >
-              {LEONES_KEY_GAMES.map((g) => (
+              {gamesList.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.date} — {g.opponent} ({g.score} {g.result})
+                  {g.gameNumber ? `J#${g.gameNumber} • ` : ""}{g.date} — {g.opponent} ({g.score} {g.result})
                 </option>
               ))}
             </select>

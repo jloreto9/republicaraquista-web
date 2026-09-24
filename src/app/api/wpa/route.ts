@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processGameWpa, getSeasonWpaLeaders, LEONES_KEY_GAMES } from "@/lib/wpa-engine";
+import { processGameWpa, getSeasonWpaLeaders, LEONES_ALL_GAMES } from "@/lib/wpa-engine";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,11 +12,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         season: 2025,
         leaders,
-        games: LEONES_KEY_GAMES,
+        games: LEONES_ALL_GAMES,
       });
     }
 
-    const gamePk = gamePkParam ? parseInt(gamePkParam, 10) : LEONES_KEY_GAMES[0].id;
+    const gamePk = gamePkParam ? parseInt(gamePkParam, 10) : LEONES_ALL_GAMES[0].id;
     const wpaData = await processGameWpa(gamePk);
 
     if (!wpaData) {

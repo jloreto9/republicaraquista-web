@@ -362,12 +362,71 @@ export function getSeasonWpaLeaders(): SeasonWpaLeader[] {
 }
 
 /**
- * Juegos preconfigurados de Leones para selección rápida.
+ * Calendario completo de los 56 juegos de la Temporada Regular 2025 para Leones del Caracas.
+ * Ordenado en secuencia cronológica inversa (desde el juego más reciente al primero).
  */
-export const LEONES_KEY_GAMES: GameOption[] = [
-  { id: 829925, date: "16 Oct 2025", opponent: "vs Bravos de Margarita", score: "8 - 5", result: "W" },
-  { id: 829758, date: "16 Oct 2025", opponent: "vs Águilas del Zulia", score: "6 - 4", result: "W" },
-  { id: 829755, date: "17 Oct 2025", opponent: "vs Tiburones de La Guaira", score: "7 - 6", result: "W" },
-  { id: 829812, date: "15 Oct 2025", opponent: "vs Tigres de Aragua", score: "5 - 3", result: "W" },
-  { id: 829785, date: "18 Oct 2025", opponent: "vs Navegantes del Magallanes", score: "4 - 5", result: "L" },
+export const LEONES_ALL_GAMES: GameOption[] = [
+  { id: 829871, date: "27 Dic 2025", gameNumber: 56, opponent: "vs Tiburones de La Guaira", score: "4-5", result: "L" },
+  { id: 829786, date: "26 Dic 2025", gameNumber: 55, opponent: "@ Cardenales de Lara", score: "13-15", result: "L" },
+  { id: 829870, date: "22 Dic 2025", gameNumber: 54, opponent: "vs Bravos de Margarita", score: "8-2", result: "W" },
+  { id: 829872, date: "21 Dic 2025", gameNumber: 53, opponent: "vs Navegantes del Magallanes", score: "7-3", result: "W" },
+  { id: 829873, date: "20 Dic 2025", gameNumber: 52, opponent: "vs Cardenales de Lara", score: "3-12", result: "L" },
+  { id: 829731, date: "19 Dic 2025", gameNumber: 51, opponent: "@ Águilas del Zulia", score: "3-14", result: "L" },
+  { id: 829733, date: "18 Dic 2025", gameNumber: 50, opponent: "@ Águilas del Zulia", score: "3-6", result: "L" },
+  { id: 829874, date: "16 Dic 2025", gameNumber: 49, opponent: "vs Caribes de Anzoátegui", score: "8-7", result: "W" },
+  { id: 829875, date: "15 Dic 2025", gameNumber: 48, opponent: "vs Bravos de Margarita", score: "2-3", result: "L" },
+  { id: 829791, date: "14 Dic 2025", gameNumber: 47, opponent: "@ Cardenales de Lara", score: "5-14", result: "L" },
+  { id: 829792, date: "13 Dic 2025", gameNumber: 46, opponent: "@ Cardenales de Lara", score: "7-6", result: "W" },
+  { id: 829736, date: "12 Dic 2025", gameNumber: 45, opponent: "@ Águilas del Zulia", score: "6-1", result: "W" },
+  { id: 829737, date: "11 Dic 2025", gameNumber: 44, opponent: "@ Águilas del Zulia", score: "1-2", result: "L" },
+  { id: 829762, date: "10 Dic 2025", gameNumber: 43, opponent: "@ Navegantes del Magallanes", score: "3-10", result: "L" },
+  { id: 829905, date: "7 Dic 2025", gameNumber: 42, opponent: "@ Bravos de Margarita", score: "5-2", result: "W" },
+  { id: 829904, date: "6 Dic 2025", gameNumber: 41, opponent: "@ Bravos de Margarita", score: "5-6", result: "L" },
+  { id: 829876, date: "5 Dic 2025", gameNumber: 40, opponent: "vs Navegantes del Magallanes", score: "9-7", result: "W" },
+  { id: 829877, date: "4 Dic 2025", gameNumber: 39, opponent: "vs Caribes de Anzoátegui", score: "1-5", result: "L" },
+  { id: 829933, date: "3 Dic 2025", gameNumber: 38, opponent: "@ Tigres de Aragua", score: "3-8", result: "L" },
+  { id: 829822, date: "2 Dic 2025", gameNumber: 37, opponent: "@ Tiburones de La Guaira", score: "3-0", result: "W" },
+  { id: 829878, date: "30 Nov 2025", gameNumber: 36, opponent: "vs Bravos de Margarita", score: "8-14", result: "L" },
+  { id: 829824, date: "29 Nov 2025", gameNumber: 35, opponent: "@ Tiburones de La Guaira", score: "3-5", result: "L" },
+  { id: 829852, date: "28 Nov 2025", gameNumber: 34, opponent: "@ Caribes de Anzoátegui", score: "13-8", result: "W" },
+  { id: 829853, date: "27 Nov 2025", gameNumber: 33, opponent: "@ Caribes de Anzoátegui", score: "7-8", result: "L" },
+  { id: 829879, date: "26 Nov 2025", gameNumber: 32, opponent: "vs Tigres de Aragua", score: "4-5", result: "L" },
+  { id: 829935, date: "25 Nov 2025", gameNumber: 31, opponent: "@ Tigres de Aragua", score: "6-4", result: "W" },
+  { id: 829880, date: "23 Nov 2025", gameNumber: 30, opponent: "vs Tiburones de La Guaira", score: "7-9", result: "L" },
+  { id: 829936, date: "22 Nov 2025", gameNumber: 29, opponent: "@ Tigres de Aragua", score: "9-6", result: "W" },
+  { id: 829881, date: "21 Nov 2025", gameNumber: 28, opponent: "vs Águilas del Zulia", score: "6-4", result: "W" },
+  { id: 829882, date: "20 Nov 2025", gameNumber: 27, opponent: "vs Águilas del Zulia", score: "1-7", result: "L" },
+  { id: 829883, date: "19 Nov 2025", gameNumber: 26, opponent: "vs Tiburones de La Guaira", score: "9-4", result: "W" },
+  { id: 829884, date: "18 Nov 2025", gameNumber: 25, opponent: "vs Cardenales de Lara", score: "1-5", result: "L" },
+  { id: 829885, date: "18 Nov 2025", gameNumber: 24, opponent: "vs Cardenales de Lara", score: "4-5", result: "L" },
+  { id: 829938, date: "16 Nov 2025", gameNumber: 23, opponent: "@ Tigres de Aragua", score: "0-5", result: "L" },
+  { id: 829801, date: "15 Nov 2025", gameNumber: 22, opponent: "@ Cardenales de Lara", score: "1-5", result: "L" },
+  { id: 829775, date: "13 Nov 2025", gameNumber: 21, opponent: "@ Navegantes del Magallanes", score: "9-12", result: "L" },
+  { id: 829886, date: "9 Nov 2025", gameNumber: 20, opponent: "vs Navegantes del Magallanes", score: "4-11", result: "L" },
+  { id: 829777, date: "8 Nov 2025", gameNumber: 19, opponent: "@ Navegantes del Magallanes", score: "3-2", result: "W" },
+  { id: 829887, date: "7 Nov 2025", gameNumber: 18, opponent: "vs Águilas del Zulia", score: "8-5", result: "W" },
+  { id: 829888, date: "6 Nov 2025", gameNumber: 17, opponent: "vs Bravos de Margarita", score: "10-9", result: "W" },
+  { id: 829889, date: "5 Nov 2025", gameNumber: 16, opponent: "vs Tigres de Aragua", score: "7-3", result: "W" },
+  { id: 829891, date: "4 Nov 2025", gameNumber: 15, opponent: "vs Águilas del Zulia", score: "16-3", result: "W" },
+  { id: 829890, date: "2 Nov 2025", gameNumber: 14, opponent: "vs Tigres de Aragua", score: "5-10", result: "L" },
+  { id: 829780, date: "1 Nov 2025", gameNumber: 13, opponent: "@ Navegantes del Magallanes", score: "4-5", result: "L" },
+  { id: 829892, date: "31 Oct 2025", gameNumber: 12, opponent: "vs Cardenales de Lara", score: "6-5", result: "W" },
+  { id: 829893, date: "30 Oct 2025", gameNumber: 11, opponent: "vs Tiburones de La Guaira", score: "6-10", result: "L" },
+  { id: 829894, date: "29 Oct 2025", gameNumber: 10, opponent: "vs Navegantes del Magallanes", score: "3-4", result: "L" },
+  { id: 829895, date: "28 Oct 2025", gameNumber: 9, opponent: "vs Tigres de Aragua", score: "7-5", result: "W" },
+  { id: 829865, date: "26 Oct 2025", gameNumber: 8, opponent: "@ Caribes de Anzoátegui", score: "10-11", result: "L" },
+  { id: 829864, date: "25 Oct 2025", gameNumber: 7, opponent: "@ Caribes de Anzoátegui", score: "4-7", result: "L" },
+  { id: 829839, date: "24 Oct 2025", gameNumber: 6, opponent: "@ Tiburones de La Guaira", score: "5-3", result: "W" },
+  { id: 829842, date: "21 Oct 2025", gameNumber: 5, opponent: "@ Tiburones de La Guaira", score: "5-6", result: "L" },
+  { id: 829896, date: "19 Oct 2025", gameNumber: 4, opponent: "vs Caribes de Anzoátegui", score: "11-9", result: "W" },
+  { id: 829897, date: "18 Oct 2025", gameNumber: 3, opponent: "vs Caribes de Anzoátegui", score: "3-2", result: "W" },
+  { id: 829924, date: "17 Oct 2025", gameNumber: 2, opponent: "@ Bravos de Margarita", score: "13-6", result: "W" },
+  { id: 829925, date: "16 Oct 2025", gameNumber: 1, opponent: "@ Bravos de Margarita", score: "2-6", result: "L" },
 ];
+
+export const LEONES_KEY_GAMES: GameOption[] = LEONES_ALL_GAMES;
+
+export function getLeonesGamesList(season = 2025): GameOption[] {
+  return LEONES_ALL_GAMES;
+}
+
