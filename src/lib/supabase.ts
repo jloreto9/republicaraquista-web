@@ -550,7 +550,7 @@ export async function getBattingStats(
     return {
       playerId: p.playerId,
       playerName: p.playerName,
-      playerAvatar: `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:spt:current.png/w_120,q_auto:best/v1/people/${p.playerId}/headshot/spt/current`,
+      playerAvatar: `https://midfield.mlbstatic.com/v1/people/${p.playerId}/spots/120`,
       teamId: team.id,
       teamName: team.name,
       teamAbbr: team.abbreviation,
@@ -700,7 +700,7 @@ export async function getPitchingStats(
     return {
       playerId: p.playerId,
       playerName: p.playerName,
-      playerAvatar: `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:spt:current.png/w_120,q_auto:best/v1/people/${p.playerId}/headshot/spt/current`,
+      playerAvatar: `https://midfield.mlbstatic.com/v1/people/${p.playerId}/spots/120`,
       teamId: team.id,
       teamName: team.name,
       teamAbbr: team.abbreviation,

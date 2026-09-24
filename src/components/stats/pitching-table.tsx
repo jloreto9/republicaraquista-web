@@ -179,6 +179,12 @@ export function PitchingTable({ stats }: PitchingTableProps) {
                           height={28}
                           className="object-cover"
                           unoptimized
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (target.src !== pitcher.teamLogo) {
+                              target.src = pitcher.teamLogo;
+                            }
+                          }}
                         />
                       </div>
                       <span className={isCaracas ? "text-[#FDB827]" : "text-slate-100"}>

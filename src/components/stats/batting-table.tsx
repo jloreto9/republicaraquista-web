@@ -190,6 +190,12 @@ export function BattingTable({ stats }: BattingTableProps) {
                           height={28}
                           className="object-cover"
                           unoptimized
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (target.src !== player.teamLogo) {
+                              target.src = player.teamLogo;
+                            }
+                          }}
                         />
                       </div>
                       <span className={isCaracas ? "text-[#FDB827]" : "text-slate-100"}>
