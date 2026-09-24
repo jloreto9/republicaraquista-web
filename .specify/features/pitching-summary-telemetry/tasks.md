@@ -78,4 +78,16 @@
 - [x] T029 [US6] Actualizar `src/lib/pitch-card-canvas.ts` para renderizar metadatos y boxscore de temporada completa en la tarjeta HD exportable
 - [x] T030 [US6] Validar con `npx tsc --noEmit` y `npm run build` antes de despliegue final
 
+---
+
+## Phase 10: User Story 4 (P4) - Paridad Total Tarjeta Thomas Nestico (@TJStats) (2400x2400 Fondo Blanco Pulcro)
+
+- [x] T031 [US4] Reestructurar `src/lib/pitch-card-canvas.ts` a canvas cuadrado 2400x2400 px con fondo blanco pulcro `#FFFFFF`
+- [x] T032 [US4] Replicar cabecera oficial de 3 columnas (headshot circular, biografía jerárquica con subtítulos dinámicos de juego/temporada y logo República Caraquista)
+- [x] T033 [US4] Replicar tabla de métricas en dos tonos (#0F172A encabezados y #F8FAFC valores) para juego y temporada
+- [x] T034 [US4] Renderizar panel gráfico tríptico con separación horizontal (LVBP: Carga por Entrada, Apalancamiento Tango RE24 con cota 1.0, Platoon Splits / MLB: Velocidades, Strike Zone 3x3, Short-Form Breaks)
+- [x] T035 [US4] Renderizar tabla inferior adaptativa (destinos PBP en juego LVBP, historial de salidas en temporada LVBP, o matriz de repertorio Hawk-Eye en MLB)
+- [x] T036 [US4] Replicar pie de página canónico con doble bloque de atribución a `@republicaraquista • Jorge Leonardo Loreto` y `Diseño inspirado en Thomas Nestico (@TJStats)`
+- [x] T037 [US4] Validar tipado y compilación con `npx tsc --noEmit` y `npm run build`
+
 

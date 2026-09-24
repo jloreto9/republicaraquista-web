@@ -47,11 +47,13 @@ La vista **Pitching Summary & Telemetría** constituye la 9ª vista analítica d
 - **Escenario 3.3 (Dispersión en Zona de Strike)**: El usuario analiza la ubicación exacta de cada lanzamiento respecto al rectángulo regulatorio de home plate.
 
 ### Historia de Usuario 4 (P4): Exportación de Tarjeta Gráfica en Alta Resolución
-**Como** creador de contenido de República Caraquista,  
-**quiero** exportar una tarjeta visual panorámica (formato 16:9 a 300 DPI) con un solo clic,  
-**para** compartirla en redes sociales (@republicaraquista) con diseño editorial consistente y créditos oficiales.
+### Historia de Usuario 4 (P4): Tarjeta Gráfica Oficial Thomas Nestico (@TJStats)
+**Como** creador de contenido y analista de República Caraquista,  
+**quiero** exportar la tarjeta sabermétrica gráfica de pitcheo con idéntico diseño, proporciones (2400x2400 px, fondo blanco pulcro) y estructura que en Streamlit y Reflex,  
+**para** mantener la identidad editorial canónica de Thomas Nestico (@TJStats) con créditos explícitos a Thomas Nestico y Jorge Leonardo Loreto (@republicaraquista).
 
-- **Escenario 4.1**: El usuario pulsa "Descargar Tarjeta HD"; se genera un archivo PNG nítido con el encabezado biográfico, avatar, boxscore, los tres paneles visuales y el pie de página con créditos a Jorge Leonardo Loreto y Thomas Nestico.
+- **Escenario 4.1 (Fidelidad 1:1 con Streamlit y Reflex)**: Al pulsar "Descargar Tarjeta HD", se renderiza un PNG cuadrado de 2400x2400 px en fondo blanco pulcro (#FFFFFF), con cabecera de 3 columnas (headshot circular, biografía jerárquica y logo oficial de República Caraquista), tabla de métricas en dos tonos (#0F172A y #FDB827), panel tríptico gráfico (carga/re24/splits en LVBP o velo/zona/breaks en MLB), tabla de repertorio/destinos y pie de página con doble atribución obligatoria (izquierda: República Caraquista / @republicaraquista • Jorge Leonardo Loreto; derecha: Diseño inspirado en Thomas Nestico (@TJStats) / Data: MLB Stats API).
+- **Escenario 4.2 (Soporte Dual Juego vs Temporada)**: La tarjeta adapta la cabecera, la barra de métricas (mostrando ERA/WHIP/Juegos en temporada o IP/H/R/ER/CSW%/Whiff% en juego) y los subplots según el modo temporal seleccionado.
 
 ### Historia de Usuario 5 (P5): Integración Repo-wide y Navegación Contextual
 **Como** usuario navegando la aplicación,  
@@ -78,9 +80,9 @@ La vista **Pitching Summary & Telemetría** constituye la 9ª vista analítica d
 - **RF-06 (Visualización Gráfica Tríptica)**:
   - En LVBP: Gráfico de Carga por Entrada (barras apiladas de strikes y bolas), Curva de Apalancamiento Tango RE24 con cota de 1.0, y Gráfico comparativo de Platoon Splits (LHB vs RHB).
   - En MLB: Gráfico cartesiano de movimiento (iVB vs HB en pulgadas), Dispersión en Zona de Strike con marco regulatorio y Distribución de velocidades/uso.
-- **RF-07 (Generador de Tarjeta Gráfica en Cliente)**: Renderizado dinámico de la tarjeta panorámica en resolución ultra-alta (2400x1350 px equivalentes a 300 DPI) con preservación tipográfica, avatares circulares y marcas de agua.
+- **RF-07 (Generador de Tarjeta Gráfica en Cliente - Formato Thomas Nestico)**: Renderizado dinámico de la tarjeta cuadrada de pitcheo (2400x2400 px equivalentes a 300 DPI en fondo blanco pulcro `#FFFFFF`) siguiendo la cuadrícula 20x20 de Thomas Nestico (@TJStats), idéntica a la implementada en Reflex y Streamlit.
 - **RF-08 (Navegación Unificada)**: Incorporación oficial de `/pitching` en la barra lateral de escritorio y en la navegación móvil, con estado activo destacado.
-- **RF-09 (Atribución y Cumplimiento de Marca)**: Inclusión obligatoria de créditos editoriales en pie de página para `@republicaraquista • Jorge Leonardo Loreto` y atribución metodológica a Thomas Nestico (@TJStats).
+- **RF-09 (Atribución y Cumplimiento de Marca Thomas Nestico)**: Inclusión obligatoria de créditos editoriales en pie de página con doble bloque: izquierda con República Caraquista y `@republicaraquista • Jorge Leonardo Loreto`; derecha con `Diseño inspirado en Thomas Nestico (@TJStats)` y origen de datos (`Data: MLB Stats API / Gameday PBP` o `Data: MLB Statcast / Baseball Savant`).
 - **RF-10 (Selector de Modo Temporal)**: Selector conmutador de alta visibilidad entre "Salida Individual" (un juego) y "Temporada Completa", recalculando automáticamente las métricas agregadas (IP acumuladas, ERA, WHIP, consolidación de la tabla de destinos o repertorio, y proyecciones de volumen) sin recargar la página.
 
 ---
