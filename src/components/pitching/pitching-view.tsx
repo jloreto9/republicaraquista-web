@@ -12,8 +12,9 @@ import { PitchingSearch } from "./pitching-search";
 import { PitchingHeader } from "./pitching-header";
 import { PBPPanel } from "./pbp-panel";
 import { StatcastPanel } from "./statcast-panel";
+import { PitchingCardViewer } from "./pitching-card-viewer";
 import { downloadPitchingCard } from "@/lib/pitch-card-canvas";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Sparkles, BarChart3 } from "lucide-react";
 
 export function PitchingView() {
   const [selectedPitcher, setSelectedPitcher] = useState<PitcherProfile>(
@@ -21,6 +22,7 @@ export function PitchingView() {
   );
   const [branch, setBranch] = useState<"lvbp" | "mlb">("lvbp");
   const [timeMode, setTimeMode] = useState<TimeMode>("game");
+  const [activeTab, setActiveTab] = useState<"card" | "telemetry">("card");
   const [season, setSeason] = useState<number>(2025);
   const [phase, setPhase] = useState<string>("all");
 
@@ -121,38 +123,38 @@ export function PitchingView() {
     };
   }, [timeMode, selectedGamePk, selectedPitcher?.id, season, branch, phase]);
 
-  // 3. Manejador de descarga de tarjeta HD
-  const handleDownloadCard = async () => {
-    if (!gameData || !selectedPitcher) return;
-    const currentLog: PitcherGameLog =
-      timeMode === "season"
-        ? {
-            gamePk: 0,
-            date: `Temporada ${season}`,
-            opponent: "Todos los Rivales",
-            isStarter: gameData.isStarter,
-            role: "Temporada",
-            gameType: phase,
-            phase: phase,
-            ip: gameData.boxscore.ip,
-            h: gameData.boxscore.h,
-            r: gameData.boxscore.r,
-            er: gameData.boxscore.er,
-            bb: gameData.boxscore.bb,
-            so: gameData.boxscore.so,
-            hr: 0,
-            pitches: gameData.boxscore.pitches,
-            strikes: gameData.boxscore.strikes,
-            era: gameData.boxscore.era || "0.00",
-            decision: (gameData.decision as any) || "",
-            league: branch === "lvbp" ? "LVBP" : "MLB",
-          }
-        : gameLogs.find((l) => l.gamePk === selectedGamePk) || gameLogs[0];
-    if (!currentLog) return;
+  // 3. Obtener el GameLog activo (salida individual o temporada consolidada)
+  const activeGameLog: PitcherGameLog | undefined =
+    timeMode === "season"
+      ? {
+          gamePk: 0,
+          date: `Temporada ${season}`,
+          opponent: "Todos los Rivales",
+          isStarter: gameData?.isStarter ?? false,
+          role: "Temporada",
+          gameType: phase,
+          phase: phase,
+          ip: gameData?.boxscore.ip || "0.0",
+          h: gameData?.boxscore.h || 0,
+          r: gameData?.boxscore.r || 0,
+          er: gameData?.boxscore.er || 0,
+          bb: gameData?.boxscore.bb || 0,
+          so: gameData?.boxscore.so || 0,
+          hr: 0,
+          pitches: gameData?.boxscore.pitches || 0,
+          strikes: gameData?.boxscore.strikes || 0,
+          era: gameData?.boxscore.era || "0.00",
+          decision: (gameData?.decision as any) || "",
+          league: branch === "lvbp" ? "LVBP" : "MLB",
+        }
+      : gameLogs.find((l) => l.gamePk === selectedGamePk) || gameLogs[0];
 
+  // 4. Manejador de descarga de tarjeta HD
+  const handleDownloadCard = async () => {
+    if (!gameData || !selectedPitcher || !activeGameLog) return;
     setIsDownloadingCard(true);
     try {
-      await downloadPitchingCard(gameData, selectedPitcher, currentLog, branch);
+      await downloadPitchingCard(gameData, selectedPitcher, activeGameLog, branch);
     } catch (err) {
       console.error("Error generating pitch card:", err);
     } finally {
@@ -192,6 +194,33 @@ export function PitchingView() {
         isDownloadingCard={isDownloadingCard}
       />
 
+      {/* Pestañas de Navegación idénticas a Streamlit (RepubliCaraquistApp) */}
+      <div className="flex border-b border-[#1E2B4D] gap-2 pt-2">
+        <button
+          onClick={() => setActiveTab("card")}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === "card"
+              ? "border-[#FDB827] text-[#FDB827] bg-[#0D152B]/80 shadow-sm"
+              : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#0D152B]/30"
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>🎨 Tarjeta HD Oficial (Thomas Nestico)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("telemetry")}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === "telemetry"
+              ? "border-[#FDB827] text-[#FDB827] bg-[#0D152B]/80 shadow-sm"
+              : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#0D152B]/30"
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>📊 Telemetría & Gráficos Interactivos</span>
+        </button>
+      </div>
+
       {/* Content Area */}
       {isLoadingLogs || isLoadingData ? (
         <div className="min-h-[400px] flex flex-col items-center justify-center bg-[#0D152B]/40 rounded-2xl border border-[#1E2B4D]">
@@ -208,16 +237,23 @@ export function PitchingView() {
             Prueba seleccionando otra salida o cambiando de temporada.
           </span>
         </div>
-      ) : !gameData || gameLogs.length === 0 ? (
+      ) : !gameData || (timeMode === "game" && gameLogs.length === 0) || !activeGameLog ? (
         <div className="min-h-[300px] flex flex-col items-center justify-center bg-[#0D152B]/40 rounded-2xl border border-[#1E2B4D] p-6 text-center">
           <span className="text-2xl mb-2">⚾</span>
           <h4 className="text-sm font-bold text-slate-200">
             Sin salidas registradas en esta temporada ({season})
           </h4>
           <p className="text-xs text-slate-400 max-w-md mt-1">
-            {selectedPitcher.name} no presenta apariciones con {branch === "lvbp" ? "en la LVBP" : "en MLB"} para el año seleccionado. Intenta cambiar de año o alternar entre la rama LVBP y MLB.
+            {selectedPitcher.name} no presenta apariciones {branch === "lvbp" ? "en la LVBP" : "en MLB"} para el año seleccionado. Intenta cambiar de año o alternar entre la rama LVBP y MLB.
           </p>
         </div>
+      ) : activeTab === "card" ? (
+        <PitchingCardViewer
+          data={gameData}
+          pitcher={selectedPitcher}
+          gameLog={activeGameLog}
+          branch={branch}
+        />
       ) : branch === "lvbp" ? (
         <PBPPanel data={gameData} pitcherName={selectedPitcher.name} />
       ) : (
