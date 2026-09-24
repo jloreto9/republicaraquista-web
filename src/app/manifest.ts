@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "República Caraquista • Plataforma Sabermétrica",
-    short_name: "Caraquista",
+    name: "REPUBLICARAQUISTAPP",
+    short_name: "REPUBLICARAQUISTAPP",
     description:
       "Analítica deportiva moderna, sabermetría avanzada y seguimiento oficial de los Leones del Caracas y la LVBP.",
     start_url: "/",

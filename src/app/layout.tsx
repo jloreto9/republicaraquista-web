@@ -24,14 +24,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "República Caraquista • Plataforma Sabermétrica LVBP",
+  title: "REPUBLICARAQUISTAPP • Plataforma Sabermétrica LVBP",
   description:
     "Analítica deportiva moderna, sabermetría avanzada y seguimiento de Leones del Caracas en la LVBP.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Caraquista",
+    title: "REPUBLICARAQUISTAPP",
   },
   icons: {
     icon: [
