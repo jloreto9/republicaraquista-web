@@ -52,7 +52,10 @@ flowchart TD
 - **Tabla de Posiciones Oficial:** JJ, G, P, PCT, DIF, Carreras Anotadas (CA), Carreras Permitidas (CP), Diferencial (+/-), Casa, Visita, Racha y L10.
 - **Expectativa Pitagórica ($xW$ / $xL$):** Proyección sabermétrica canónica de victorias basada en el diferencial de carreras con exponente $1.83$:
   $$xPCT = \frac{CA^{1.83}}{CA^{1.83} + CP^{1.83}}$$
-- **Power Rankings ELO:** Rating dinámico de poder relativo de las 8 franquicias de la LVBP con base en 1500 puntos.
+### 3. Endpoints de la API REST (`/api/*`)
+- **`GET /api/standings`**: Retorna la tabla de posiciones calculada a partir de los 224 juegos disputados en la temporada regular 2025. Parámetros opcionales: `season` (ej. 2025) y `phase` (`regular`, `round_robin`, `final`, `all`).
+- **`GET /api/games`**: Retorna los marcadores y encuentros oficiales más recientes. Parámetros opcionales: `season` y `limit`.
+- **`GET /api/kpis`**: Retorna el resumen de temporada sabermétrico de Leones del Caracas (W-L, racha, diferencial de carreras, récord Día vs Noche).
 
 ---
 
