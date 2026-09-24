@@ -13,6 +13,7 @@ import { PitchingHeader } from "./pitching-header";
 import { PBPPanel } from "./pbp-panel";
 import { StatcastPanel } from "./statcast-panel";
 import { PitchingCardViewer } from "./pitching-card-viewer";
+import { PitchingGameLogsTable } from "./pitching-game-logs-table";
 import { downloadPitchingCard } from "@/lib/pitch-card-canvas";
 import { Loader2, AlertCircle, Sparkles, BarChart3 } from "lucide-react";
 
@@ -154,7 +155,7 @@ export function PitchingView() {
     if (!gameData || !selectedPitcher || !activeGameLog) return;
     setIsDownloadingCard(true);
     try {
-      await downloadPitchingCard(gameData, selectedPitcher, activeGameLog, branch);
+      await downloadPitchingCard(gameData, selectedPitcher, activeGameLog, branch, gameLogs);
     } catch (err) {
       console.error("Error generating pitch card:", err);
     } finally {
@@ -247,17 +248,34 @@ export function PitchingView() {
             {selectedPitcher.name} no presenta apariciones {branch === "lvbp" ? "en la LVBP" : "en MLB"} para el año seleccionado. Intenta cambiar de año o alternar entre la rama LVBP y MLB.
           </p>
         </div>
-      ) : activeTab === "card" ? (
-        <PitchingCardViewer
-          data={gameData}
-          pitcher={selectedPitcher}
-          gameLog={activeGameLog}
-          branch={branch}
-        />
-      ) : branch === "lvbp" ? (
-        <PBPPanel data={gameData} pitcherName={selectedPitcher.name} />
       ) : (
-        <StatcastPanel data={gameData} pitcherName={selectedPitcher.name} />
+        <div className="flex flex-col items-center w-full space-y-8">
+          {activeTab === "card" ? (
+            <PitchingCardViewer
+              data={gameData}
+              pitcher={selectedPitcher}
+              gameLog={activeGameLog}
+              branch={branch}
+              gameLogs={gameLogs}
+            />
+          ) : branch === "lvbp" ? (
+            <PBPPanel data={gameData} pitcherName={selectedPitcher.name} />
+          ) : (
+            <StatcastPanel data={gameData} pitcherName={selectedPitcher.name} />
+          )}
+
+          {/* Sección de Historial de Salidas / Últimos 10 Juegos con Rol Destacado (idéntico a Streamlit) */}
+          <PitchingGameLogsTable
+            gameLogs={gameLogs}
+            selectedGamePk={timeMode === "game" ? selectedGamePk : undefined}
+            onSelectGamePk={(pk) => {
+              if (timeMode !== "game") setTimeMode("game");
+              setSelectedGamePk(pk);
+            }}
+            title="Historial de Salidas del Período (Últimos 10 Juegos)"
+            maxRows={10}
+          />
+        </div>
       )}
     </div>
   );

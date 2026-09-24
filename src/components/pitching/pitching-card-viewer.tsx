@@ -10,6 +10,7 @@ interface PitchingCardViewerProps {
   pitcher: PitcherProfile;
   gameLog: PitcherGameLog;
   branch: "lvbp" | "mlb";
+  gameLogs?: PitcherGameLog[];
 }
 
 export function PitchingCardViewer({
@@ -17,6 +18,7 @@ export function PitchingCardViewer({
   pitcher,
   gameLog,
   branch,
+  gameLogs = [],
 }: PitchingCardViewerProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isRendering, setIsRendering] = useState(true);
@@ -26,7 +28,7 @@ export function PitchingCardViewer({
     let active = true;
     setIsRendering(true);
 
-    generatePitchingCardBlob(data, pitcher, gameLog, branch)
+    generatePitchingCardBlob(data, pitcher, gameLog, branch, gameLogs)
       .then((blob) => {
         if (!active) return;
         if (blob) {
@@ -46,12 +48,12 @@ export function PitchingCardViewer({
     return () => {
       active = false;
     };
-  }, [data, pitcher, gameLog, branch]);
+  }, [data, pitcher, gameLog, branch, gameLogs]);
 
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
-      await downloadPitchingCard(data, pitcher, gameLog, branch);
+      await downloadPitchingCard(data, pitcher, gameLog, branch, gameLogs);
     } finally {
       setIsDownloading(false);
     }
