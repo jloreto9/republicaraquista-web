@@ -53,7 +53,7 @@ export function PitchingTable({ stats }: PitchingTableProps) {
   return (
     <div className="rounded-xl bg-[#0D152B] border border-[#1E2B4D] overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
+        <table className="w-full text-left text-xs min-w-[760px]">
           <thead>
             <tr className="bg-[#070B19]/70 text-slate-400 font-mono border-b border-[#1E2B4D] text-[11px]">
               <th className="py-3 px-3 text-center w-10">#</th>

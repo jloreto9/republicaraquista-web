@@ -45,13 +45,15 @@ export function KPISummary({ kpis }: KPISummaryProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
       {cards.map((card, i) => {
         const Icon = card.icon;
         return (
           <div
             key={i}
-            className={`p-4 rounded-xl border transition-all ${
+            className={`p-3 sm:p-4 rounded-xl border transition-all ${
+              i === 0 ? "col-span-2 sm:col-span-1" : "col-span-1"
+            } ${
               card.highlight
                 ? "bg-[#0D152B] border-[#FDB827]/40 shadow-[0_0_20px_-5px_rgba(253,184,39,0.15)]"
                 : "bg-[#0D152B]/80 border-[#1E2B4D] hover:border-[#1E2B4D]/80"

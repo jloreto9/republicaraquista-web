@@ -23,7 +23,7 @@ export default async function DashboardPage() {
         season={2025}
       />
 
-      <main className="flex-1 p-6 space-y-6 max-w-7xl w-full mx-auto">
+      <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
         {/* Resumen de Temporada (KPIs) */}
         <section className="space-y-2">
           <div className="flex items-center justify-between">

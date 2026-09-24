@@ -17,21 +17,21 @@ export function Header({
   const caracas = getTeam(695);
 
   return (
-    <header className="h-16 border-b border-[#1E2B4D] bg-[#070B19]/90 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
+    <header className="min-h-14 sm:h-16 border-b border-[#1E2B4D] bg-[#070B19]/90 backdrop-blur-md px-4 sm:px-6 py-2.5 sm:py-0 flex items-center justify-between sticky top-0 z-20">
       <div className="flex items-center space-x-3">
         <div>
-          <h1 className="text-base font-bold text-slate-100 tracking-tight flex items-center gap-2">
+          <h1 className="text-sm sm:text-base font-bold text-slate-100 tracking-tight flex items-center gap-2">
             {title}
           </h1>
           {subtitle && (
-            <p className="text-xs text-slate-400 font-normal">{subtitle}</p>
+            <p className="text-[11px] sm:text-xs text-slate-400 font-normal line-clamp-1">{subtitle}</p>
           )}
         </div>
       </div>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
         {/* Status Pill */}
-        <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-[#0D152B] border border-[#1E2B4D] text-xs">
+        <div className="hidden sm:flex items-center space-x-2 px-3 py-1 rounded-full bg-[#0D152B] border border-[#1E2B4D] text-xs">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           <span className="text-slate-300 font-mono text-[11px]">
             Temporada {season} (2025-26)

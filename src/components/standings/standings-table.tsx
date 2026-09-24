@@ -34,7 +34,7 @@ export function StandingsTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
+        <table className="w-full text-left text-xs min-w-[720px]">
           <thead>
             <tr className="bg-[#070B19]/60 text-slate-400 font-mono border-b border-[#1E2B4D] text-[11px]">
               <th className="py-3 px-4 font-semibold text-center w-12">POS</th>
