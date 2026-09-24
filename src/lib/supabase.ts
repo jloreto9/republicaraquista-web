@@ -57,14 +57,27 @@ interface RawPitchingRow {
   games?: { season?: number | null; game_type?: string | null } | null;
 }
 
-const supabaseUrl =
+function sanitizeSupabaseUrl(url?: string): string {
+  if (!url) return "";
+  let clean = url.trim();
+  // Quitar trailing slashes
+  clean = clean.replace(/\/+$/, "");
+  // Quitar /rest/v1 o /rest si fue pegado accidentalmente
+  clean = clean.replace(/\/rest\/v1\/?$/, "").replace(/\/rest\/?$/, "");
+  return clean.replace(/\/+$/, "");
+}
+
+const rawSupabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   process.env.SUPABASE_URL ||
   "";
-const supabaseAnonKey =
+const supabaseUrl = sanitizeSupabaseUrl(rawSupabaseUrl);
+
+const supabaseAnonKey = (
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   process.env.SUPABASE_KEY ||
-  "";
+  ""
+).trim();
 
 export const supabase =
   supabaseUrl && supabaseAnonKey
@@ -78,9 +91,8 @@ export async function getStandings(
   season = 2025,
   phase = "regular"
 ): Promise<TeamStanding[]> {
-  if (!supabase) {
-    console.warn("Supabase no configurado; retornando standings base.");
-    return LVBP_TEAM_IDS.map((teamId) => {
+  const defaultStandings = () =>
+    LVBP_TEAM_IDS.map((teamId) => {
       const team = getTeam(teamId);
       return {
         teamId,
@@ -105,6 +117,10 @@ export async function getStandings(
         eloRating: 1500,
       };
     });
+
+  if (!supabase) {
+    console.warn("Supabase no configurado; retornando standings base.");
+    return defaultStandings();
   }
 
   const phaseTypeMap: Record<string, string[]> = {
@@ -123,7 +139,8 @@ export async function getStandings(
     .in("game_type", gameTypes);
 
   if (error) {
-    throw new Error(`Error en consulta de juegos de Supabase: ${error.message}`);
+    console.error("Error en consulta de juegos de Supabase:", error);
+    return defaultStandings();
   }
 
   const games = (rawGames || []) as SupabaseGameRow[];
@@ -304,7 +321,8 @@ export async function getRecentGames(
     .limit(limit);
 
   if (error) {
-    throw new Error(`Error en consulta de juegos recientes: ${error.message}`);
+    console.error("Error en consulta de juegos recientes:", error);
+    return [];
   }
 
   const games = (rawGames || []) as SupabaseGameRow[];
