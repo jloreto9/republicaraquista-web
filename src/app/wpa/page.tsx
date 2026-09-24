@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { Header } from "@/components/layout/header";
 import { WpaView } from "@/components/wpa/wpa-view";
 import { processGameWpa, getSeasonWpaLeaders, LEONES_KEY_GAMES } from "@/lib/wpa-engine";
 
@@ -15,8 +16,16 @@ export default async function WpaPage() {
   const seasonLeaders = getSeasonWpaLeaders();
 
   return (
-    <div className="space-y-6">
-      <WpaView initialGameData={initialGameData} seasonLeaders={seasonLeaders} />
+    <div className="flex-1 flex flex-col min-h-screen">
+      <Header
+        title="Win Expectancy & WPA"
+        subtitle="Probabilidad de Victoria • Matriz Tango RE24 • Apalancamiento (Leverage Index)"
+        season={2025}
+      />
+
+      <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
+        <WpaView initialGameData={initialGameData} seasonLeaders={seasonLeaders} />
+      </main>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { Header } from "@/components/layout/header";
 import { getCollectiveStats } from "@/lib/collective";
 import { ColectivasView } from "@/components/colectivas/colectivas-view";
 
@@ -14,18 +15,16 @@ export default async function ColectivasPage() {
   const stats = await getCollectiveStats(2025, "R");
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col space-y-1">
-        <h1 className="text-xl md:text-2xl font-black tracking-tight text-slate-100 flex items-center space-x-2">
-          <span>ESTADÍSTICAS COLECTIVAS</span>
-          <span className="text-[#FDB827]">LVBP</span>
-        </h1>
-        <p className="text-xs text-slate-400">
-          Rendimiento consolidado de los 8 equipos en bateo, rotación monticular y solvencia defensiva.
-        </p>
-      </div>
+    <div className="flex-1 flex flex-col min-h-screen">
+      <Header
+        title="Estadísticas Colectivas"
+        subtitle="Comparativa de los 8 Equipos • Bateo, Pitcheo y Fildeo LVBP"
+        season={2025}
+      />
 
-      <ColectivasView initialData={stats} season={2025} initialPhase="R" />
+      <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
+        <ColectivasView initialData={stats} season={2025} initialPhase="R" />
+      </main>
     </div>
   );
 }

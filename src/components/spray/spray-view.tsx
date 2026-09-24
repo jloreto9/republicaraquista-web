@@ -61,18 +61,11 @@ export function SprayView({
 
   return (
     <div className="space-y-6">
-      {/* Header y Selector de Bateador */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-        <div>
-          <div className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-[#FDB827]" />
-            <h1 className="text-xl font-bold text-slate-100">
-              Spray Charts & Strike Zone
-            </h1>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Gráficos espaciales en diamante con modelo determinístico de dureza BIS y mapas de disciplina en el plato 3x3.
-          </p>
+      {/* Selector de Bateador y Control */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+          <Target className="w-4 h-4 text-[#FDB827]" />
+          <span>Filtro de Telemetría por Bateador</span>
         </div>
 
         {/* Selector de Bateador */}

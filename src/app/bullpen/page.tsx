@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { Header } from "@/components/layout/header";
 import { getBullpenAndLineups } from "@/lib/bullpen";
 import { BullpenView } from "@/components/bullpen/bullpen-view";
 
@@ -14,18 +15,16 @@ export default async function BullpenPage() {
   const data = getBullpenAndLineups(2025, 695);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col space-y-1">
-        <h1 className="text-xl md:text-2xl font-black tracking-tight text-slate-100 flex items-center space-x-2">
-          <span>BULLPEN & TRACKER</span>
-          <span className="text-[#FDB827]">LINEUPS 1-9</span>
-        </h1>
-        <p className="text-xs text-slate-400">
-          Analítica de corredores heredados (IR/IRS) y seguimiento sistemático de combinaciones titulares y orden al bate.
-        </p>
-      </div>
+    <div className="flex-1 flex flex-col min-h-screen">
+      <Header
+        title="Bullpen & Lineups"
+        subtitle="Herencia de Corredores (IR/IRS) • Dugout Scorecard 1-9 • Matriz de Alineaciones"
+        season={2025}
+      />
 
-      <BullpenView initialData={data} season={2025} />
+      <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
+        <BullpenView initialData={data} season={2025} />
+      </main>
     </div>
   );
 }

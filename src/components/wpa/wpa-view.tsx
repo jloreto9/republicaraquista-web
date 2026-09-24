@@ -70,18 +70,11 @@ export function WpaView({ initialGameData, seasonLeaders }: WpaViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header y Selector de Partido */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-        <div>
-          <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-[#FDB827]" />
-            <h1 className="text-xl font-bold text-slate-100">
-              Win Expectancy & WPA
-            </h1>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Probabilidad de victoria jugada por jugada, modelo Tango RE24 de 24 estados y apalancamiento (Leverage Index).
-          </p>
+      {/* Selector de Partido y Control */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+          <Activity className="w-4 h-4 text-[#FDB827]" />
+          <span>Análisis de Probabilidad por Partido</span>
         </div>
 
         {/* Selector de Juego */}

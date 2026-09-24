@@ -33,18 +33,6 @@ export function SituacionalView({ initialData }: SituacionalViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="p-5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-        <div className="flex items-center gap-2">
-          <PieChart className="w-5 h-5 text-[#FDB827]" />
-          <h1 className="text-xl font-bold text-slate-100">
-            Splits Situacionales & LOB Tracker
-          </h1>
-        </div>
-        <p className="text-xs text-slate-400 mt-1">
-          Rendimiento en situaciones de presión (RISP, Clutch, Bases Llenas), rastreo de corredores dejados en base (LOB Tracker) y enfrentamientos cara a cara BvP.
-        </p>
-      </div>
 
       {/* 4 KPIs Clave */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
