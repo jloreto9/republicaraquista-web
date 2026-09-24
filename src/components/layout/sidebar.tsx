@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 const navigationItems = [
   { name: "Centro de Mando", href: "/", icon: LayoutDashboard },
   { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
-  { name: "Líderes Individuales", href: "/individuales", icon: Users, badge: "Fase 2" },
+  { name: "Líderes Individuales", href: "/individuales", icon: Users },
   { name: "Estadísticas Colectivas", href: "/colectivas", icon: BarChart3, badge: "Fase 4" },
   { name: "Matchup 360 (H2H)", href: "/matchup", icon: GitCompare, badge: "Fase 3" },
   { name: "Win Expectancy & WPA", href: "/wpa", icon: Activity, badge: "Fase 5" },

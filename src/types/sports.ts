@@ -66,3 +66,74 @@ export interface SeasonKPIs {
   nightWins: number;
   nightLosses: number;
 }
+
+export interface BattingStats {
+  playerId: number;
+  playerName: string;
+  playerAvatar: string;
+  teamId: number;
+  teamName: string;
+  teamAbbr: string;
+  teamLogo: string;
+  games: number;
+  atBats: number;
+  runs: number;
+  hits: number;
+  doubles: number;
+  triples: number;
+  homeRuns: number;
+  rbi: number;
+  walks: number;
+  strikeouts: number;
+  stolenBases: number;
+  caughtStealing: number;
+  avg: number;
+  obp: number;
+  slg: number;
+  ops: number;
+  iso: number;
+  babip: number;
+}
+
+export interface PitchingStats {
+  playerId: number;
+  playerName: string;
+  playerAvatar: string;
+  teamId: number;
+  teamName: string;
+  teamAbbr: string;
+  teamLogo: string;
+  games: number;
+  gamesStarted: number;
+  inningsPitched: number;
+  inningsDisplay: string;
+  hits: number;
+  runs: number;
+  earnedRuns: number;
+  walks: number;
+  strikeouts: number;
+  homeRuns: number;
+  era: number;
+  whip: number;
+  kPer9: number;
+  bbPer9: number;
+  kToBb: number;
+}
+
+export interface FieldingStats {
+  playerId: number;
+  playerName: string;
+  playerAvatar: string;
+  teamId: number;
+  teamName: string;
+  teamAbbr: string;
+  teamLogo: string;
+  position: string;
+  games: number;
+  putouts: number;
+  assists: number;
+  errors: number;
+  totalChances: number;
+  fieldingPct: number;
+  doublePlays: number;
+}
