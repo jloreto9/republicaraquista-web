@@ -62,7 +62,7 @@ export function IndividualesView({
     return () => {
       isMounted = false;
     };
-  }, [activeTab, selectedPhase, selectedTeam]);
+  }, [activeTab, selectedPhase, selectedTeam, pitchingStats.length]);
 
   return (
     <div className="space-y-6">

@@ -1,5 +1,5 @@
 import { SeasonKPIs } from "@/types/sports";
-import { Trophy, TrendingUp, Sun, Moon, Flame } from "lucide-react";
+import { Trophy, TrendingUp, Sun, Flame } from "lucide-react";
 
 interface KPISummaryProps {
   kpis: SeasonKPIs;

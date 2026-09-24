@@ -22,6 +22,41 @@ interface SupabaseGameRow {
   is_day_game?: boolean;
 }
 
+interface RawBattingRow {
+  player_id: number;
+  team_id: number;
+  ab?: number | null;
+  r?: number | null;
+  h?: number | null;
+  doubles?: number | null;
+  triples?: number | null;
+  hr?: number | null;
+  rbi?: number | null;
+  bb?: number | null;
+  so?: number | null;
+  sb?: number | null;
+  cs?: number | null;
+  hbp?: number | null;
+  sf?: number | null;
+  sh?: number | null;
+  players?: { full_name?: string | null } | null;
+  games?: { season?: number | null; game_type?: string | null } | null;
+}
+
+interface RawPitchingRow {
+  player_id: number;
+  team_id: number;
+  ip_decimal?: number | null;
+  h?: number | null;
+  r?: number | null;
+  er?: number | null;
+  bb?: number | null;
+  so?: number | null;
+  hr?: number | null;
+  players?: { full_name?: string | null } | null;
+  games?: { season?: number | null; game_type?: string | null } | null;
+}
+
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   process.env.SUPABASE_URL ||
@@ -44,9 +79,32 @@ export async function getStandings(
   phase = "regular"
 ): Promise<TeamStanding[]> {
   if (!supabase) {
-    throw new Error(
-      "Credenciales de Supabase no configuradas. Por favor define NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY."
-    );
+    console.warn("Supabase no configurado; retornando standings base.");
+    return LVBP_TEAM_IDS.map((teamId) => {
+      const team = getTeam(teamId);
+      return {
+        teamId,
+        teamName: team.name,
+        abbreviation: team.abbreviation,
+        logoUrl: team.logoUrl,
+        gamesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        pct: 0,
+        gamesBack: 0,
+        runsScored: 0,
+        runsAllowed: 0,
+        runDifferential: 0,
+        homeRecord: "0-0",
+        awayRecord: "0-0",
+        streak: "-",
+        last10: "0-0",
+        pythagoreanPct: 0.5,
+        expectedWins: 0,
+        expectedLosses: 0,
+        eloRating: 1500,
+      };
+    });
   }
 
   const phaseTypeMap: Record<string, string[]> = {
@@ -233,9 +291,8 @@ export async function getRecentGames(
   limit = 8
 ): Promise<GameSummary[]> {
   if (!supabase) {
-    throw new Error(
-      "Credenciales de Supabase no configuradas. Define NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY."
-    );
+    console.warn("Supabase no configurado; retornando juegos vacíos.");
+    return [];
   }
 
   const { data: rawGames, error } = await supabase
@@ -346,7 +403,8 @@ export async function getBattingStats(
   minAb = 10
 ): Promise<BattingStats[]> {
   if (!supabase) {
-    throw new Error("Supabase client no configurado.");
+    console.warn("Supabase no configurado; retornando bateo vacío.");
+    return [];
   }
 
   let query = supabase
@@ -368,7 +426,7 @@ export async function getBattingStats(
 
   if (error) {
     console.error("Error al consultar batting_stats:", error);
-    throw new Error(`Error en batting_stats: ${error.message}`);
+    return [];
   }
 
   if (!rawData || rawData.length === 0) {
@@ -400,7 +458,7 @@ export async function getBattingStats(
     }
   > = {};
 
-  rawData.forEach((row: any) => {
+  (rawData as unknown as RawBattingRow[]).forEach((row: RawBattingRow) => {
     const pId = Number(row.player_id);
     const pName = row.players?.full_name || "Desconocido";
     const tId = Number(row.team_id);
@@ -517,7 +575,8 @@ export async function getPitchingStats(
   minIp = 3.0
 ): Promise<PitchingStats[]> {
   if (!supabase) {
-    throw new Error("Supabase client no configurado.");
+    console.warn("Supabase no configurado; retornando pitcheo vacío.");
+    return [];
   }
 
   let query = supabase
@@ -539,7 +598,7 @@ export async function getPitchingStats(
 
   if (error) {
     console.error("Error al consultar pitching_stats:", error);
-    throw new Error(`Error en pitching_stats: ${error.message}`);
+    return [];
   }
 
   if (!rawData || rawData.length === 0) {
@@ -564,7 +623,7 @@ export async function getPitchingStats(
     }
   > = {};
 
-  rawData.forEach((row: any) => {
+  (rawData as unknown as RawPitchingRow[]).forEach((row: RawPitchingRow) => {
     const pId = Number(row.player_id);
     const pName = row.players?.full_name || "Desconocido";
     const tId = Number(row.team_id);
