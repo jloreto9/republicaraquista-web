@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { PitchingStats } from "@/types/sports";
 import { ArrowUpDown } from "lucide-react";
 
@@ -187,9 +188,18 @@ export function PitchingTable({ stats }: PitchingTableProps) {
                           }}
                         />
                       </div>
-                      <span className={isCaracas ? "text-[#FDB827]" : "text-slate-100"}>
-                        {pitcher.playerName}
-                      </span>
+                      <Link
+                        href="/pitching"
+                        title={`Ver Pitching Summary de ${pitcher.playerName}`}
+                        className={`hover:underline flex items-center gap-1 group ${
+                          isCaracas ? "text-[#FDB827]" : "text-slate-100"
+                        }`}
+                      >
+                        <span>{pitcher.playerName}</span>
+                        <span className="text-[10px] text-slate-400 opacity-50 group-hover:opacity-100 group-hover:text-[#FDB827]">
+                          ↗
+                        </span>
+                      </Link>
                     </div>
                   </td>
                   <td className="py-2.5 px-2 text-center">

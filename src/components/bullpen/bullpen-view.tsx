@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Shield,
   ClipboardList,
@@ -247,7 +248,16 @@ export function BullpenView({ initialData, season = 2025 }: BullpenViewProps) {
                     {data.bullpen.relievers.map((r) => (
                       <tr key={r.pitcherName} className="hover:bg-white/[0.02]">
                         <td className="py-2.5 px-3 font-semibold text-slate-100 truncate">
-                          {r.pitcherName}
+                          <Link
+                            href="/pitching"
+                            title={`Ver Pitching Summary de ${r.pitcherName}`}
+                            className="hover:underline hover:text-[#FDB827] inline-flex items-center gap-1 group"
+                          >
+                            <span>{r.pitcherName}</span>
+                            <span className="text-[10px] text-slate-400 opacity-50 group-hover:opacity-100 group-hover:text-[#FDB827]">
+                              ↗
+                            </span>
+                          </Link>
                         </td>
                         <td className="py-2.5 px-2 text-center text-slate-400">
                           {r.appearances}
