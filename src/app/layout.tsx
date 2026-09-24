@@ -18,7 +18,15 @@ export const metadata: Metadata = {
   description:
     "Analítica deportiva moderna, sabermetría avanzada y seguimiento de Leones del Caracas en la LVBP.",
   icons: {
-    icon: "/assets/logo.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "192x192" },
+      { url: "/assets/logo.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+    shortcut: ["/favicon.ico"],
   },
 };
 
