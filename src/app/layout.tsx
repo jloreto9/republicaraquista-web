@@ -4,6 +4,7 @@ import "./globals.css";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { PWARegister } from "@/components/pwa-register";
+import { Footer } from "@/components/layout/footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,7 +27,15 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "REPUBLICARAQUISTAPP • Plataforma Sabermétrica LVBP",
   description:
-    "Analítica deportiva moderna, sabermetría avanzada y seguimiento de Leones del Caracas en la LVBP.",
+    "Analítica deportiva moderna, sabermetría avanzada y seguimiento oficial de Leones del Caracas en la LVBP.",
+  authors: [
+    {
+      name: "Jorge Leonardo Loreto",
+      url: "https://github.com/jloreto9",
+    },
+  ],
+  creator: "Jorge Leonardo Loreto",
+  publisher: "Jorge Leonardo Loreto • República Caraquista",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -59,8 +68,11 @@ export default function RootLayout({
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
           <MobileNav />
-          <div className="flex-1 min-w-0 overflow-y-auto pb-20 lg:pb-0">
-            {children}
+          <div className="flex-1 min-w-0 overflow-y-auto pb-20 lg:pb-0 flex flex-col">
+            <div className="flex-1">
+              {children}
+            </div>
+            <Footer />
           </div>
         </div>
       </body>

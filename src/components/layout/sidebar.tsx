@@ -97,14 +97,23 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer Info */}
-      <div className="p-4 border-t border-[#1E2B4D] bg-[#070B19]/80">
+      {/* Footer Info & Credits */}
+      <div className="p-4 border-t border-[#1E2B4D] bg-[#070B19]/80 space-y-2">
         <div className="flex items-center justify-between text-[11px] text-slate-400">
           <span>Temporada LVBP</span>
           <span className="font-mono text-[#FDB827] font-semibold">2025-26</span>
         </div>
-        <div className="text-[10px] text-slate-500 mt-1">
-          Next.js • Edge Vercel • Supabase
+        <div className="pt-2 border-t border-[#1E2B4D]/60 flex flex-col">
+          <span className="text-[10px] text-slate-400 font-medium">
+            Desarrollado y modelado por:
+          </span>
+          <span className="text-xs font-bold text-slate-100 flex items-center gap-1.5 mt-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#FDB827]"></span>
+            Jorge Leonardo Loreto
+          </span>
+          <span className="text-[10px] text-[#FDB827]/80 font-mono mt-0.5">
+            @republicaraquista
+          </span>
         </div>
       </div>
     </aside>

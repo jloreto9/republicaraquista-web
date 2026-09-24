@@ -146,11 +146,23 @@ export function MobileNav() {
           })}
         </nav>
 
-        {/* Footer del Drawer */}
-        <div className="p-4 border-t border-[#1E2B4D] bg-[#0D152B]/40">
+        {/* Footer del Drawer con Créditos */}
+        <div className="p-4 border-t border-[#1E2B4D] bg-[#0D152B]/40 space-y-2">
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
             <span>Temporada 2025-26</span>
-            <span className="text-[#FDB827]">PWA App</span>
+            <span className="text-[#FDB827]">REPUBLICARAQUISTAPP</span>
+          </div>
+          <div className="pt-2 border-t border-[#1E2B4D]/60 flex flex-col">
+            <span className="text-[10px] text-slate-400 font-medium">
+              Desarrollado y modelado por:
+            </span>
+            <span className="text-xs font-bold text-slate-100 flex items-center gap-1.5 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FDB827]"></span>
+              Jorge Leonardo Loreto
+            </span>
+            <span className="text-[10px] text-[#FDB827]/80 font-mono mt-0.5">
+              @republicaraquista • Sabermetría
+            </span>
           </div>
         </div>
       </div>
