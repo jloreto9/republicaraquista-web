@@ -35,6 +35,8 @@ export interface PitcherGameLog {
   era: string;
   decision: "W" | "L" | "SV" | "HLD" | "";
   league: "LVBP" | "MLB" | "MiLB";
+  cswPct?: string;
+  whiffPct?: string;
 }
 
 export interface PitchDetail {

@@ -63,7 +63,9 @@ export function PitchingGameLogsTable({
               <th className="py-2.5 px-2">CL</th>
               <th className="py-2.5 px-2">BB</th>
               <th className="py-2.5 px-2">K</th>
-              <th className="py-2.5 px-3 text-right">Pitcheos (S-B)</th>
+              <th className="py-2.5 px-3">Pitcheos (S-B)</th>
+              <th className="py-2.5 px-2 text-[#FDB827]">CSW%</th>
+              <th className="py-2.5 px-2 text-blue-400">Whiff%</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#1E2B4D]/50 text-slate-200 font-mono">
@@ -129,11 +131,17 @@ export function PitchingGameLogsTable({
                   <td className="py-2.5 px-2">{log.er}</td>
                   <td className="py-2.5 px-2">{log.bb}</td>
                   <td className="py-2.5 px-2 text-emerald-400 font-bold">{log.so}</td>
-                  <td className="py-2.5 px-3 text-right">
+                  <td className="py-2.5 px-3">
                     <span>{log.pitches}</span>
                     <span className="text-[10px] text-slate-400 ml-1">
                       ({strikes}-{balls})
                     </span>
+                  </td>
+                  <td className="py-2.5 px-2 font-bold text-amber-300">
+                    {log.cswPct || "—"}
+                  </td>
+                  <td className="py-2.5 px-2 font-bold text-blue-300">
+                    {log.whiffPct || "—"}
                   </td>
                 </tr>
               );

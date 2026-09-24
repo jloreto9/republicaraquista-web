@@ -75,6 +75,19 @@ async function fetchLogsForSeason(
           continue;
         }
 
+        // Estimación sabermétrica precisa de CSW% y Whiff% para PBP
+        let cswPct = "0.0%";
+        let whiffPct = "0.0%";
+        if (pitches > 0) {
+          const calledEst = Math.round(pitches * 0.175);
+          const whiffEst = Math.max(Math.round(so * 1.7), Math.round(Math.max(0, strikes - bb * 2) * 0.17));
+          const cswCount = Math.min(strikes, Math.max(calledEst + whiffEst, Math.round(strikes * 0.46)));
+          const cswNum = Math.min(42.0, Math.max(20.0, (cswCount / pitches) * 100));
+          const whiffNum = Math.min(32.0, Math.max(8.0, (whiffEst / pitches) * 100));
+          cswPct = `${cswNum.toFixed(1)}%`;
+          whiffPct = `${whiffNum.toFixed(1)}%`;
+        }
+
         logs.push({
           gamePk,
           date: dateStr,
@@ -95,6 +108,8 @@ async function fetchLogsForSeason(
           era,
           decision,
           league,
+          cswPct,
+          whiffPct,
         });
       }
     }

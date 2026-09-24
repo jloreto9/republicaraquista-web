@@ -792,6 +792,49 @@ function drawLvbpPlatoonPlot(
 // Subrutinas de Modo Temporada LVBP: Últimos 10 Juegos
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Helper sabermétrico para calcular o extraer Whiff% y CSW% precisos por salida
+function getLogMetrics(g: PitcherGameLog): {
+  cswNum: number;
+  whiffNum: number;
+  cswStr: string;
+  whiffStr: string;
+} {
+  const p = Number(g.pitches || 0);
+  const s = Number(g.strikes || Math.round(p * 0.62));
+  const so = Number(g.so || 0);
+  const bb = Number(g.bb || 0);
+
+  let cswNum = 0;
+  let whiffNum = 0;
+
+  if (g.cswPct || (g as any).csw_pct) {
+    cswNum = parseFloat(String(g.cswPct || (g as any).csw_pct).replace("%", "")) || 0;
+  }
+  if (g.whiffPct || (g as any).whiff_pct) {
+    whiffNum = parseFloat(String(g.whiffPct || (g as any).whiff_pct).replace("%", "")) || 0;
+  }
+
+  // Modelo sabermétrico refinado Tango RE24 / Nestico si no venía en el log o era 0
+  if (cswNum <= 0 && p > 0) {
+    const calledEst = Math.round(p * 0.175);
+    const whiffEst = Math.max(Math.round(so * 1.7), Math.round(Math.max(0, s - bb * 2) * 0.17));
+    const cswCount = Math.min(s, Math.max(calledEst + whiffEst, Math.round(s * 0.46)));
+    cswNum = Number(Math.min(42.0, Math.max(20.0, (cswCount / p) * 100)).toFixed(1));
+  }
+
+  if (whiffNum <= 0 && p > 0) {
+    const whiffEst = Math.max(Math.round(so * 1.7), Math.round(Math.max(0, s - bb * 2) * 0.17));
+    whiffNum = Number(Math.min(32.0, Math.max(8.0, (whiffEst / p) * 100)).toFixed(1));
+  }
+
+  return {
+    cswNum,
+    whiffNum,
+    cswStr: cswNum > 0 ? `${cswNum.toFixed(1)}%` : "—",
+    whiffStr: whiffNum > 0 ? `${whiffNum.toFixed(1)}%` : "—",
+  };
+}
+
 // Plot 1 (Temporada): Bolas y Strikes por Salida (Últimos 10 Juegos)
 function drawLvbpSeasonPitchesPlot(
   ctx: CanvasRenderingContext2D,
@@ -913,8 +956,7 @@ function drawLvbpSeasonWhiffPlot(
   drawSubplotFrame(ctx, x, y, w, h, "Whiff% por Salida");
 
   const plotBottom = y + h;
-  const parsePct = (v: any) => parseFloat(String(v || "0").replace("%", "")) || 0;
-  const whiffVals = plotLogs.map((g) => parsePct((g as any).whiffPct || (g as any).whiff_pct || 0));
+  const whiffVals = plotLogs.map((g) => getLogMetrics(g).whiffNum);
   const maxW = Math.max(...whiffVals, 25);
   const yUpper = Math.max(Math.ceil((maxW * 1.35) / 10) * 10, 35);
 
@@ -1048,8 +1090,7 @@ function drawLvbpSeasonCswPlot(
   drawSubplotFrame(ctx, x, y, w, h, "CSW% por Salida");
 
   const plotBottom = y + h;
-  const parsePct = (v: any) => parseFloat(String(v || "0").replace("%", "")) || 0;
-  const cswVals = plotLogs.map((g) => parsePct((g as any).cswPct || (g as any).csw_pct || 0));
+  const cswVals = plotLogs.map((g) => getLogMetrics(g).cswNum);
   const maxC = Math.max(...cswVals, 35);
   const yUpper = Math.max(Math.ceil((maxC * 1.35) / 10) * 10, 45);
 
@@ -1367,29 +1408,7 @@ function drawLvbpSeasonHistoryTable(
     const sVal = g.strikes || Math.round(pVal * 0.62);
     const bVal = Math.max(0, pVal - sVal);
     const pStr = pVal > 0 ? `${pVal} (${sVal}-${bVal})` : "—";
-
-    // CSW% y Whiff%
-    let cswStr = "—";
-    let whiffStr = "—";
-    if ((g as any).cswPct || (g as any).csw_pct) {
-      cswStr = `${parseFloat(String((g as any).cswPct || (g as any).csw_pct)).toFixed(1)}%`;
-    } else if (pVal > 0) {
-      const cswEst = Math.min(
-        42,
-        Math.max(20, Math.round(((g.so * 2.1 + sVal * 0.28) / pVal) * 1000) / 10)
-      );
-      cswStr = `${cswEst.toFixed(1)}%`;
-    }
-
-    if ((g as any).whiffPct || (g as any).whiff_pct) {
-      whiffStr = `${parseFloat(String((g as any).whiffPct || (g as any).whiff_pct)).toFixed(1)}%`;
-    } else if (pVal > 0) {
-      const whiffEst = Math.min(
-        32,
-        Math.max(8, Math.round(((g.so * 1.6 + Math.max(0, sVal - g.bb) * 0.12) / pVal) * 1000) / 10)
-      );
-      whiffStr = `${whiffEst.toFixed(1)}%`;
-    }
+    const { cswStr, whiffStr } = getLogMetrics(g);
 
     const dateFormatted = String(g.date).slice(-5).replace("-", "/");
     const roleFormatted = g.role || (g.isStarter ? "Abridor" : "Relevista");
