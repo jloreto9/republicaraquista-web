@@ -35,6 +35,7 @@ export function PitchingView() {
   const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
   const [isDownloadingCard, setIsDownloadingCard] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
 
   // 1. Cargar salidas (Game Logs) cuando cambia lanzador, temporada, rama o fase
   const fetchGameLogs = useCallback(async () => {
@@ -49,6 +50,17 @@ export function PitchingView() {
         const json = await res.json();
         const logs: PitcherGameLog[] = json.logs || [];
         setGameLogs(logs);
+
+        if (json.fallbackUsed && json.effectiveSeason && json.effectiveSeason !== season) {
+          setFallbackNotice(
+            json.fallbackMessage ||
+              `ℹ️ No se encontraron salidas registradas en la temporada ${season} para esta rama. Mostrando la última temporada disponible (${json.effectiveSeason}).`
+          );
+          setSeason(json.effectiveSeason);
+        } else if (!json.fallbackUsed) {
+          setFallbackNotice(null);
+        }
+
         if (logs.length > 0) {
           setSelectedGamePk(logs[0].gamePk);
         } else {
@@ -99,14 +111,19 @@ export function PitchingView() {
         const res = await fetch(url);
         if (res.ok) {
           const json = await res.json();
-          if (isMounted) setGameData(json);
+          if (isMounted) {
+            setGameData(json);
+            if (json.fallbackUsed && json.effectiveSeason && json.effectiveSeason !== season) {
+              setFallbackNotice(
+                json.fallbackMessage ||
+                  `ℹ️ No se encontraron salidas registradas en la temporada ${season} para esta rama. Mostrando la última temporada disponible (${json.effectiveSeason}).`
+              );
+              setSeason(json.effectiveSeason);
+            }
+          }
         } else {
           if (isMounted) {
-            setErrorMsg(
-              timeMode === "season"
-                ? "No se pudieron calcular los datos de la temporada para este lanzador"
-                : "No se pudieron cargar los datos de pitcheo de este juego"
-            );
+            setErrorMsg("Error del servidor al procesar los datos de pitcheo.");
             setGameData(null);
           }
         }
@@ -195,6 +212,20 @@ export function PitchingView() {
         isDownloadingCard={isDownloadingCard}
       />
 
+      {/* Fallback Inteligente de Temporada (estilo Streamlit) */}
+      {fallbackNotice && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#002D62]/70 border border-[#FDB827]/40 text-xs text-amber-200 shadow-md">
+          <span className="text-base shrink-0">ℹ️</span>
+          <p className="flex-1 font-medium leading-relaxed">{fallbackNotice}</p>
+          <button
+            onClick={() => setFallbackNotice(null)}
+            className="text-amber-400 hover:text-amber-100 font-bold ml-2 cursor-pointer text-xs px-2 py-0.5 rounded bg-[#0D152B]/80 border border-amber-400/30"
+          >
+            Entendido ✕
+          </button>
+        </div>
+      )}
+
       {/* Pestañas de Navegación idénticas a Streamlit (RepubliCaraquistApp) */}
       <div className="flex border-b border-[#1E2B4D] gap-2 pt-2">
         <button
@@ -238,7 +269,7 @@ export function PitchingView() {
             Prueba seleccionando otra salida o cambiando de temporada.
           </span>
         </div>
-      ) : !gameData || (timeMode === "game" && gameLogs.length === 0) || !activeGameLog ? (
+      ) : !gameData || gameData.gamesCount === 0 || (timeMode === "game" && gameLogs.length === 0) || !activeGameLog ? (
         <div className="min-h-[300px] flex flex-col items-center justify-center bg-[#0D152B]/40 rounded-2xl border border-[#1E2B4D] p-6 text-center">
           <span className="text-2xl mb-2">⚾</span>
           <h4 className="text-sm font-bold text-slate-200">

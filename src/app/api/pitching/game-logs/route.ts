@@ -15,21 +15,12 @@ function parseDecision(stat: any): "W" | "L" | "SV" | "HLD" | "" {
   return "";
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const pitcherIdParam = searchParams.get("pitcher_id");
-  const seasonParam = searchParams.get("season") || "2025";
-  const branch = (searchParams.get("branch") || "lvbp").toLowerCase();
-  const phase = searchParams.get("phase") || "all";
-
-  const pitcherId = Number(pitcherIdParam);
-  if (!pitcherId) {
-    return NextResponse.json({ error: "pitcher_id es requerido" }, { status: 400 });
-  }
-
-  const season = Number(seasonParam) || 2025;
-  const isLvbp = branch === "lvbp";
-
+async function fetchLogsForSeason(
+  pitcherId: number,
+  season: number,
+  isLvbp: boolean,
+  phase: string
+): Promise<PitcherGameLog[]> {
   const url = isLvbp
     ? `https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${season}&sportId=17&gameType=R,F,D,L,W`
     : `https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${season}&sportIds=1,11,12`;
@@ -79,7 +70,7 @@ export async function GET(request: NextRequest) {
           ? "MLB"
           : "MiLB";
 
-        // Filtrar registros fantasma
+        // Filtrar registros vacíos
         if (ip === "0.0" && h === 0 && r === 0 && er === 0 && bb === 0 && so === 0 && pitches === 0) {
           continue;
         }
@@ -108,15 +99,55 @@ export async function GET(request: NextRequest) {
       }
     }
   } catch (err) {
-    console.error("Error fetching pitcher game logs:", err);
+    console.error(`Error fetching pitcher game logs for season ${season}:`, err);
   }
 
   // Ordenar de más reciente a más antiguo
   logs.sort((a, b) => b.date.localeCompare(a.date));
+  return logs;
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const pitcherIdParam = searchParams.get("pitcher_id");
+  const seasonParam = searchParams.get("season") || "2025";
+  const branch = (searchParams.get("branch") || "lvbp").toLowerCase();
+  const phase = searchParams.get("phase") || "all";
+
+  const pitcherId = Number(pitcherIdParam);
+  if (!pitcherId) {
+    return NextResponse.json({ error: "pitcher_id es requerido" }, { status: 400 });
+  }
+
+  const season = Number(seasonParam) || 2025;
+  const isLvbp = branch === "lvbp";
+
+  let effectiveSeason = season;
+  let fallbackUsed = false;
+  let logs = await fetchLogsForSeason(pitcherId, season, isLvbp, phase);
+
+  // Fallback inteligente como en Streamlit si la temporada pedida no tiene salidas (modo 'all')
+  if (logs.length === 0 && phase === "all") {
+    const fallbackCandidates = [2025, 2024, 2023, 2022].filter((s) => s !== season);
+    for (const fallbackS of fallbackCandidates) {
+      const candidateLogs = await fetchLogsForSeason(pitcherId, fallbackS, isLvbp, phase);
+      if (candidateLogs.length > 0) {
+        logs = candidateLogs;
+        effectiveSeason = fallbackS;
+        fallbackUsed = true;
+        break;
+      }
+    }
+  }
 
   return NextResponse.json({
     pitcherId,
     season,
+    effectiveSeason,
+    fallbackUsed,
+    fallbackMessage: fallbackUsed
+      ? `No se encontraron salidas registradas en la temporada ${season} para esta rama. Mostrando la última temporada disponible (${effectiveSeason}).`
+      : undefined,
     branch,
     phase,
     count: logs.length,

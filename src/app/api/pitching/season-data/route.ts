@@ -25,25 +25,12 @@ function parseDecision(stat: any): "W" | "L" | "SV" | "HLD" | "" {
   return "";
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const pitcherIdParam = searchParams.get("pitcher_id");
-  const seasonParam = searchParams.get("season") || "2025";
-  const branch = (searchParams.get("branch") || "lvbp").toLowerCase();
-  const phase = searchParams.get("phase") || "all";
-
-  const pitcherId = Number(pitcherIdParam);
-  if (!pitcherId) {
-    return NextResponse.json(
-      { error: "pitcher_id es requerido" },
-      { status: 400 }
-    );
-  }
-
-  const season = Number(seasonParam) || 2025;
-  const isLvbp = branch === "lvbp";
-
-  // 1. Obtener todas las salidas de la temporada
+async function fetchLogsForSeason(
+  pitcherId: number,
+  season: number,
+  isLvbp: boolean,
+  phase: string
+): Promise<PitcherGameLog[]> {
   const logsUrl = isLvbp
     ? `https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${season}&sportId=17&gameType=R,F,D,L,W`
     : `https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${season}&sportIds=1,11,12`;
@@ -128,14 +115,99 @@ export async function GET(request: NextRequest) {
       }
     }
   } catch (err) {
-    console.error("Error fetching logs for season data:", err);
+    console.error(`Error fetching logs for season data ${season}:`, err);
   }
 
-  if (logs.length === 0) {
+  logs.sort((a, b) => b.date.localeCompare(a.date));
+  return logs;
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const pitcherIdParam = searchParams.get("pitcher_id");
+  const seasonParam = searchParams.get("season") || "2025";
+  const branch = (searchParams.get("branch") || "lvbp").toLowerCase();
+  const phase = searchParams.get("phase") || "all";
+
+  const pitcherId = Number(pitcherIdParam);
+  if (!pitcherId) {
     return NextResponse.json(
-      { error: "No se encontraron salidas para este lanzador en la temporada" },
-      { status: 404 }
+      { error: "pitcher_id es requerido" },
+      { status: 400 }
     );
+  }
+
+  const season = Number(seasonParam) || 2025;
+  const isLvbp = branch === "lvbp";
+
+  // 1. Obtener todas las salidas de la temporada solicitada
+  let effectiveSeason = season;
+  let fallbackUsed = false;
+  let logs = await fetchLogsForSeason(pitcherId, season, isLvbp, phase);
+
+  // Fallback inteligente si la temporada actual no tiene salidas (modo 'all')
+  if (logs.length === 0 && phase === "all") {
+    const fallbackCandidates = [2025, 2024, 2023, 2022].filter((s) => s !== season);
+    for (const fallbackS of fallbackCandidates) {
+      const candidateLogs = await fetchLogsForSeason(pitcherId, fallbackS, isLvbp, phase);
+      if (candidateLogs.length > 0) {
+        logs = candidateLogs;
+        effectiveSeason = fallbackS;
+        fallbackUsed = true;
+        break;
+      }
+    }
+  }
+
+  // Si después del fallback no hay salidas, retornar 200 graceful con gamesCount: 0 (nunca 404)
+  if (logs.length === 0) {
+    const emptyResponse: PitchGameDataResponse = {
+      gamePk: 0,
+      pitcherId,
+      timeMode: "season",
+      gamesCount: 0,
+      isStarter: false,
+      role: "Temporada",
+      decision: "0-0",
+      totalPitches: 0,
+      hasStatcast: false,
+      boxscore: {
+        ip: "0.0",
+        h: 0,
+        r: 0,
+        er: 0,
+        bb: 0,
+        so: 0,
+        pitches: 0,
+        strikes: 0,
+        cswPct: "0.0%",
+        whiffPct: "0.0%",
+        era: "0.00",
+        whip: "0.00",
+      },
+      statcastTable: [],
+      pbpTable: [],
+      pbpKpis: {
+        totalPitches: 0,
+        strikes: 0,
+        balls: 0,
+        strikePct: "0.0%",
+        cswPct: "0.0%",
+        whiffPct: "0.0%",
+        fpsPct: "0.0%",
+        swings: 0,
+        calledStrikes: 0,
+        fouls: 0,
+        inPlay: 0,
+      },
+      inningsWorkload: [],
+      splitsPlatoon: {
+        vsLhb: { pitches: 0, cswPct: "0.0%", whiffPct: "0.0%", strikePct: "0.0%" },
+        vsRhb: { pitches: 0, cswPct: "0.0%", whiffPct: "0.0%", strikePct: "0.0%" },
+      },
+      pitches: [],
+    };
+    return NextResponse.json(emptyResponse);
   }
 
   // 2. Acumular Boxscore de la temporada
@@ -233,7 +305,12 @@ export async function GET(request: NextRequest) {
     inningsWorkload: metrics.inningsWorkload,
     splitsPlatoon: metrics.splitsPlatoon,
     pitches: allParsedPitches,
-  };
+    effectiveSeason,
+    fallbackUsed,
+    fallbackMessage: fallbackUsed
+      ? `No se encontraron salidas registradas en la temporada ${season} para esta rama. Mostrando la última temporada disponible (${effectiveSeason}).`
+      : undefined,
+  } as any;
 
   return NextResponse.json(response);
 }
