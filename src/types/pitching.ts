@@ -10,6 +10,9 @@ export interface PitcherProfile {
   lvbpTeamName?: string;
   lvbpTeamAbbr?: string;
   photoUrl: string;
+  age?: number;
+  height?: string;
+  weight?: number;
 }
 
 export interface PitcherGameLog {

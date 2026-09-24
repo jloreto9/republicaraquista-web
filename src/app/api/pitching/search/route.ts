@@ -71,6 +71,9 @@ export async function GET(request: NextRequest) {
             lvbpTeamName: isCaracas ? "Leones del Caracas" : undefined,
             lvbpTeamAbbr: isCaracas ? "CAR" : undefined,
             photoUrl: `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/${pId}/headshot/67/current`,
+            age: p.currentAge,
+            height: p.height,
+            weight: p.weight,
           };
           return NextResponse.json({ query: q, count: 1, results: [singleProfile] });
         }
@@ -118,6 +121,9 @@ export async function GET(request: NextRequest) {
           lvbpTeamName: isCaracas ? "Leones del Caracas" : undefined,
           lvbpTeamAbbr: isCaracas ? "CAR" : undefined,
           photoUrl: `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/${pId}/headshot/67/current`,
+          age: p.currentAge,
+          height: p.height,
+          weight: p.weight,
         });
       }
     }

@@ -48,6 +48,9 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
     photoUrl: "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/544150/headshot/67/current",
+    age: 35,
+    height: "6' 3\"",
+    weight: 235,
   },
   {
     id: 612797,
@@ -61,6 +64,9 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
     photoUrl: "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/612797/headshot/67/current",
+    age: 31,
+    height: "6' 3\"",
+    weight: 180,
   },
   {
     id: 660508,
@@ -74,6 +80,9 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
     photoUrl: "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/660508/headshot/67/current",
+    age: 29,
+    height: "6' 2\"",
+    weight: 200,
   },
   {
     id: 468504,
@@ -87,6 +96,9 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
     photoUrl: "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/468504/headshot/67/current",
+    age: 37,
+    height: "6' 3\"",
+    weight: 220,
   },
   {
     id: 600965,
@@ -100,6 +112,9 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
     photoUrl: "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/600965/headshot/67/current",
+    age: 33,
+    height: "6' 2\"",
+    weight: 215,
   },
   {
     id: 642570,
@@ -113,5 +128,8 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
     photoUrl: "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/642570/headshot/67/current",
+    age: 29,
+    height: "6' 2\"",
+    weight: 250,
   },
 ];
