@@ -17,7 +17,7 @@ export interface PitcherGameLog {
   date: string;
   opponent: string;
   isStarter: boolean;
-  role: "Abridor" | "Relevista";
+  role: "Abridor" | "Relevista" | "Temporada";
   gameType: string;
   phase: string;
   ip: string;
@@ -121,11 +121,15 @@ export interface PlatoonSplits {
   vsRhb: PlatoonSplitItem;
 }
 
+export type TimeMode = "game" | "season";
+
 export interface PitchGameDataResponse {
   gamePk: number;
   pitcherId: number;
+  timeMode?: TimeMode;
+  gamesCount?: number;
   isStarter: boolean;
-  role: "Abridor" | "Relevista";
+  role: "Abridor" | "Relevista" | "Temporada";
   decision: string;
   totalPitches: number;
   hasStatcast: boolean;
@@ -140,6 +144,8 @@ export interface PitchGameDataResponse {
     strikes: number;
     cswPct: string;
     whiffPct: string;
+    era?: string;
+    whip?: string;
   };
   statcastTable: StatcastPitchRow[];
   pbpTable: PBPDestinationRow[];

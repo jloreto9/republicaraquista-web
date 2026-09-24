@@ -64,4 +64,18 @@
 ## Phase 8: Polish & Cross-Cutting Concerns
 
 - [x] T022 Validar tipado TypeScript estricto con `npx tsc --noEmit` y compilación de producción con `npm run build`
-- [ ] T023 Validar respuesta en vivo de la ruta `/pitching` y de los endpoints de API en Vercel
+- [x] T023 Validar respuesta en vivo de la ruta `/pitching` y de los endpoints de API en Vercel
+
+---
+
+## Phase 9: User Story 6 (P6) - Modos Temporales (Salida Individual vs Temporada Completa)
+
+- [x] T024 [US6] Extender `src/types/pitching.ts` con tipo `TimeMode` y soporte de métricas acumuladas (ERA, WHIP, juegos totales)
+- [x] T025 [US6] Implementar agregación de datos de temporada completa en `src/app/api/pitching/season-data/route.ts` y servicio de datos
+- [x] T026 [US6] Incorporar conmutador de modo temporal ("Salida Individual" vs "Temporada Completa") en `src/components/pitching/pitching-header.tsx`
+- [x] T027 [US6] Actualizar `src/components/pitching/pitching-view.tsx` para alternar entre salida puntual y acumulado de temporada
+- [x] T028 [US6] Adaptar pastillas de KPI y tarjetas visuales en `src/components/pitching/pbp-panel.tsx` y `src/components/pitching/statcast-panel.tsx` para mostrar ERA/WHIP en modo temporada
+- [x] T029 [US6] Actualizar `src/lib/pitch-card-canvas.ts` para renderizar metadatos y boxscore de temporada completa en la tarjeta HD exportable
+- [x] T030 [US6] Validar con `npx tsc --noEmit` y `npm run build` antes de despliegue final
+
+

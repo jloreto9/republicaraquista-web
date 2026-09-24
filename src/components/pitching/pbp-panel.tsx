@@ -77,16 +77,20 @@ export function PBPPanel({ data, pitcherName }: PBPPanelProps) {
         </div>
 
         <div className="bg-[#0D152B] border border-[#FDB827]/30 rounded-xl p-3 text-center shadow-[0_0_12px_rgba(253,184,39,0.1)]">
-          <span className="text-[10px] text-[#FDB827] font-mono font-bold uppercase">CSW%</span>
+          <span className="text-[10px] text-[#FDB827] font-mono font-bold uppercase">
+            {data.timeMode === "season" ? "ERA" : "CSW%"}
+          </span>
           <div className="text-base sm:text-lg font-black text-[#FDB827] font-mono mt-0.5">
-            {boxscore.cswPct}
+            {data.timeMode === "season" ? boxscore.era || "0.00" : boxscore.cswPct}
           </div>
         </div>
 
         <div className="bg-[#0D152B] border border-[#FDB827]/30 rounded-xl p-3 text-center shadow-[0_0_12px_rgba(253,184,39,0.1)]">
-          <span className="text-[10px] text-[#FDB827] font-mono font-bold uppercase">WHIFF%</span>
+          <span className="text-[10px] text-[#FDB827] font-mono font-bold uppercase">
+            {data.timeMode === "season" ? "WHIP" : "WHIFF%"}
+          </span>
           <div className="text-base sm:text-lg font-black text-[#FDB827] font-mono mt-0.5">
-            {boxscore.whiffPct}
+            {data.timeMode === "season" ? boxscore.whip || "0.00" : boxscore.whiffPct}
           </div>
         </div>
       </div>

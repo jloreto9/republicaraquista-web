@@ -28,15 +28,19 @@ export function StatcastPanel({ data, pitcherName }: StatcastPanelProps) {
           </div>
         </div>
         <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-3 text-center">
-          <span className="text-[10px] text-slate-400 font-mono uppercase">CSW% Global</span>
+          <span className="text-[10px] text-slate-400 font-mono uppercase">
+            {data.timeMode === "season" ? "ERA Acumulada" : "CSW% Global"}
+          </span>
           <div className="text-base sm:text-lg font-black text-cyan-400 font-mono mt-0.5">
-            {boxscore.cswPct}
+            {data.timeMode === "season" ? boxscore.era || "0.00" : boxscore.cswPct}
           </div>
         </div>
         <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-3 text-center">
-          <span className="text-[10px] text-slate-400 font-mono uppercase">Whiff% Global</span>
+          <span className="text-[10px] text-slate-400 font-mono uppercase">
+            {data.timeMode === "season" ? "WHIP Acumulado" : "Whiff% Global"}
+          </span>
           <div className="text-base sm:text-lg font-black text-[#FDB827] font-mono mt-0.5">
-            {boxscore.whiffPct}
+            {data.timeMode === "season" ? boxscore.whip || "0.00" : boxscore.whiffPct}
           </div>
         </div>
         <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-3 text-center">

@@ -1,13 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { Download, Calendar, Shield, Zap, CheckCircle2, Loader2 } from "lucide-react";
-import { PitcherProfile, PitcherGameLog } from "@/types/pitching";
+import { Download, Calendar, Shield, Zap, CheckCircle2, Loader2, Clock } from "lucide-react";
+import { PitcherProfile, PitcherGameLog, TimeMode } from "@/types/pitching";
 
 interface PitchingHeaderProps {
   pitcher: PitcherProfile;
   branch: "lvbp" | "mlb";
   onChangeBranch: (b: "lvbp" | "mlb") => void;
+  timeMode: TimeMode;
+  onChangeTimeMode: (m: TimeMode) => void;
   season: number;
   onChangeSeason: (s: number) => void;
   phase: string;
@@ -23,6 +25,8 @@ export function PitchingHeader({
   pitcher,
   branch,
   onChangeBranch,
+  timeMode,
+  onChangeTimeMode,
   season,
   onChangeSeason,
   phase,
@@ -107,7 +111,7 @@ export function PitchingHeader({
           {/* Download HD Card */}
           <button
             onClick={onDownloadCard}
-            disabled={isDownloadingCard || !selectedLog}
+            disabled={isDownloadingCard || (!selectedLog && timeMode === "game")}
             className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#FDB827] to-[#E5A722] hover:from-[#FFE17D] hover:to-[#FDB827] text-slate-950 font-bold text-xs flex items-center gap-2 shadow-[0_4px_16px_rgba(253,184,39,0.25)] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             {isDownloadingCard ? (
@@ -120,12 +124,38 @@ export function PitchingHeader({
         </div>
       </div>
 
-      {/* Bottom controls: Season + Phase + Game Log Selector */}
-      <div className="pt-3 border-t border-[#1E2B4D]/60 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        {/* Season & Phase Pickers */}
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* Bottom controls: TimeMode Toggle + Season + Phase + Game Log Selector */}
+      <div className="pt-3 border-t border-[#1E2B4D]/60 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        {/* Left Side: TimeMode + Season + Phase */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Time Mode Switcher */}
+          <div className="flex items-center bg-[#070B19] p-1 rounded-xl border border-[#1E2B4D] shrink-0">
+            <button
+              onClick={() => onChangeTimeMode("game")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                timeMode === "game"
+                  ? "bg-[#0D152B] text-[#FDB827] border border-[#FDB827]/40 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Salida Individual
+            </button>
+            <button
+              onClick={() => onChangeTimeMode("season")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                timeMode === "season"
+                  ? "bg-[#FDB827] text-slate-950 font-black shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              Temporada Completa
+            </button>
+          </div>
+
+          {/* Season Picker */}
           <div className="flex items-center gap-1.5 bg-[#070B19] px-2.5 py-1.5 rounded-lg border border-[#1E2B4D]">
-            <Calendar className="w-3.5 h-3.5 text-[#FDB827]" />
             <span className="text-[11px] text-slate-400 font-medium">Temporada:</span>
             <select
               value={season}
@@ -140,6 +170,7 @@ export function PitchingHeader({
             </select>
           </div>
 
+          {/* Phase Picker (LVBP only) */}
           {branch === "lvbp" && (
             <div className="flex items-center gap-1.5 bg-[#070B19] px-2.5 py-1.5 rounded-lg border border-[#1E2B4D]">
               <span className="text-[11px] text-slate-400 font-medium">Fase:</span>
@@ -157,32 +188,46 @@ export function PitchingHeader({
           )}
         </div>
 
-        {/* Game Log Dropdown Selector */}
+        {/* Right Side: Conditional Game Log Selector vs Season Summary Badge */}
         <div className="flex items-center gap-2 flex-1 max-w-xl justify-end">
-          <span className="text-[11px] text-slate-400 shrink-0 font-medium hidden sm:inline">
-            Salida (Game Log):
-          </span>
-          <select
-            value={selectedGamePk || ""}
-            onChange={(e) => onSelectGamePk(Number(e.target.value))}
-            className="w-full bg-[#070B19] border border-[#1E2B4D] focus:border-[#FDB827] text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none cursor-pointer font-medium truncate"
-          >
-            {gameLogs.length === 0 ? (
-              <option value="" disabled className="bg-[#070B19]">
-                Sin salidas registradas en esta temporada
-              </option>
-            ) : (
-              gameLogs.map((log) => {
-                const decBadge = log.decision ? `[${log.decision}] ` : "";
-                return (
-                  <option key={log.gamePk} value={log.gamePk} className="bg-[#070B19]">
-                    {log.date} vs {log.opponent} • {decBadge}
-                    {log.role} ({log.ip} IP, {log.er} ER, {log.so} K, {log.pitches} Pitcheos)
+          {timeMode === "game" ? (
+            <>
+              <span className="text-[11px] text-slate-400 shrink-0 font-medium hidden sm:inline">
+                Salida:
+              </span>
+              <select
+                value={selectedGamePk || ""}
+                onChange={(e) => onSelectGamePk(Number(e.target.value))}
+                className="w-full bg-[#070B19] border border-[#1E2B4D] focus:border-[#FDB827] text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none cursor-pointer font-medium truncate"
+              >
+                {gameLogs.length === 0 ? (
+                  <option value="" disabled className="bg-[#070B19]">
+                    Sin salidas registradas en esta temporada
                   </option>
-                );
-              })
-            )}
-          </select>
+                ) : (
+                  gameLogs.map((log) => {
+                    const decBadge = log.decision ? `[${log.decision}] ` : "";
+                    return (
+                      <option key={log.gamePk} value={log.gamePk} className="bg-[#070B19]">
+                        {log.date} vs {log.opponent} • {decBadge}
+                        {log.role} ({log.ip} IP, {log.er} ER, {log.so} K, {log.pitches}P)
+                      </option>
+                    );
+                  })
+                )}
+              </select>
+            </>
+          ) : (
+            <div className="w-full bg-[#002D62]/40 border border-[#FDB827]/40 px-3.5 py-2 rounded-lg text-xs text-[#FDB827] font-semibold flex items-center justify-between gap-2 shadow-[0_0_12px_rgba(253,184,39,0.1)]">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Consolidado Temporada {season} ({gameLogs.length} Salidas)</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                Repertorio y métricas acumuladas
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

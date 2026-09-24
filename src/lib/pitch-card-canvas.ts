@@ -78,9 +78,12 @@ export async function generatePitchingCardBlob(
 
   ctx.fillStyle = "#94A3B8";
   ctx.font = "500 22px Inter, monospace";
-  const outing = `Salida del ${gameLog.date} vs ${gameLog.opponent} (${gameLog.role}${
-    gameLog.decision ? ` • Decisión: ${gameLog.decision}` : ""
-  })`;
+  const outing =
+    data.timeMode === "season"
+      ? `Temporada Completa (${data.gamesCount || "—"} Salidas acumuladas • Récord: ${gameLog.decision || "—"})`
+      : `Salida del ${gameLog.date} vs ${gameLog.opponent} (${gameLog.role}${
+          gameLog.decision ? ` • Decisión: ${gameLog.decision}` : ""
+        })`;
   ctx.fillText(outing, 260, headerY + 135);
 
   // Logo / Branding Header Derecho
@@ -92,7 +95,13 @@ export async function generatePitchingCardBlob(
   ctx.fillStyle = "#FDB827";
   ctx.font = "bold 20px Inter, monospace";
   ctx.fillText(
-    branch === "lvbp" ? "PITCHING SUMMARY LVBP" : "STATCAST & HAWK-EYE SUMMARY",
+    data.timeMode === "season"
+      ? branch === "lvbp"
+        ? "PITCHING SUMMARY LVBP (TEMPORADA)"
+        : "STATCAST SUMMARY (TEMPORADA)"
+      : branch === "lvbp"
+      ? "PITCHING SUMMARY LVBP"
+      : "STATCAST & HAWK-EYE SUMMARY",
     width - 80,
     headerY + 95
   );
@@ -115,8 +124,16 @@ export async function generatePitchingCardBlob(
     { label: "SO", val: String(data.boxscore.so), color: "#FDB827" },
     { label: "PIT", val: String(data.boxscore.pitches), color: "#FFFFFF" },
     { label: "STR", val: String(data.boxscore.strikes), color: "#10B981" },
-    { label: "CSW%", val: data.boxscore.cswPct, color: "#38BDF8" },
-    { label: "WHIFF%", val: data.boxscore.whiffPct, color: "#FDB827" },
+    {
+      label: data.timeMode === "season" ? "ERA" : "CSW%",
+      val: data.timeMode === "season" ? data.boxscore.era || "0.00" : data.boxscore.cswPct,
+      color: "#38BDF8",
+    },
+    {
+      label: data.timeMode === "season" ? "WHIP" : "WHIFF%",
+      val: data.timeMode === "season" ? data.boxscore.whip || "0.00" : data.boxscore.whiffPct,
+      color: "#FDB827",
+    },
   ];
 
   kpis.forEach((kpi, i) => {

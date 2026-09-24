@@ -58,6 +58,14 @@ La vista **Pitching Summary & Telemetría** constituye la 9ª vista analítica d
 **quiero** acceder a la vista de pitcheo desde el menú principal y mediante enlaces directos en las fichas de lanzadores de otras vistas,  
 **para** tener una experiencia de usuario fluida e interconectada.
 
+### Historia de Usuario 6 (P6): Modos Temporales (Salida Individual vs Temporada Completa)
+**Como** analista sabermétrico o aficionado,  
+**quiero** alternar con un botón entre el análisis de una salida puntual ("Salida Individual") y el consolidado acumulado de toda la temporada ("Temporada Completa"),  
+**para** evaluar tanto el desempeño en un partido específico como la consistencia y tendencias del repertorio a lo largo de todo el año.
+
+- **Escenario 6.1 (Modo Juego)**: El usuario selecciona una salida y analiza el boxscore, destinos y gráficos de ese juego en particular.
+- **Escenario 6.2 (Modo Temporada)**: El usuario pulsa "Temporada Completa"; el sistema consolida todas las apariciones de la temporada seleccionada, suma las entradas lanzadas, carreras, boletos, ponches y pitcheos, calculando ERA, WHIP y CSW% global, y agrupando todos los lanzamientos registrados de la temporada en la matriz de destinos o repertorio.
+
 ---
 
 ## 3. Requerimientos Funcionales
@@ -73,6 +81,7 @@ La vista **Pitching Summary & Telemetría** constituye la 9ª vista analítica d
 - **RF-07 (Generador de Tarjeta Gráfica en Cliente)**: Renderizado dinámico de la tarjeta panorámica en resolución ultra-alta (2400x1350 px equivalentes a 300 DPI) con preservación tipográfica, avatares circulares y marcas de agua.
 - **RF-08 (Navegación Unificada)**: Incorporación oficial de `/pitching` en la barra lateral de escritorio y en la navegación móvil, con estado activo destacado.
 - **RF-09 (Atribución y Cumplimiento de Marca)**: Inclusión obligatoria de créditos editoriales en pie de página para `@republicaraquista • Jorge Leonardo Loreto` y atribución metodológica a Thomas Nestico (@TJStats).
+- **RF-10 (Selector de Modo Temporal)**: Selector conmutador de alta visibilidad entre "Salida Individual" (un juego) y "Temporada Completa", recalculando automáticamente las métricas agregadas (IP acumuladas, ERA, WHIP, consolidación de la tabla de destinos o repertorio, y proyecciones de volumen) sin recargar la página.
 
 ---
 

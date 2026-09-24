@@ -5,6 +5,7 @@ import {
   PitcherProfile,
   PitcherGameLog,
   PitchGameDataResponse,
+  TimeMode,
 } from "@/types/pitching";
 import { CARACAS_FEATURED_PITCHERS } from "@/lib/pitching-constants";
 import { PitchingSearch } from "./pitching-search";
@@ -19,6 +20,7 @@ export function PitchingView() {
     CARACAS_FEATURED_PITCHERS[0]
   );
   const [branch, setBranch] = useState<"lvbp" | "mlb">("lvbp");
+  const [timeMode, setTimeMode] = useState<TimeMode>("game");
   const [season, setSeason] = useState<number>(2025);
   const [phase, setPhase] = useState<string>("all");
 
@@ -67,9 +69,14 @@ export function PitchingView() {
     fetchGameLogs();
   }, [fetchGameLogs]);
 
-  // 2. Cargar detalle del partido cuando cambia el juego seleccionado
+  // 2. Cargar detalle del partido o temporada cuando cambia selección o modo temporal
   useEffect(() => {
-    if (!selectedGamePk || !selectedPitcher?.id) {
+    if (!selectedPitcher?.id) {
+      setGameData(null);
+      return;
+    }
+
+    if (timeMode === "game" && !selectedGamePk) {
       setGameData(null);
       return;
     }
@@ -80,21 +87,28 @@ export function PitchingView() {
 
     const fetchDetail = async () => {
       try {
-        const url = `/api/pitching/game-data?game_pk=${selectedGamePk}&pitcher_id=${selectedPitcher.id}&is_lvbp=${
-          branch === "lvbp"
-        }`;
+        const url =
+          timeMode === "season"
+            ? `/api/pitching/season-data?pitcher_id=${selectedPitcher.id}&season=${season}&branch=${branch}&phase=${phase}`
+            : `/api/pitching/game-data?game_pk=${selectedGamePk}&pitcher_id=${selectedPitcher.id}&is_lvbp=${
+                branch === "lvbp"
+              }`;
         const res = await fetch(url);
         if (res.ok) {
           const json = await res.json();
           if (isMounted) setGameData(json);
         } else {
           if (isMounted) {
-            setErrorMsg("No se pudieron cargar los datos de pitcheo de este juego");
+            setErrorMsg(
+              timeMode === "season"
+                ? "No se pudieron calcular los datos de la temporada para este lanzador"
+                : "No se pudieron cargar los datos de pitcheo de este juego"
+            );
             setGameData(null);
           }
         }
       } catch (err) {
-        console.error("Error loading game data:", err);
+        console.error("Error loading pitch data:", err);
         if (isMounted) setErrorMsg("Error de conexión al cargar la telemetría");
       } finally {
         if (isMounted) setIsLoadingData(false);
@@ -105,12 +119,35 @@ export function PitchingView() {
     return () => {
       isMounted = false;
     };
-  }, [selectedGamePk, selectedPitcher?.id, branch]);
+  }, [timeMode, selectedGamePk, selectedPitcher?.id, season, branch, phase]);
 
   // 3. Manejador de descarga de tarjeta HD
   const handleDownloadCard = async () => {
     if (!gameData || !selectedPitcher) return;
-    const currentLog = gameLogs.find((l) => l.gamePk === selectedGamePk) || gameLogs[0];
+    const currentLog: PitcherGameLog =
+      timeMode === "season"
+        ? {
+            gamePk: 0,
+            date: `Temporada ${season}`,
+            opponent: "Todos los Rivales",
+            isStarter: gameData.isStarter,
+            role: "Temporada",
+            gameType: phase,
+            phase: phase,
+            ip: gameData.boxscore.ip,
+            h: gameData.boxscore.h,
+            r: gameData.boxscore.r,
+            er: gameData.boxscore.er,
+            bb: gameData.boxscore.bb,
+            so: gameData.boxscore.so,
+            hr: 0,
+            pitches: gameData.boxscore.pitches,
+            strikes: gameData.boxscore.strikes,
+            era: gameData.boxscore.era || "0.00",
+            decision: (gameData.decision as any) || "",
+            league: branch === "lvbp" ? "LVBP" : "MLB",
+          }
+        : gameLogs.find((l) => l.gamePk === selectedGamePk) || gameLogs[0];
     if (!currentLog) return;
 
     setIsDownloadingCard(true);
@@ -142,6 +179,8 @@ export function PitchingView() {
         pitcher={selectedPitcher}
         branch={branch}
         onChangeBranch={(b) => setBranch(b)}
+        timeMode={timeMode}
+        onChangeTimeMode={(m) => setTimeMode(m)}
         season={season}
         onChangeSeason={(s) => setSeason(s)}
         phase={phase}
