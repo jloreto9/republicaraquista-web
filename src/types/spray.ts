@@ -68,3 +68,35 @@ export interface StrikeZoneMetrics {
   swStrPct: string;
   zoneCounts: Record<number, number>; // 1-9 count
 }
+
+export interface SprayPlayerOption {
+  id: number;
+  name: string;
+  count?: number;
+}
+
+export const EVENT_COLORS: Record<string, string> = {
+  Single: "#2ecc71",     // Verde
+  Double: "#3498db",     // Azul
+  Triple: "#f39c12",     // Naranja / Oro
+  "Home Run": "#e74c3c", // Rojo
+  Out: "#64748b",        // Pizarra / Gris
+  "Field Error": "#a855f7", // Morado
+  Other: "#94a3b8",
+};
+
+export const TRAJECTORY_COLORS: Record<string, string> = {
+  ground_ball: "#eab308", // Amarillo
+  line_drive: "#3b82f6",  // Azul cielo
+  fly_ball: "#ec4899",    // Magenta
+  popup: "#64748b",       // Gris
+  unknown: "#94a3b8",
+};
+
+export const HARDNESS_COLORS: Record<string, string> = {
+  hard: "#ef4444",   // Rojo intenso (Hard)
+  medium: "#3b82f6", // Azul (Medium)
+  soft: "#10b981",   // Verde (Soft)
+  unknown: "#64748b",
+};
+

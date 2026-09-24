@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { BattedBall, SprayStats, PitchEvent, StrikeZoneMetrics } from "@/types/spray";
+import { BattedBall, SprayStats, PitchEvent, StrikeZoneMetrics, SprayPlayerOption } from "@/types/spray";
 import { BaseballDiamond } from "./baseball-diamond";
 import { StrikeZoneHeatmap } from "./strike-zone-heatmap";
 import { LEONES_SPRAY_PLAYERS } from "@/lib/spray-engine";
@@ -13,6 +13,7 @@ interface SprayViewProps {
   initialStats: SprayStats;
   initialPitches: PitchEvent[];
   initialMetrics: StrikeZoneMetrics;
+  players?: SprayPlayerOption[];
 }
 
 export function SprayView({
@@ -21,8 +22,10 @@ export function SprayView({
   initialStats,
   initialPitches,
   initialMetrics,
+  players = LEONES_SPRAY_PLAYERS,
 }: SprayViewProps) {
   const [selectedPlayerId, setSelectedPlayerId] = useState<number>(initialPlayerId);
+  const [playerList, setPlayerList] = useState<SprayPlayerOption[]>(players);
   const [battedBalls, setBattedBalls] = useState<BattedBall[]>(initialBalls);
   const [sprayStats, setSprayStats] = useState<SprayStats>(initialStats);
   const [pitches, setPitches] = useState<PitchEvent[]>(initialPitches);
@@ -32,7 +35,15 @@ export function SprayView({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (selectedPlayerId === initialPlayerId) return;
+    if (selectedPlayerId === initialPlayerId) {
+      if (initialBalls && battedBalls !== initialBalls) {
+        setBattedBalls(initialBalls);
+        setSprayStats(initialStats);
+        setPitches(initialPitches);
+        setStrikeMetrics(initialMetrics);
+      }
+      return;
+    }
 
     let isMounted = true;
     async function loadPlayerData() {
@@ -45,6 +56,7 @@ export function SprayView({
           setSprayStats(data.sprayStats || initialStats);
           setPitches(data.pitches || []);
           setStrikeMetrics(data.strikeZoneMetrics || initialMetrics);
+          if (data.players) setPlayerList(data.players);
         }
       } catch (err) {
         console.error("Error loading spray data:", err);
@@ -57,7 +69,7 @@ export function SprayView({
     return () => {
       isMounted = false;
     };
-  }, [selectedPlayerId, initialPlayerId, initialStats, initialMetrics]);
+  }, [selectedPlayerId, initialPlayerId, initialBalls, initialStats, initialPitches, initialMetrics]);
 
   return (
     <div className="space-y-6">
@@ -65,7 +77,7 @@ export function SprayView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
           <Target className="w-4 h-4 text-[#FDB827]" />
-          <span>Filtro de Telemetría por Bateador</span>
+          <span>Filtro de Telemetría por Bateador ({playerList.length} disponibles)</span>
         </div>
 
         {/* Selector de Bateador */}
@@ -73,15 +85,15 @@ export function SprayView({
           <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider shrink-0">
             Bateador:
           </label>
-          <div className="relative">
+          <div className="relative max-w-full sm:max-w-md">
             <select
               value={selectedPlayerId}
               onChange={(e) => setSelectedPlayerId(Number(e.target.value))}
-              className="appearance-none bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs font-medium rounded-lg px-3 py-2 pr-8 focus:outline-none focus:border-[#FDB827]/50"
+              className="appearance-none w-full bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs font-medium rounded-lg px-3 py-2 pr-8 focus:outline-none focus:border-[#FDB827]/50"
             >
-              {LEONES_SPRAY_PLAYERS.map((p) => (
+              {playerList.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {p.name} {p.count ? `(${p.count} batazos)` : ""}
                 </option>
               ))}
             </select>

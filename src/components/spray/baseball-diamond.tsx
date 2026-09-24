@@ -205,6 +205,11 @@ export function BaseballDiamond({ battedBalls, colorMode }: BaseballDiamondProps
           </div>
 
           <div className="text-slate-300">
+            <span className="text-slate-400">Bateador:</span>{" "}
+            <span className="font-semibold text-slate-100">{hoveredBall.batterName}</span>
+          </div>
+
+          <div className="text-slate-300">
             <span className="text-slate-400">Distancia:</span>{" "}
             <span className="font-mono font-bold text-[#FDB827]">{hoveredBall.distanceFt} ft</span>
           </div>

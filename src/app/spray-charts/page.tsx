@@ -37,6 +37,7 @@ export default function SprayChartsPage() {
           initialStats={initialStats}
           initialPitches={initialPitches}
           initialMetrics={initialMetrics}
+          players={LEONES_SPRAY_PLAYERS}
         />
       </main>
     </div>

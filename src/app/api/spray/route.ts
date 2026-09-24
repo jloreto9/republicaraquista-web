@@ -9,7 +9,7 @@ import {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const playerId = parseInt(searchParams.get("player_id") || "660821", 10);
+    const playerId = parseInt(searchParams.get("player_id") ?? "0", 10);
 
     const balls = getPlayerBattedBalls(playerId);
     const stats = computeSprayStats(balls);

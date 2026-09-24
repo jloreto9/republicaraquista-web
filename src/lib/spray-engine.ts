@@ -1,4 +1,16 @@
-import { BattedBall, SprayStats, PitchEvent, StrikeZoneMetrics } from "@/types/spray";
+import {
+  BattedBall,
+  SprayStats,
+  PitchEvent,
+  StrikeZoneMetrics,
+  SprayPlayerOption,
+  EVENT_COLORS,
+  TRAJECTORY_COLORS,
+  HARDNESS_COLORS,
+} from "@/types/spray";
+import sprayDataRaw from "@/data/lvbp_spray_2025.json";
+
+export { EVENT_COLORS, TRAJECTORY_COLORS, HARDNESS_COLORS };
 
 export const EVENT_TRANSLATIONS: Record<string, string> = {
   Single: "Sencillo (1B)",
@@ -15,31 +27,6 @@ export const EVENT_TRANSLATIONS: Record<string, string> = {
   "Sac Bunt": "Toque de sacrificio",
   "Double Play": "Doble Play",
   "Grounded Into DP": "Rolling para DP",
-};
-
-export const EVENT_COLORS: Record<string, string> = {
-  Single: "#2ecc71",     // Verde
-  Double: "#3498db",     // Azul
-  Triple: "#f39c12",     // Naranja / Oro
-  "Home Run": "#e74c3c", // Rojo
-  Out: "#64748b",        // Pizarra / Gris
-  "Field Error": "#a855f7", // Morado
-  Other: "#94a3b8",
-};
-
-export const TRAJECTORY_COLORS: Record<string, string> = {
-  ground_ball: "#eab308", // Amarillo
-  line_drive: "#3b82f6",  // Azul cielo
-  fly_ball: "#ec4899",    // Magenta
-  popup: "#64748b",       // Gris
-  unknown: "#94a3b8",
-};
-
-export const HARDNESS_COLORS: Record<string, string> = {
-  hard: "#ef4444",   // Rojo intenso (Hard)
-  medium: "#3b82f6", // Azul (Medium)
-  soft: "#10b981",   // Verde (Soft)
-  unknown: "#64748b",
 };
 
 export function transformCoordinates(coordX: number, coordY: number): {
@@ -139,86 +126,15 @@ export function convertPitchCoordinates(
 }
 
 /**
- * Genera datos de muestra consistentes y calibrados de spray charts para un jugador de Leones.
+ * Obtiene los batazos reales de la temporada 2025 para el jugador indicado o para toda la ofensiva (id: 0).
  */
 export function getPlayerBattedBalls(playerId: number): BattedBall[] {
-  // Lista de bateadores con semillas de dispersión
-  const isCedeño = playerId === 660821;
-  const isBonaci = playerId === 683748;
-  const isCorredor = playerId === 672580;
-  const count = isCedeño ? 54 : isBonaci ? 78 : isCorredor ? 95 : 60;
-  const playerName = isCedeño ? "Leandro Cedeño" : isBonaci ? "Brainer Bonaci" : isCorredor ? "Aldrem Corredor" : "Víctor Bericoto";
-  const batSide = isCorredor ? "L" : "R";
-
-  const balls: BattedBall[] = [];
-
-  for (let i = 0; i < count; i++) {
-    // Generar dispersión realista
-    const isOut = i % 3 !== 0;
-    let event = isOut ? (i % 2 === 0 ? "Groundout" : "Flyout") : (i % 6 === 0 ? "Home Run" : i % 4 === 0 ? "Double" : "Single");
-    if (i === 12 && isCedeño) event = "Triple";
-
-    let distFt: number;
-    let angleDeg: number;
-
-    if (event === "Home Run") {
-      distFt = 370 + ((i * 17) % 55);
-      angleDeg = batSide === "R" ? -35 + ((i * 9) % 45) : 10 + ((i * 9) % 35);
-    } else if (event === "Double") {
-      distFt = 280 + ((i * 13) % 60);
-      angleDeg = -40 + ((i * 11) % 80);
-    } else if (event === "Single") {
-      distFt = 160 + ((i * 14) % 80);
-      angleDeg = -35 + ((i * 15) % 70);
-    } else if (event === "Flyout") {
-      distFt = 240 + ((i * 12) % 80);
-      angleDeg = -40 + ((i * 7) % 80);
-    } else {
-      // Groundout
-      distFt = 70 + ((i * 9) % 65);
-      angleDeg = batSide === "R" ? -40 + ((i * 6) % 35) : 5 + ((i * 6) % 35);
-    }
-
-    const rad = (angleDeg * Math.PI) / 180;
-    const xFt = Math.round(distFt * Math.sin(rad) * 10) / 10;
-    const yFt = Math.round(distFt * Math.cos(rad) * 10) / 10;
-
-    // Convertir de vuelta a coordenadas Gameday (250x250)
-    const coordX = Math.round((xFt / 2.5 + 125.0) * 10) / 10;
-    const coordY = Math.round((204.5 - yFt / 2.5) * 10) / 10;
-
-    const traj = event === "Home Run" || event === "Flyout" ? "fly_ball" : (event === "Double" || (event === "Single" && distFt > 190)) ? "line_drive" : "ground_ball";
-    const hardness = classifyHardness(event, traj, distFt);
-    const direction = classifyDirection(angleDeg, batSide);
-
-    balls.push({
-      gamePk: 829925 + (i % 10),
-      gameDate: "2025-11-15",
-      batterId: playerId,
-      batterName: playerName,
-      pitcherId: 666687,
-      pitcherName: "Lanzador Rival",
-      event,
-      eventGroup: event === "Home Run" ? "Home Run" : event === "Double" ? "Double" : event === "Triple" ? "Triple" : event === "Single" ? "Single" : "Out",
-      eventEs: EVENT_TRANSLATIONS[event] || event,
-      isHit: ["Single", "Double", "Triple", "Home Run"].includes(event),
-      description: `${event} de ${playerName} a ${distFt} ft`,
-      rbi: event === "Home Run" ? 2 : event === "Double" ? 1 : 0,
-      coordX,
-      coordY,
-      xFt,
-      yFt,
-      distanceFt: distFt,
-      sprayAngle: angleDeg,
-      direction,
-      trajectory: traj,
-      trajectoryEs: traj === "fly_ball" ? "Elevado (FB)" : traj === "line_drive" ? "Línea (LD)" : "Rolling (GB)",
-      hardness,
-      hardnessEs: hardness === "hard" ? "Fuerte (Hard)" : hardness === "medium" ? "Medio (Medium)" : "Suave (Soft)",
-    });
+  const allBalls = (sprayDataRaw.battedBalls || []) as BattedBall[];
+  if (!playerId || playerId === 0) {
+    return allBalls;
   }
-
-  return balls;
+  const filtered = allBalls.filter((b) => b.batterId === playerId);
+  return filtered.length > 0 ? filtered : allBalls;
 }
 
 export function computeSprayStats(balls: BattedBall[]): SprayStats {
@@ -278,17 +194,41 @@ export function computeSprayStats(balls: BattedBall[]): SprayStats {
 }
 
 /**
- * Genera lanzamientos y métricas de disciplina en zona de strike para el bateador.
+ * Obtiene lanzamientos reales y métricas de disciplina en zona de strike para el bateador.
  */
 export function getPlayerStrikeZoneData(playerId: number): {
   pitches: PitchEvent[];
   metrics: StrikeZoneMetrics;
 } {
-  const isCedeño = playerId === 660821;
-  const total = isCedeño ? 140 : 180;
-  const pitches: PitchEvent[] = [];
-  const zoneCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 };
+  const pitchesMap = sprayDataRaw.pitchesByBatter as Record<string, PitchEvent[]>;
+  let playerPitches: PitchEvent[] = [];
 
+  if (!playerId || playerId === 0) {
+    const all = Object.values(pitchesMap).flat();
+    playerPitches = all.slice(0, 300);
+  } else {
+    playerPitches = pitchesMap[String(playerId)] || [];
+  }
+
+  if (!playerPitches.length) {
+    return {
+      pitches: [],
+      metrics: {
+        totalPitches: 0,
+        zonePct: "0.0%",
+        oSwingPct: "0.0%",
+        zSwingPct: "0.0%",
+        zContactPct: "0.0%",
+        oContactPct: "0.0%",
+        whiffPct: "0.0%",
+        cswPct: "0.0%",
+        swStrPct: "0.0%",
+        zoneCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 },
+      },
+    };
+  }
+
+  const total = playerPitches.length;
   let inZoneCount = 0;
   let oSwing = 0;
   let oTotal = 0;
@@ -299,115 +239,49 @@ export function getPlayerStrikeZoneData(playerId: number): {
   let whiffs = 0;
   let calledStrikes = 0;
   let swings = 0;
+  const zoneCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 };
 
-  for (let i = 0; i < total; i++) {
-    // Generar coordenadas de pitch simuladas alrededor de home plate
-    const inZone = i % 10 < 6; // 60% en zona
-    let xFt: number;
-    let zFt: number;
-
-    if (inZone) {
-      xFt = -0.65 + ((i * 13) % 130) / 100;
-      zFt = 1.6 + ((i * 17) % 170) / 100;
-    } else {
-      xFt = -1.2 + ((i * 23) % 240) / 100;
-      zFt = 1.0 + ((i * 29) % 280) / 100;
+  for (const p of playerPitches) {
+    if (p.zone >= 1 && p.zone <= 9) {
+      zoneCounts[p.zone] = (zoneCounts[p.zone] || 0) + 1;
     }
-
-    const { zone } = convertPitchCoordinates(xFt * (35.0 / 1.417) + 110.0, 176.0 - ((zFt - 1.5) / 1.9) * 40.0);
-    if (zone >= 1 && zone <= 9) {
-      zoneCounts[zone] = (zoneCounts[zone] || 0) + 1;
-    }
-
-    let isSwing = false;
-    let isWhiff = false;
-    let isContact = false;
-    let isCalledStrike = false;
-    let isBall = false;
-
-    if (inZone) {
+    if (p.inZone) {
       inZoneCount++;
       zTotal++;
-      // 68% swing en zona
-      if (i % 10 < 7) {
-        isSwing = true;
+      if (p.isSwing) {
         swings++;
         zSwing++;
-        // 82% contact en zona
-        if (i % 10 < 8) {
-          isContact = true;
-          zContact++;
-        } else {
-          isWhiff = true;
-          whiffs++;
-        }
-      } else {
-        isCalledStrike = true;
+        if (p.isContact) zContact++;
+      } else if (p.isCalledStrike) {
         calledStrikes++;
       }
     } else {
       oTotal++;
-      // 28% chase (O-Swing) fuera de zona
-      if (i % 10 < 3) {
-        isSwing = true;
+      if (p.isSwing) {
         swings++;
         oSwing++;
-        // 50% contact fuera de zona
-        if (i % 2 === 0) {
-          isContact = true;
-          oContact++;
-        } else {
-          isWhiff = true;
-          whiffs++;
-        }
-      } else {
-        isBall = true;
+        if (p.isContact) oContact++;
       }
     }
-
-    let callGroup: "Whiff" | "Called Strike" | "Foul" | "In Play" | "Ball" | "Other" = "Ball";
-    if (isWhiff) callGroup = "Whiff";
-    else if (isCalledStrike) callGroup = "Called Strike";
-    else if (isContact) callGroup = i % 2 === 0 ? "Foul" : "In Play";
-
-    pitches.push({
-      pitchNumber: i + 1,
-      callDesc: callGroup,
-      callGroup,
-      xFt,
-      zFt,
-      zone,
-      isSwing,
-      isWhiff,
-      isContact,
-      isCalledStrike,
-      isBall,
-      isStrike: isCalledStrike || isSwing,
-      inZone,
-    });
+    if (p.isWhiff) whiffs++;
   }
 
   const metrics: StrikeZoneMetrics = {
     totalPitches: total,
-    zonePct: `${((inZoneCount / total) * 100).toFixed(1)}%`,
+    zonePct: `${((inZoneCount / Math.max(1, total)) * 100).toFixed(1)}%`,
     oSwingPct: `${((oSwing / Math.max(1, oTotal)) * 100).toFixed(1)}%`,
     zSwingPct: `${((zSwing / Math.max(1, zTotal)) * 100).toFixed(1)}%`,
     zContactPct: `${((zContact / Math.max(1, zSwing)) * 100).toFixed(1)}%`,
     oContactPct: `${((oContact / Math.max(1, oSwing)) * 100).toFixed(1)}%`,
     whiffPct: `${((whiffs / Math.max(1, swings)) * 100).toFixed(1)}%`,
-    cswPct: `${(((calledStrikes + whiffs) / total) * 100).toFixed(1)}%`,
-    swStrPct: `${((whiffs / total) * 100).toFixed(1)}%`,
+    cswPct: `${(((calledStrikes + whiffs) / Math.max(1, total)) * 100).toFixed(1)}%`,
+    swStrPct: `${((whiffs / Math.max(1, total)) * 100).toFixed(1)}%`,
     zoneCounts,
   };
 
-  return { pitches, metrics };
+  return { pitches: playerPitches.slice(0, 250), metrics };
 }
 
-export const LEONES_SPRAY_PLAYERS = [
-  { id: 660821, name: "Leandro Cedeño" },
-  { id: 683748, name: "Brainer Bonaci" },
-  { id: 672580, name: "Aldrem Corredor" },
-  { id: 666971, name: "Víctor Bericoto" },
-  { id: 660688, name: "Harold Castro" },
-  { id: 682626, name: "Liván Soto" },
-];
+export const LEONES_SPRAY_PLAYERS: SprayPlayerOption[] =
+  (sprayDataRaw.players as SprayPlayerOption[]) || [];
+
