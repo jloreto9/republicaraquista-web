@@ -23,6 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -69,7 +70,7 @@ export default function RootLayout({
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
           <MobileNav />
-          <div className="flex-1 min-w-0 overflow-y-auto pb-20 lg:pb-0 flex flex-col">
+          <div className="flex-1 min-w-0 overflow-y-auto pb-20 landscape-content-padding lg:pb-0 px-safe flex flex-col">
             <div className="flex-1">
               {children}
             </div>

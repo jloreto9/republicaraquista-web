@@ -138,9 +138,9 @@ export function WpaView({
       )}
 
       {/* Cuadrantes de KPIs Sabermétricos */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+      <div className="grid grid-cols-2 landscape:grid-cols-4 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="p-3 sm:p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1.5 sm:mb-2">
             <span>MAYOR IMPACTO POSITIVO</span>
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
@@ -152,8 +152,8 @@ export function WpaView({
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+        <div className="p-3 sm:p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1.5 sm:mb-2">
             <span>SWING WPA MÁS ALTO</span>
             <Zap className="w-4 h-4 text-[#FDB827]" />
           </div>
@@ -165,8 +165,8 @@ export function WpaView({
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+        <div className="p-3 sm:p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1.5 sm:mb-2">
             <span>APALANCAMIENTO PROM.</span>
             <Flame className="w-4 h-4 text-amber-500" />
           </div>
@@ -178,8 +178,8 @@ export function WpaView({
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+        <div className="p-3 sm:p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1.5 sm:mb-2">
             <span>ESTADOS RE24 TANGO</span>
             <ShieldAlert className="w-4 h-4 text-blue-400" />
           </div>

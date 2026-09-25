@@ -2,7 +2,7 @@
 
 import React from "react";
 import { PitcherGameLog } from "@/types/pitching";
-import { Calendar, Shield, Award } from "lucide-react";
+import { Calendar, Shield, Award, Smartphone } from "lucide-react";
 
 interface PitchingGameLogsTableProps {
   gameLogs: PitcherGameLog[];
@@ -29,8 +29,8 @@ export function PitchingGameLogsTable({
     .slice(0, maxRows);
 
   return (
-    <div className="w-full max-w-4xl bg-[#0D152B] border border-[#1E2B4D] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
-      <div className="flex items-center justify-between border-b border-[#1E2B4D] pb-3">
+    <div className="w-full max-w-full lg:max-w-4xl bg-[#0D152B] border border-[#1E2B4D] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1E2B4D] pb-3 gap-2">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-lg bg-[#002D62] text-[#FDB827] border border-[#FDB827]/30">
             <Calendar className="w-4 h-4" />
@@ -47,25 +47,31 @@ export function PitchingGameLogsTable({
             </p>
           </div>
         </div>
+
+        {/* Tip de rotación visible solo en móvil vertical */}
+        <div className="flex sm:hidden landscape:hidden items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#002D62]/50 border border-[#FDB827]/30 text-[10px] text-amber-300 font-medium">
+          <Smartphone className="w-3.5 h-3.5 text-[#FDB827] rotate-90 shrink-0" />
+          <span>Gira tu teléfono a horizontal para ver el boxscore extendido</span>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-[#1E2B4D]/70 bg-[#070B19]">
         <table className="w-full text-xs text-center border-collapse">
           <thead>
             <tr className="bg-[#0F172A] text-[#FDB827] font-bold border-b border-[#1E2B4D]">
-              <th className="py-2.5 px-3 text-left">Fecha</th>
-              <th className="py-2.5 px-3 text-left">Rival</th>
-              <th className="py-2.5 px-3">Rol</th>
-              <th className="py-2.5 px-2">Dec.</th>
-              <th className="py-2.5 px-2">IP</th>
-              <th className="py-2.5 px-2">H</th>
-              <th className="py-2.5 px-2">C</th>
-              <th className="py-2.5 px-2">CL</th>
-              <th className="py-2.5 px-2">BB</th>
-              <th className="py-2.5 px-2">K</th>
-              <th className="py-2.5 px-3">Pitcheos (S-B)</th>
-              <th className="py-2.5 px-2 text-[#FDB827]">CSW%</th>
-              <th className="py-2.5 px-2 text-blue-400">Whiff%</th>
+              <th className="py-2.5 px-3 landscape:py-2 landscape:px-2 text-left">Fecha</th>
+              <th className="py-2.5 px-3 landscape:py-2 landscape:px-2 text-left">Rival</th>
+              <th className="py-2.5 px-3 landscape:py-2 landscape:px-2">Rol</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">Dec.</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">IP</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">H</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">C</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">CL</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">BB</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">K</th>
+              <th className="py-2.5 px-3 landscape:py-2 landscape:px-2">Pitcheos (S-B)</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5 text-[#FDB827]">CSW%</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5 text-blue-400">Whiff%</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#1E2B4D]/50 text-slate-200 font-mono">

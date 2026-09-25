@@ -51,9 +51,9 @@ export function MobileNav() {
   return (
     <>
       {/* ── Barra Superior Móvil (Visible solo en < lg) ── */}
-      <header className="lg:hidden h-14 bg-[#070B19]/95 backdrop-blur-md border-b border-[#1E2B4D] px-4 flex items-center justify-between sticky top-0 z-40 shrink-0">
+      <header className="lg:hidden h-14 landscape-compact-header bg-[#070B19]/95 backdrop-blur-md border-b border-[#1E2B4D] px-4 px-safe flex items-center justify-between sticky top-0 z-40 shrink-0">
         <Link href="/" className="flex items-center space-x-2.5">
-          <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#FDB827]/40 bg-[#0D152B] p-0.5 flex items-center justify-center shrink-0">
+          <div className="relative w-8 h-8 logo-container rounded-lg overflow-hidden border border-[#FDB827]/40 bg-[#0D152B] p-0.5 flex items-center justify-center shrink-0">
             <Image
               src="/assets/logo.png"
               alt="República Caraquista"
@@ -178,7 +178,7 @@ export function MobileNav() {
       </div>
 
       {/* ── Barra de Navegación Inferior (Bottom Bar Móvil) ── */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#070B19]/95 backdrop-blur-lg border-t border-[#1E2B4D] px-2 flex items-center justify-around z-30 pb-safe">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 landscape-compact-nav bg-[#070B19]/95 backdrop-blur-lg border-t border-[#1E2B4D] px-2 px-safe flex items-center justify-around z-30 pb-safe">
         <Link
           href="/"
           className={cn(

@@ -63,3 +63,54 @@ body {
 .pt-safe {
   padding-top: env(safe-area-inset-top, 0px);
 }
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.px-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Mobile Landscape optimizaciones cuando la pantalla es ancha pero de poca altura (<= 520px) */
+@media (orientation: landscape) and (max-height: 520px) {
+  .landscape-compact-header {
+    height: 42px !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+  .landscape-compact-header .logo-container {
+    width: 26px !important;
+    height: 26px !important;
+  }
+  .landscape-compact-header h1,
+  .landscape-compact-header span {
+    font-size: 11px !important;
+  }
+  .landscape-compact-nav {
+    height: 42px !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+  .landscape-compact-nav a,
+  .landscape-compact-nav button {
+    flex-direction: row !important;
+    gap: 6px !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+  .landscape-compact-nav span {
+    font-size: 10px !important;
+  }
+  .landscape-compact-nav svg {
+    width: 15px !important;
+    height: 15px !important;
+    margin-bottom: 0px !important;
+  }
+  .landscape-content-padding {
+    padding-bottom: 50px !important;
+  }
+}
+
