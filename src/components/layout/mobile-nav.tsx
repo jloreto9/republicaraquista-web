@@ -18,6 +18,7 @@ import {
   Activity,
   Layers,
   Radio,
+  Calendar,
   LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ interface NavItem {
 const navigationItems: NavItem[] = [
   { name: "Centro de Mando", href: "/", icon: LayoutDashboard },
   { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
+  { name: "Calendario Oficial", href: "/calendario", icon: Calendar },
   { name: "Líderes Individuales", href: "/individuales", icon: Users },
   { name: "Pitching Summary", href: "/pitching", icon: Radio },
   { name: "Matchup 360 (H2H)", href: "/matchup", icon: GitCompare },
@@ -199,6 +201,17 @@ export function MobileNav() {
         >
           <Trophy className="w-5 h-5 mb-0.5" />
           <span>Posiciones</span>
+        </Link>
+
+        <Link
+          href="/calendario"
+          className={cn(
+            "flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition-colors",
+            pathname === "/calendario" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
+          )}
+        >
+          <Calendar className="w-5 h-5 mb-0.5" />
+          <span>Calendario</span>
         </Link>
 
         <Link

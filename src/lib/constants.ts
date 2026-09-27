@@ -112,3 +112,29 @@ export function calculatePythagorean(runsFor: number, runsAgainst: number): numb
   const total = rfExp + raExp;
   return total > 0 ? rfExp / total : 0.5;
 }
+
+// Enlaces Oficiales de Suscripción para Calendario de Leones del Caracas
+export const CALENDAR_FEED_URLS = {
+  rawIcs:
+    "https://raw.githubusercontent.com/jloreto9/calendario-republica-caraquista/main/calendario/calendario_republica_caraquista.ics",
+  webcalIcs:
+    "webcal://raw.githubusercontent.com/jloreto9/calendario-republica-caraquista/main/calendario/calendario_republica_caraquista.ics",
+  googleCalendar:
+    "https://calendar.google.com/calendar/render?cid=OTQyMjBjZTMxYWE0YTg3MDc1MWRhODFmZmY0NGUwYmExZDgxMWEyNWYxN2U5OTdhNDRiOTdiNzAwNTYwYmZmMkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t",
+};
+
+export const MONTH_NAMES_ES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+

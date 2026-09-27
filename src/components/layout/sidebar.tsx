@@ -14,6 +14,7 @@ import {
   Shield,
   Activity,
   Radio,
+  Calendar,
 } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ interface NavItem {
 const navigationItems: NavItem[] = [
   { name: "Centro de Mando", href: "/", icon: LayoutDashboard },
   { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
+  { name: "Calendario Oficial", href: "/calendario", icon: Calendar },
   { name: "Líderes Individuales", href: "/individuales", icon: Users },
   { name: "Pitching Summary", href: "/pitching", icon: Radio },
   { name: "Matchup 360 (H2H)", href: "/matchup", icon: GitCompare },
