@@ -1,6 +1,7 @@
 import { Header } from "@/components/layout/header";
 import { IndividualesView } from "@/components/stats/individuales-view";
 import { getBattingStats, getPitchingStats } from "@/lib/supabase";
+import { ACTIVE_SEASON } from "@/lib/constants";
 
 export const revalidate = 300; // ISR cada 5 minutos
 
@@ -11,8 +12,8 @@ export const metadata = {
 
 export default async function IndividualesPage() {
   const [initialBattingStats, initialPitchingStats] = await Promise.all([
-    getBattingStats(2025, "R", "all", 60),
-    getPitchingStats(2025, "R", "all", 60),
+    getBattingStats(ACTIVE_SEASON, "R", "all", 60),
+    getPitchingStats(ACTIVE_SEASON, "R", "all", 60),
   ]);
 
   return (
@@ -20,7 +21,7 @@ export default async function IndividualesPage() {
       <Header
         title="Líderes Individuales"
         subtitle="Estadísticas Tradicionales & Sabermetría • LVBP"
-        season={2025}
+        season={ACTIVE_SEASON}
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">

@@ -3,6 +3,7 @@ import {
   LVBP_TEAM_IDS,
   getTeam,
   calculatePythagorean,
+  ACTIVE_SEASON,
 } from "./constants";
 import { TeamStanding, GameSummary, SeasonKPIs, BattingStats, PitchingStats } from "@/types/sports";
 
@@ -88,7 +89,7 @@ export const supabase =
  * Obtiene los standings calculados a partir de los partidos finalizados en Supabase.
  */
 export async function getStandings(
-  season = 2025,
+  season = ACTIVE_SEASON,
   phase = "regular"
 ): Promise<TeamStanding[]> {
   const defaultStandings = () =>
@@ -304,7 +305,7 @@ export async function getStandings(
  * Obtiene los últimos encuentros disputados o activos.
  */
 export async function getRecentGames(
-  season = 2025,
+  season = ACTIVE_SEASON,
   limit = 8
 ): Promise<GameSummary[]> {
   if (!supabase) {
@@ -357,7 +358,7 @@ export async function getRecentGames(
 /**
  * Obtiene los KPIs de resumen de los Leones del Caracas para la temporada.
  */
-export async function getSeasonKPIs(season = 2025): Promise<SeasonKPIs> {
+export async function getSeasonKPIs(season = ACTIVE_SEASON): Promise<SeasonKPIs> {
   const standings = await getStandings(season);
   const caracasStanding = standings.find((s) => s.teamId === 695);
   const pos = standings.findIndex((s) => s.teamId === 695) + 1;
@@ -414,7 +415,7 @@ export async function getSeasonKPIs(season = 2025): Promise<SeasonKPIs> {
  * Obtiene estadísticas agregadas de bateo por jugador para una temporada y fase.
  */
 export async function getBattingStats(
-  season = 2025,
+  season = ACTIVE_SEASON,
   phase = "R",
   teamId: string | number = "all",
   limit = 50,
@@ -586,7 +587,7 @@ export async function getBattingStats(
  * Obtiene estadísticas agregadas de pitcheo por jugador para una temporada y fase.
  */
 export async function getPitchingStats(
-  season = 2025,
+  season = ACTIVE_SEASON,
   phase = "R",
   teamId: string | number = "all",
   limit = 50,

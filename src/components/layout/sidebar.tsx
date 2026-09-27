@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ACTIVE_SEASON, formatSeason } from "@/lib/constants";
 
 interface NavItem {
   name: string;
@@ -113,7 +114,9 @@ export function Sidebar() {
       <div className="p-4 border-t border-[#1E2B4D] bg-[#070B19]/80 space-y-2">
         <div className="flex items-center justify-between text-[11px] text-slate-400">
           <span>Temporada LVBP</span>
-          <span className="font-mono text-[#FDB827] font-semibold">2025-26</span>
+          <span className="font-mono text-[#FDB827] font-semibold">
+            {formatSeason(ACTIVE_SEASON)}
+          </span>
         </div>
         <div className="pt-2 border-t border-[#1E2B4D]/60 flex flex-col">
           <span className="text-[10px] text-slate-400 font-medium">

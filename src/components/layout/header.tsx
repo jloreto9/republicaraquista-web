@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { getTeam } from "@/lib/constants";
+import { getTeam, ACTIVE_SEASON, formatSeason } from "@/lib/constants";
 
 interface HeaderProps {
   title: string;
@@ -12,7 +12,7 @@ interface HeaderProps {
 export function Header({
   title,
   subtitle = "Analítica Avanzada & Sabermetría LVBP",
-  season = 2025,
+  season = ACTIVE_SEASON,
 }: HeaderProps) {
   const caracas = getTeam(695);
 
@@ -34,7 +34,7 @@ export function Header({
         <div className="hidden sm:flex items-center space-x-2 px-3 py-1 rounded-full bg-[#0D152B] border border-[#1E2B4D] text-xs">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           <span className="text-slate-300 font-mono text-[11px]">
-            Temporada {season} (2025-26)
+            Temporada {season} ({formatSeason(season)})
           </span>
         </div>
 

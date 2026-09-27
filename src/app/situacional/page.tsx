@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { Header } from "@/components/layout/header";
 import { SituacionalView } from "@/components/situacional/situacional-view";
 import { getLeonesSituationalData } from "@/lib/situational-engine";
+import { ACTIVE_SEASON } from "@/lib/constants";
 
 export const revalidate = 300; // 5 minutos ISR
 
@@ -19,7 +20,7 @@ export default function SituacionalPage() {
       <Header
         title="Splits Situacionales & LOB Tracker"
         subtitle="Rendimiento en Presión (RISP, Clutch, Bases Llenas) • Dejados en Base • BvP"
-        season={2025}
+        season={ACTIVE_SEASON}
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">

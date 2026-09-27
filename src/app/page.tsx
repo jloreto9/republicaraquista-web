@@ -4,26 +4,56 @@ import { KPISummary } from "@/components/dashboard/kpi-summary";
 import { Scoreboard } from "@/components/dashboard/scoreboard";
 import { StandingsTable } from "@/components/standings/standings-table";
 import { getSeasonKPIs, getRecentGames, getStandings } from "@/lib/supabase";
-import { ArrowRight, Trophy } from "lucide-react";
+import { ACTIVE_SEASON } from "@/lib/constants";
+import { ArrowRight, Trophy, Calendar } from "lucide-react";
 
 export const revalidate = 300; // ISR cada 5 minutos en Edge de Vercel
 
 export default async function DashboardPage() {
   const [kpis, recentGames, standings] = await Promise.all([
-    getSeasonKPIs(2025),
-    getRecentGames(2025, 6),
-    getStandings(2025, "regular"),
+    getSeasonKPIs(ACTIVE_SEASON),
+    getRecentGames(ACTIVE_SEASON, 6),
+    getStandings(ACTIVE_SEASON, "regular"),
   ]);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <Header
         title="Centro de Mando"
-        subtitle="Temporada Regular LVBP • Leones del Caracas"
-        season={2025}
+        subtitle={`Temporada Regular LVBP • Leones del Caracas`}
+        season={ACTIVE_SEASON}
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
+        {/* Banner Temporada Oficial 2026-2027 */}
+        <section className="p-4 rounded-2xl bg-gradient-to-r from-[#0D152B] via-[#131E3D] to-[#0D152B] border border-[#FDB827]/40 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-[#FDB827]/10 border border-[#FDB827]/30 flex items-center justify-center shrink-0">
+              <Calendar className="w-5 h-5 text-[#FDB827]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#FDB827] font-semibold">
+                  Temporada LVBP 2026-2027
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              </div>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-100">
+                ¡Calendario Oficial de 56 Juegos Disponible!
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Inicia el 13 de Octubre en Maracaibo vs. Águilas del Zulia.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/calendario"
+            className="flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl bg-[#FDB827] text-[#070B19] text-xs font-bold hover:bg-[#FDB827]/90 transition-all shrink-0 shadow-md font-mono"
+          >
+            <span>Ver Calendario & Sincronizar</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </section>
         {/* Resumen de Temporada (KPIs) */}
         <section className="space-y-2">
           <div className="flex items-center justify-between">

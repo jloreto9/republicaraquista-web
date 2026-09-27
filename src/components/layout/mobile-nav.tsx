@@ -22,6 +22,7 @@ import {
   LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ACTIVE_SEASON, formatSeason } from "@/lib/constants";
 
 interface NavItem {
   name: string;
@@ -161,7 +162,7 @@ export function MobileNav() {
         {/* Footer del Drawer con Créditos */}
         <div className="p-4 border-t border-[#1E2B4D] bg-[#0D152B]/40 space-y-2">
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span>Temporada 2025-26</span>
+            <span>Temporada {formatSeason(ACTIVE_SEASON)}</span>
             <span className="text-[#FDB827]">REPUBLICARAQUISTAPP</span>
           </div>
           <div className="pt-2 border-t border-[#1E2B4D]/60 flex flex-col">

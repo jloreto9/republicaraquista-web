@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { Header } from "@/components/layout/header";
 import { PitchingView } from "@/components/pitching/pitching-view";
+import { ACTIVE_SEASON } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Pitching Summary & Telemetría | República Caraquista",
@@ -14,7 +15,7 @@ export default function PitchingPage() {
       <Header
         title="Pitching Summary & Telemetría"
         subtitle="Telemetría Hawk-Eye (MLB) • Play-by-Play Leones del Caracas • Tarjetas HD Thomas Nestico"
-        season={2025}
+        season={ACTIVE_SEASON}
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
