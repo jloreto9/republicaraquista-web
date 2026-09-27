@@ -39,7 +39,7 @@ export default async function DashboardPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
               </div>
               <h3 className="text-xs sm:text-sm font-bold text-slate-100">
-                ¡Calendario Oficial de 56 Juegos Disponible!
+                ¡Calendario Oficial Disponible!
               </h3>
               <p className="text-[11px] text-slate-400">
                 Inicia el 13 de Octubre en Maracaibo vs. Águilas del Zulia.
