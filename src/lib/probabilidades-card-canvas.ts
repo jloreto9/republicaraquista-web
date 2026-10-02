@@ -248,25 +248,37 @@ export async function generateProbabilidadesCardBlob(
     ctx.fillText("MEJOR CUOTA MERCADO", rightColX, cardY + cardH * 0.22);
 
     // Mejor Cuota Away
-    ctx.fillStyle = "#10B981"; // Verde esmeralda
-    ctx.font = `bold ${isSquare ? 26 : 15}px 'Inter', sans-serif`;
-    ctx.fillText(
-      `${formatOdds(game.bestOdds.bestAwayMl.odds, oddsFormat)} (${game.bestOdds.bestAwayMl.sportsbookName.slice(0, 8)})`,
-      rightColX,
-      awayRowY
-    );
+    if (game.bestOdds.hasMarketOdds && game.bestOdds.bestAwayMl) {
+      ctx.fillStyle = "#10B981"; // Verde esmeralda
+      ctx.font = `bold ${isSquare ? 26 : 15}px 'Inter', sans-serif`;
+      ctx.fillText(
+        `${formatOdds(game.bestOdds.bestAwayMl.odds, oddsFormat)} (${game.bestOdds.bestAwayMl.sportsbookName.slice(0, 8)})`,
+        rightColX,
+        awayRowY
+      );
+    } else {
+      ctx.fillStyle = "#64748B";
+      ctx.font = `italic ${isSquare ? 22 : 12}px 'Inter', sans-serif`;
+      ctx.fillText("Línea por abrir", rightColX, awayRowY);
+    }
 
     // Mejor Cuota Home
-    ctx.fillStyle = "#10B981";
-    ctx.font = `bold ${isSquare ? 26 : 15}px 'Inter', sans-serif`;
-    ctx.fillText(
-      `${formatOdds(game.bestOdds.bestHomeMl.odds, oddsFormat)} (${game.bestOdds.bestHomeMl.sportsbookName.slice(0, 8)})`,
-      rightColX,
-      homeRowY
-    );
+    if (game.bestOdds.hasMarketOdds && game.bestOdds.bestHomeMl) {
+      ctx.fillStyle = "#10B981";
+      ctx.font = `bold ${isSquare ? 26 : 15}px 'Inter', sans-serif`;
+      ctx.fillText(
+        `${formatOdds(game.bestOdds.bestHomeMl.odds, oddsFormat)} (${game.bestOdds.bestHomeMl.sportsbookName.slice(0, 8)})`,
+        rightColX,
+        homeRowY
+      );
+    } else {
+      ctx.fillStyle = "#64748B";
+      ctx.font = `italic ${isSquare ? 22 : 12}px 'Inter', sans-serif`;
+      ctx.fillText("Línea por abrir", rightColX, homeRowY);
+    }
 
     // ── Badge de Pick Recomendado (+EV) ──
-    if (game.topPick && game.topPick.evPercent >= 4.0) {
+    if (game.bestOdds.hasMarketOdds && game.topPick && game.topPick.evPercent >= 4.0) {
       const isMis = game.topPick.rating === "mispriced";
       const badgeW = isSquare ? 240 : 120;
       const badgeH = isSquare ? 50 : 28;

@@ -62,7 +62,7 @@ export function ExportCardModal({
       isMounted = false;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
-  }, [isOpen, format, dateStr, projections, topPicks, mispricedAlerts]);
+  }, [isOpen, format, dateStr, projections, topPicks, mispricedAlerts, oddsFormat]);
 
   if (!isOpen) return null;
 

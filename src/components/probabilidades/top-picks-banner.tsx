@@ -13,7 +13,25 @@ interface TopPicksBannerProps {
 }
 
 export function TopPicksBanner({ picks, mispricedAlerts, oddsFormat }: TopPicksBannerProps) {
-  if (picks.length === 0 && mispricedAlerts.length === 0) return null;
+  if (picks.length === 0 && mispricedAlerts.length === 0) {
+    return (
+      <div className="p-4 rounded-2xl bg-[#0D152B]/70 border border-[#1E2B4D] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center space-x-2.5 text-slate-300">
+          <span className="p-1.5 rounded-lg bg-[#1E2B4D] text-[#FDB827] shrink-0">
+            <Info className="w-4 h-4" />
+          </span>
+          <div>
+            <span className="font-bold text-slate-200">
+              Líneas de Mercado Pendientes de Apertura
+            </span>
+            <p className="text-slate-400 text-[11px] mt-0.5">
+              Las casas de apuestas (JEL, BCR, STP, ROY) aún no han publicado sus líneas oficiales para esta jornada. Consulta las <strong>Cuotas Justas del Modelo Sabermétrico</strong> en cada partido o introduce tus cuotas en la tabla para comparar el valor (+EV).
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

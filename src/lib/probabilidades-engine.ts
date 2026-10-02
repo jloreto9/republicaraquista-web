@@ -332,7 +332,10 @@ export function americanToDecimal(american: number): number {
  * Ej: formatOdds(2.20, "american") -> "+120"
  * Ej: formatOdds(1.83, "american") -> "-120"
  */
-export function formatOdds(decimal: number, format: OddsFormat = "american"): string {
+export function formatOdds(decimal?: number | null, format: OddsFormat = "american"): string {
+  if (decimal == null || isNaN(decimal) || decimal <= 1.0) {
+    return "—";
+  }
   if (format === "decimal") {
     return decimal.toFixed(2);
   }
@@ -516,129 +519,79 @@ export function projectMatchup(
 }
 
 /**
- * Genera cuotas de mercado simuladas para las 4 casas con variaciones realistas
+ * Genera la estructura inicial de cuotas para las casas de apuestas.
+ * Regla de negocio estricta: si ninguna casa ha publicado líneas reales,
+ * NO se inventan cuotas. Todas las casas inician en isOpen = false y homeMl = null.
  */
-export function generateRealisticOdds(
-  model: ModelProbabilities,
-  homeAbbr: string,
-  awayAbbr: string
-): Record<SportsbookId, SportsbookOdds> {
-  const marginJel = 1.05; // 5% vig
-  const marginBcr = 1.04; // 4% vig
-  const marginStp = 1.07; // 7% vig
-  const marginRoy = 1.08; // 8% vig
+export function generateInitialOdds(model: ModelProbabilities): Record<SportsbookId, SportsbookOdds> {
+  const books: SportsbookId[] = ["juegaenlinea", "betcris", "sellatuparley", "apuestasroyal", "custom"];
 
-  // Variaciones de cuotas entre casas (creando ineficiencias sutiles)
-  // Betcris más afilada, JEL balanceada, STP y ROY a veces colgadas
-  const homeFair = model.fairHomeDecimal;
-  const awayFair = model.fairAwayDecimal;
-
-  // JuegaEnLínea (Benchmark oficial)
-  const jelHome = Number((homeFair * 0.96).toFixed(2));
-  const jelAway = Number((awayFair * 0.96).toFixed(2));
-
-  // Betcris (Líneas más agresivas)
-  const bcrHome = Number((homeFair * 0.97).toFixed(2));
-  const bcrAway = Number((awayFair * 0.97).toFixed(2));
-
-  // SellaTuParley (A veces infla favoritos o deja colgados underdogs)
-  const stpBias = model.homeWinProb > 0.55 ? 0.92 : 1.03; // Ineficiencia intencional
-  const stpHome = Number((homeFair * stpBias).toFixed(2));
-  const stpAway = Number((awayFair * (2 - stpBias) * 0.94).toFixed(2));
-
-  // Apuestas Royal
-  const royBias = model.awayWinProb > 0.50 ? 1.04 : 0.93;
-  const royHome = Number((homeFair * (2 - royBias) * 0.93).toFixed(2));
-  const royAway = Number((awayFair * royBias).toFixed(2));
-
-  return {
-    juegaenlinea: {
-      sportsbookId: "juegaenlinea",
-      sportsbookName: "JuegaEnLínea",
-      homeMl: Math.max(1.15, jelHome),
-      awayMl: Math.max(1.15, jelAway),
+  const oddsObj: Partial<Record<SportsbookId, SportsbookOdds>> = {};
+  for (const bId of books) {
+    const meta = SPORTSBOOKS_META[bId];
+    oddsObj[bId] = {
+      sportsbookId: bId,
+      sportsbookName: meta.name,
+      homeMl: null,
+      awayMl: null,
       overTotal: model.recommendedTotal,
-      overOdds: 1.90,
-      underOdds: 1.90,
+      overOdds: null,
+      underOdds: null,
       runlineSpread: -1.5,
-      runlineHomeOdds: Number((model.fairRunlineHomeDecimal * 0.95).toFixed(2)),
-      runlineAwayOdds: Number((model.fairRunlineAwayDecimal * 0.95).toFixed(2)),
-    },
-    betcris: {
-      sportsbookId: "betcris",
-      sportsbookName: "Betcris",
-      homeMl: Math.max(1.15, bcrHome),
-      awayMl: Math.max(1.15, bcrAway),
-      overTotal: model.recommendedTotal,
-      overOdds: 1.92,
-      underOdds: 1.88,
-      runlineSpread: -1.5,
-      runlineHomeOdds: Number((model.fairRunlineHomeDecimal * 0.96).toFixed(2)),
-      runlineAwayOdds: Number((model.fairRunlineAwayDecimal * 0.96).toFixed(2)),
-    },
-    sellatuparley: {
-      sportsbookId: "sellatuparley",
-      sportsbookName: "SellaTuParley",
-      homeMl: Math.max(1.15, stpHome),
-      awayMl: Math.max(1.15, stpAway),
-      overTotal: model.recommendedTotal,
-      overOdds: 1.85,
-      underOdds: 1.85,
-      runlineSpread: -1.5,
-      runlineHomeOdds: Number((model.fairRunlineHomeDecimal * 0.93).toFixed(2)),
-      runlineAwayOdds: Number((model.fairRunlineAwayDecimal * 0.93).toFixed(2)),
-    },
-    apuestasroyal: {
-      sportsbookId: "apuestasroyal",
-      sportsbookName: "Apuestas Royal",
-      homeMl: Math.max(1.15, royHome),
-      awayMl: Math.max(1.15, royAway),
-      overTotal: model.recommendedTotal,
-      overOdds: 1.86,
-      underOdds: 1.84,
-      runlineSpread: -1.5,
-      runlineHomeOdds: Number((model.fairRunlineHomeDecimal * 0.92).toFixed(2)),
-      runlineAwayOdds: Number((model.fairRunlineAwayDecimal * 0.92).toFixed(2)),
-    },
-    custom: {
-      sportsbookId: "custom",
-      sportsbookName: "Personalizada",
-      homeMl: Math.max(1.15, jelHome),
-      awayMl: Math.max(1.15, jelAway),
-      overTotal: model.recommendedTotal,
-      overOdds: 1.90,
-      underOdds: 1.90,
-      runlineSpread: -1.5,
-      runlineHomeOdds: Number((model.fairRunlineHomeDecimal * 0.95).toFixed(2)),
-      runlineAwayOdds: Number((model.fairRunlineAwayDecimal * 0.95).toFixed(2)),
-    },
-  };
+      runlineHomeOdds: null,
+      runlineAwayOdds: null,
+      isOpen: false,
+    };
+  }
+
+  return oddsObj as Record<SportsbookId, SportsbookOdds>;
 }
 
+export const generateRealisticOdds = generateInitialOdds;
+
 /**
- * Encuentra las mejores cuotas del mercado (Best Odds) entre las 4 casas
+ * Encuentra las mejores cuotas del mercado (Best Odds) únicamente entre líneas abiertas y reales
  */
 export function extractBestOdds(oddsByBook: Record<SportsbookId, SportsbookOdds>): BestOddsSummary {
-  const books: SportsbookId[] = ["juegaenlinea", "betcris", "sellatuparley", "apuestasroyal"];
+  const books: SportsbookId[] = ["juegaenlinea", "betcris", "sellatuparley", "apuestasroyal", "custom"];
 
-  let bestHome = { odds: 0, sportsbookId: "juegaenlinea" as SportsbookId, sportsbookName: "JuegaEnLínea" };
-  let bestAway = { odds: 0, sportsbookId: "juegaenlinea" as SportsbookId, sportsbookName: "JuegaEnLínea" };
+  let bestHome: { odds: number; sportsbookId: SportsbookId; sportsbookName: string } | undefined = undefined;
+  let bestAway: { odds: number; sportsbookId: SportsbookId; sportsbookName: string } | undefined = undefined;
+  let bestOver: { odds: number; line: number; sportsbookId: SportsbookId; sportsbookName: string } | undefined = undefined;
+  let bestUnder: { odds: number; line: number; sportsbookId: SportsbookId; sportsbookName: string } | undefined = undefined;
 
   for (const bId of books) {
     const ob = oddsByBook[bId];
-    if (ob) {
-      if (ob.homeMl > bestHome.odds) {
+    if (!ob || !ob.isOpen) continue;
+
+    if (ob.homeMl && ob.homeMl > 1.0) {
+      if (!bestHome || ob.homeMl > bestHome.odds) {
         bestHome = { odds: ob.homeMl, sportsbookId: bId, sportsbookName: ob.sportsbookName };
       }
-      if (ob.awayMl > bestAway.odds) {
+    }
+    if (ob.awayMl && ob.awayMl > 1.0) {
+      if (!bestAway || ob.awayMl > bestAway.odds) {
         bestAway = { odds: ob.awayMl, sportsbookId: bId, sportsbookName: ob.sportsbookName };
+      }
+    }
+    if (ob.overOdds && ob.overOdds > 1.0 && ob.overTotal) {
+      if (!bestOver || ob.overOdds > bestOver.odds) {
+        bestOver = { odds: ob.overOdds, line: ob.overTotal, sportsbookId: bId, sportsbookName: ob.sportsbookName };
+      }
+    }
+    if (ob.underOdds && ob.underOdds > 1.0 && ob.overTotal) {
+      if (!bestUnder || ob.underOdds > bestUnder.odds) {
+        bestUnder = { odds: ob.underOdds, line: ob.overTotal, sportsbookId: bId, sportsbookName: ob.sportsbookName };
       }
     }
   }
 
   return {
+    hasMarketOdds: Boolean(bestHome || bestAway),
     bestHomeMl: bestHome,
     bestAwayMl: bestAway,
+    bestOver,
+    bestUnder,
   };
 }
 
@@ -655,82 +608,86 @@ export function evaluateAssessments(
   park: ParkFactor
 ): ValueAssessment[] {
   const assessments: ValueAssessment[] = [];
-  const books: SportsbookId[] = ["juegaenlinea", "betcris", "sellatuparley", "apuestasroyal"];
+  const books: SportsbookId[] = ["juegaenlinea", "betcris", "sellatuparley", "apuestasroyal", "custom"];
 
   for (const bId of books) {
     const ob = oddsByBook[bId];
-    if (!ob) continue;
+    if (!ob || !ob.isOpen) continue;
 
-    // 1. Home Moneyline
-    const evHome = calculateEv(model.homeWinProb, ob.homeMl);
-    const ratingHome = evaluateRating(evHome);
-    const stakeHome = calculateKellyStake(model.homeWinProb, ob.homeMl);
-    const expHome =
-      ratingHome === "mispriced"
-        ? generateMispricingExplanation(
-            `Victoria ${homeTeamAbbr}`,
-            homeTeamAbbr,
-            ob.sportsbookName,
-            ob.homeMl,
-            model.fairHomeDecimal,
-            homePitcher,
-            awayPitcher,
-            park,
-            evHome
-          )
-        : undefined;
+    // 1. Home Moneyline (solo si la línea está abierta con cuota real)
+    if (ob.homeMl && ob.homeMl > 1.0) {
+      const evHome = calculateEv(model.homeWinProb, ob.homeMl);
+      const ratingHome = evaluateRating(evHome);
+      const stakeHome = calculateKellyStake(model.homeWinProb, ob.homeMl);
+      const expHome =
+        ratingHome === "mispriced"
+          ? generateMispricingExplanation(
+              `Victoria ${homeTeamAbbr}`,
+              homeTeamAbbr,
+              ob.sportsbookName,
+              ob.homeMl,
+              model.fairHomeDecimal,
+              homePitcher,
+              awayPitcher,
+              park,
+              evHome
+            )
+          : undefined;
 
-    assessments.push({
-      selection: "home_ml",
-      label: `${homeTeamAbbr} (Victoria ML)`,
-      teamAbbr: homeTeamAbbr,
-      sportsbookId: bId,
-      sportsbookName: ob.sportsbookName,
-      marketOdds: ob.homeMl,
-      fairOdds: model.fairHomeDecimal,
-      winProb: model.homeWinProb,
-      evPercent: evHome,
-      rating: ratingHome,
-      kellyStakePercent: stakeHome,
-      explanation: expHome,
-    });
+      assessments.push({
+        selection: "home_ml",
+        label: `${homeTeamAbbr} (Victoria ML)`,
+        teamAbbr: homeTeamAbbr,
+        sportsbookId: bId,
+        sportsbookName: ob.sportsbookName,
+        marketOdds: ob.homeMl,
+        fairOdds: model.fairHomeDecimal,
+        winProb: model.homeWinProb,
+        evPercent: evHome,
+        rating: ratingHome,
+        kellyStakePercent: stakeHome,
+        explanation: expHome,
+      });
+    }
 
     // 2. Away Moneyline
-    const evAway = calculateEv(model.awayWinProb, ob.awayMl);
-    const ratingAway = evaluateRating(evAway);
-    const stakeAway = calculateKellyStake(model.awayWinProb, ob.awayMl);
-    const expAway =
-      ratingAway === "mispriced"
-        ? generateMispricingExplanation(
-            `Victoria ${awayTeamAbbr}`,
-            awayTeamAbbr,
-            ob.sportsbookName,
-            ob.awayMl,
-            model.fairAwayDecimal,
-            awayPitcher,
-            homePitcher,
-            park,
-            evAway
-          )
-        : undefined;
+    if (ob.awayMl && ob.awayMl > 1.0) {
+      const evAway = calculateEv(model.awayWinProb, ob.awayMl);
+      const ratingAway = evaluateRating(evAway);
+      const stakeAway = calculateKellyStake(model.awayWinProb, ob.awayMl);
+      const expAway =
+        ratingAway === "mispriced"
+          ? generateMispricingExplanation(
+              `Victoria ${awayTeamAbbr}`,
+              awayTeamAbbr,
+              ob.sportsbookName,
+              ob.awayMl,
+              model.fairAwayDecimal,
+              awayPitcher,
+              homePitcher,
+              park,
+              evAway
+            )
+          : undefined;
 
-    assessments.push({
-      selection: "away_ml",
-      label: `${awayTeamAbbr} (Victoria ML)`,
-      teamAbbr: awayTeamAbbr,
-      sportsbookId: bId,
-      sportsbookName: ob.sportsbookName,
-      marketOdds: ob.awayMl,
-      fairOdds: model.fairAwayDecimal,
-      winProb: model.awayWinProb,
-      evPercent: evAway,
-      rating: ratingAway,
-      kellyStakePercent: stakeAway,
-      explanation: expAway,
-    });
+      assessments.push({
+        selection: "away_ml",
+        label: `${awayTeamAbbr} (Victoria ML)`,
+        teamAbbr: awayTeamAbbr,
+        sportsbookId: bId,
+        sportsbookName: ob.sportsbookName,
+        marketOdds: ob.awayMl,
+        fairOdds: model.fairAwayDecimal,
+        winProb: model.awayWinProb,
+        evPercent: evAway,
+        rating: ratingAway,
+        kellyStakePercent: stakeAway,
+        explanation: expAway,
+      });
+    }
 
     // 3. Over Totals
-    if (ob.overOdds) {
+    if (ob.overOdds && ob.overOdds > 1.0) {
       const evOver = calculateEv(model.overProb, ob.overOdds);
       const ratingOver = evaluateRating(evOver);
       assessments.push({
@@ -748,7 +705,7 @@ export function evaluateAssessments(
     }
 
     // 4. Under Totals
-    if (ob.underOdds) {
+    if (ob.underOdds && ob.underOdds > 1.0) {
       const evUnder = calculateEv(model.underProb, ob.underOdds);
       const ratingUnder = evaluateRating(evUnder);
       assessments.push({
@@ -929,7 +886,7 @@ export function getSampleDailyCard(dateStr = "2026-10-13"): TipsterDailyCard {
     };
 
     const model = projectMatchup(g.homeId, g.awayId, homePitcher, awayPitcher, park);
-    const oddsByBook = generateRealisticOdds(model, homeTeam.abbreviation, awayTeam.abbreviation);
+    const oddsByBook = generateInitialOdds(model);
     const bestOdds = extractBestOdds(oddsByBook);
     const assessments = evaluateAssessments(
       model,
@@ -941,7 +898,7 @@ export function getSampleDailyCard(dateStr = "2026-10-13"): TipsterDailyCard {
       park
     );
 
-    const topPick = assessments.find((a) => a.rating === "mispriced") || assessments[0];
+    const topPick = assessments.find((a) => a.rating === "mispriced") || assessments[0] || undefined;
 
     return {
       gameId: g.id,
@@ -974,6 +931,7 @@ export function getSampleDailyCard(dateStr = "2026-10-13"): TipsterDailyCard {
   const allAssessments = projections.flatMap((p) => p.assessments);
   const mispricedAlerts = allAssessments.filter((a) => a.rating === "mispriced");
   const topPicks = allAssessments.filter((a) => a.evPercent >= 5.0).slice(0, 4);
+  const hasLiveMarketOdds = projections.some((p) => p.bestOdds.hasMarketOdds);
 
   return {
     date: dateStr,
@@ -982,6 +940,7 @@ export function getSampleDailyCard(dateStr = "2026-10-13"): TipsterDailyCard {
     projections,
     topPicks,
     mispricedAlerts,
+    hasLiveMarketOdds,
     isCalendarScheduled: !!calEvent,
     calendarEventSummary: calEvent?.summary,
     isRestDay: !calEvent,

@@ -160,20 +160,30 @@ function ProbabilidadesContent() {
     gameId: string,
     sportsbookId: SportsbookId,
     field: keyof SportsbookOdds,
-    val: number
+    val: number | null
   ) => {
     setCustomOddsOverrides((prev) => {
       const gameObj = prev[gameId] || {};
       const bookObj = gameObj[sportsbookId] || {};
 
+      const updatedBook: Partial<SportsbookOdds> = {
+        ...bookObj,
+        [field]: val,
+      };
+
+      const hasValidLine =
+        (updatedBook.homeMl != null && updatedBook.homeMl > 1.0) ||
+        (updatedBook.awayMl != null && updatedBook.awayMl > 1.0) ||
+        (updatedBook.overOdds != null && updatedBook.overOdds > 1.0) ||
+        (updatedBook.underOdds != null && updatedBook.underOdds > 1.0);
+
+      updatedBook.isOpen = hasValidLine;
+
       return {
         ...prev,
         [gameId]: {
           ...gameObj,
-          [sportsbookId]: {
-            ...bookObj,
-            [field]: val,
-          },
+          [sportsbookId]: updatedBook,
         },
       };
     });

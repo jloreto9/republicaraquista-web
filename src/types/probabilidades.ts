@@ -19,14 +19,15 @@ export interface SportsbookMeta {
 export interface SportsbookOdds {
   sportsbookId: SportsbookId;
   sportsbookName: string;
-  homeMl: number;       // Cuota decimal (ej. 1.85)
-  awayMl: number;       // Cuota decimal (ej. 1.95)
-  overTotal?: number;   // Línea de carreras (ej. 9.0)
-  overOdds?: number;    // Cuota Over (ej. 1.90)
-  underOdds?: number;   // Cuota Under (ej. 1.90)
-  runlineSpread?: number; // Spread local (ej. -1.5)
-  runlineHomeOdds?: number; // Cuota local RL (ej. 2.40)
-  runlineAwayOdds?: number; // Cuota visitante RL (ej. 1.55)
+  homeMl: number | null;       // Cuota decimal (null si la casa no ha publicado línea)
+  awayMl: number | null;       // Cuota decimal (null si la casa no ha publicado línea)
+  overTotal?: number | null;   // Línea de carreras (ej. 9.0)
+  overOdds?: number | null;    // Cuota Over (ej. 1.90)
+  underOdds?: number | null;   // Cuota Under (ej. 1.90)
+  runlineSpread?: number | null; // Spread local (ej. -1.5)
+  runlineHomeOdds?: number | null; // Cuota local RL (ej. 2.40)
+  runlineAwayOdds?: number | null; // Cuota visitante RL (ej. 1.55)
+  isOpen?: boolean;            // true solo si la casa publicó cuotas o el usuario las ingresó
   updatedAt?: string;
 }
 
@@ -91,8 +92,9 @@ export interface ValueAssessment {
 }
 
 export interface BestOddsSummary {
-  bestHomeMl: { odds: number; sportsbookId: SportsbookId; sportsbookName: string };
-  bestAwayMl: { odds: number; sportsbookId: SportsbookId; sportsbookName: string };
+  hasMarketOdds: boolean;
+  bestHomeMl?: { odds: number; sportsbookId: SportsbookId; sportsbookName: string };
+  bestAwayMl?: { odds: number; sportsbookId: SportsbookId; sportsbookName: string };
   bestOver?: { odds: number; line: number; sportsbookId: SportsbookId; sportsbookName: string };
   bestUnder?: { odds: number; line: number; sportsbookId: SportsbookId; sportsbookName: string };
 }
@@ -146,6 +148,7 @@ export interface TipsterDailyCard {
   projections: GameProjection[];
   topPicks: ValueAssessment[];
   mispricedAlerts: ValueAssessment[];
+  hasLiveMarketOdds?: boolean;
   isCalendarScheduled?: boolean;
   calendarEventSummary?: string;
   isRestDay?: boolean;

@@ -33,7 +33,7 @@ interface GameProbabilityCardProps {
     gameId: string,
     sportsbookId: SportsbookId,
     field: keyof SportsbookOdds,
-    val: number
+    val: number | null
   ) => void;
 }
 
@@ -254,8 +254,14 @@ export function GameProbabilityCard({
                   const ob = game.oddsByBook[bId];
                   if (!ob) return null;
 
-                  const isBestHome = game.bestOdds.bestHomeMl.sportsbookId === bId;
-                  const isBestAway = game.bestOdds.bestAwayMl.sportsbookId === bId;
+                  const isBestHome = Boolean(
+                    game.bestOdds.hasMarketOdds &&
+                    game.bestOdds.bestHomeMl?.sportsbookId === bId
+                  );
+                  const isBestAway = Boolean(
+                    game.bestOdds.hasMarketOdds &&
+                    game.bestOdds.bestAwayMl?.sportsbookId === bId
+                  );
 
                   // Buscar si esta casa tiene cuota desfasada en este juego
                   const bookAlert = game.assessments.find(
@@ -290,9 +296,15 @@ export function GameProbabilityCard({
                         <div className="inline-flex items-center space-x-1">
                           <input
                             type="text"
-                            value={formatOdds(ob.awayMl, oddsFormat)}
+                            value={ob.awayMl != null ? formatOdds(ob.awayMl, oddsFormat) : ""}
+                            placeholder="—"
+                            title="Clic para ingresar o editar cuota"
                             onChange={(e) => {
                               const val = e.target.value.trim();
+                              if (!val) {
+                                onUpdateOdd(game.gameId, bId, "awayMl", null);
+                                return;
+                              }
                               if (oddsFormat === "american") {
                                 const parsed = parseInt(val.replace("+", ""), 10);
                                 if (!isNaN(parsed) && Math.abs(parsed) >= 100) {
@@ -306,10 +318,12 @@ export function GameProbabilityCard({
                               }
                             }}
                             className={cn(
-                              "w-18 px-1.5 py-0.5 text-center font-bold font-mono rounded bg-[#070B19] border text-xs focus:outline-none focus:border-[#FDB827]",
+                              "w-20 px-1.5 py-0.5 text-center font-bold font-mono rounded bg-[#070B19] border text-xs focus:outline-none focus:border-[#FDB827]",
                               isBestAway
                                 ? "border-emerald-500 text-emerald-300 bg-emerald-950/20"
-                                : "border-[#1E2B4D] text-slate-200"
+                                : ob.awayMl != null
+                                ? "border-[#1E2B4D] text-slate-200"
+                                : "border-[#1E2B4D]/60 text-slate-400 placeholder:text-slate-600 placeholder:italic"
                             )}
                           />
                           {isBestAway && (
@@ -323,9 +337,15 @@ export function GameProbabilityCard({
                         <div className="inline-flex items-center space-x-1">
                           <input
                             type="text"
-                            value={formatOdds(ob.homeMl, oddsFormat)}
+                            value={ob.homeMl != null ? formatOdds(ob.homeMl, oddsFormat) : ""}
+                            placeholder="—"
+                            title="Clic para ingresar o editar cuota"
                             onChange={(e) => {
                               const val = e.target.value.trim();
+                              if (!val) {
+                                onUpdateOdd(game.gameId, bId, "homeMl", null);
+                                return;
+                              }
                               if (oddsFormat === "american") {
                                 const parsed = parseInt(val.replace("+", ""), 10);
                                 if (!isNaN(parsed) && Math.abs(parsed) >= 100) {
@@ -339,10 +359,12 @@ export function GameProbabilityCard({
                               }
                             }}
                             className={cn(
-                              "w-18 px-1.5 py-0.5 text-center font-bold font-mono rounded bg-[#070B19] border text-xs focus:outline-none focus:border-[#FDB827]",
+                              "w-20 px-1.5 py-0.5 text-center font-bold font-mono rounded bg-[#070B19] border text-xs focus:outline-none focus:border-[#FDB827]",
                               isBestHome
                                 ? "border-emerald-500 text-emerald-300 bg-emerald-950/20"
-                                : "border-[#1E2B4D] text-slate-200"
+                                : ob.homeMl != null
+                                ? "border-[#1E2B4D] text-slate-200"
+                                : "border-[#1E2B4D]/60 text-slate-400 placeholder:text-slate-600 placeholder:italic"
                             )}
                           />
                           {isBestHome && (
@@ -355,9 +377,15 @@ export function GameProbabilityCard({
                       <td className="p-2.5 text-center font-mono">
                         <input
                           type="text"
-                          value={formatOdds(ob.overOdds ?? 1.9, oddsFormat)}
+                          value={ob.overOdds != null ? formatOdds(ob.overOdds, oddsFormat) : ""}
+                          placeholder="—"
+                          title="Clic para editar cuota Over"
                           onChange={(e) => {
                             const val = e.target.value.trim();
+                            if (!val) {
+                              onUpdateOdd(game.gameId, bId, "overOdds", null);
+                              return;
+                            }
                             if (oddsFormat === "american") {
                               const parsed = parseInt(val.replace("+", ""), 10);
                               if (!isNaN(parsed) && Math.abs(parsed) >= 100) {
@@ -370,7 +398,7 @@ export function GameProbabilityCard({
                               }
                             }
                           }}
-                          className="w-16 px-1.5 py-0.5 text-center font-bold rounded bg-[#070B19] border border-[#1E2B4D] text-slate-300 text-xs focus:outline-none focus:border-[#FDB827]"
+                          className="w-18 px-1.5 py-0.5 text-center font-bold rounded bg-[#070B19] border border-[#1E2B4D] text-slate-300 text-xs focus:outline-none focus:border-[#FDB827] placeholder:text-slate-600 placeholder:italic"
                         />
                       </td>
 
@@ -378,9 +406,15 @@ export function GameProbabilityCard({
                       <td className="p-2.5 text-center font-mono">
                         <input
                           type="text"
-                          value={formatOdds(ob.underOdds ?? 1.9, oddsFormat)}
+                          value={ob.underOdds != null ? formatOdds(ob.underOdds, oddsFormat) : ""}
+                          placeholder="—"
+                          title="Clic para editar cuota Under"
                           onChange={(e) => {
                             const val = e.target.value.trim();
+                            if (!val) {
+                              onUpdateOdd(game.gameId, bId, "underOdds", null);
+                              return;
+                            }
                             if (oddsFormat === "american") {
                               const parsed = parseInt(val.replace("+", ""), 10);
                               if (!isNaN(parsed) && Math.abs(parsed) >= 100) {
@@ -393,7 +427,7 @@ export function GameProbabilityCard({
                               }
                             }
                           }}
-                          className="w-16 px-1.5 py-0.5 text-center font-bold rounded bg-[#070B19] border border-[#1E2B4D] text-slate-300 text-xs focus:outline-none focus:border-[#FDB827]"
+                          className="w-18 px-1.5 py-0.5 text-center font-bold rounded bg-[#070B19] border border-[#1E2B4D] text-slate-300 text-xs focus:outline-none focus:border-[#FDB827] placeholder:text-slate-600 placeholder:italic"
                         />
                       </td>
 
@@ -403,8 +437,10 @@ export function GameProbabilityCard({
                           <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40">
                             ⚡ +{bookAlert.evPercent}% EV
                           </span>
-                        ) : (
+                        ) : ob.isOpen && (ob.homeMl != null || ob.awayMl != null) ? (
                           <span className="text-[10px] text-slate-400">Eficiente</span>
+                        ) : (
+                          <span className="text-[10px] text-slate-500 italic">Por abrir</span>
                         )}
                       </td>
                     </tr>

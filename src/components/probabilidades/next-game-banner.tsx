@@ -57,17 +57,17 @@ export function NextGameBanner({
       : caracasProjection.model.awayWinProb
     : 0.545;
 
-  const caracasFairOdds = caracasProjection
+  const caracasFairOddsDecimal = caracasProjection
     ? isCaracasHome
-      ? caracasProjection.model.fairHomeAmerican
-      : caracasProjection.model.fairAwayAmerican
-    : -120;
+      ? caracasProjection.model.fairHomeDecimal
+      : caracasProjection.model.fairAwayDecimal
+    : 1.83;
 
-  const opponentFairOdds = caracasProjection
+  const opponentFairOddsDecimal = caracasProjection
     ? isCaracasHome
-      ? caracasProjection.model.fairAwayAmerican
-      : caracasProjection.model.fairHomeAmerican
-    : 110;
+      ? caracasProjection.model.fairAwayDecimal
+      : caracasProjection.model.fairHomeDecimal
+    : 2.10;
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0D152B] via-[#091024] to-[#070B19] border border-[#FDB827]/30 p-4 sm:p-5 shadow-xl">
@@ -192,7 +192,7 @@ export function NextGameBanner({
                 Línea Justa
               </span>
               <span className="text-sm font-black text-[#FDB827] font-mono">
-                {formatOdds(caracasFairOdds, oddsFormat)}
+                {formatOdds(caracasFairOddsDecimal, oddsFormat)}
               </span>
             </div>
 
@@ -203,7 +203,7 @@ export function NextGameBanner({
                 Rival
               </span>
               <span className="text-sm font-bold text-slate-300 font-mono">
-                {formatOdds(opponentFairOdds, oddsFormat)}
+                {formatOdds(opponentFairOddsDecimal, oddsFormat)}
               </span>
             </div>
           </div>
