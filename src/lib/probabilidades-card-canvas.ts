@@ -284,16 +284,27 @@ export async function generateProbabilidadesCardBlob(
     }
   }
 
-  // ── 5. Pie de Página (Footer Oficial) ──
-  const footerY = height - (isSquare ? 50 : 30);
+  // ── 5. Pie de Página (Footer Oficial y Disclaimer) ──
+  const footerY1 = height - (isSquare ? 65 : 42);
+  const footerY2 = height - (isSquare ? 35 : 20);
 
   ctx.fillStyle = "#64748B";
   ctx.font = `${isSquare ? 22 : 12}px 'Inter', sans-serif`;
-  ctx.fillText("REPÚBLICA CARAQUISTA • @republicaraquista • Jorge Leonardo Loreto", marginX, footerY);
+  ctx.fillText("REPÚBLICA CARAQUISTA • @republicaraquista • Jorge Leonardo Loreto", marginX, footerY1);
 
   const rightText = "Benchmarks: JuegaEnLínea • Betcris • SellaTuParley • Apuestas Royal";
   ctx.textAlign = "right";
-  ctx.fillText(rightText, width - marginX, footerY);
+  ctx.fillText(rightText, width - marginX, footerY1);
+
+  // Línea 2: Disclaimer de fines informativos y juego responsable
+  ctx.fillStyle = "#475569";
+  ctx.font = `italic ${isSquare ? 18 : 10}px 'Inter', sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText(
+    "Fines estrictamente informativos y de modelado sabermétrico • Cuotas de referencia • Juego Responsable (+18)",
+    width / 2,
+    footerY2
+  );
   ctx.textAlign = "left";
 
   return new Promise((resolve) => {
