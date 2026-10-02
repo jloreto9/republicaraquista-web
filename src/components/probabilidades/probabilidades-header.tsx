@@ -89,16 +89,43 @@ export function ProbabilidadesHeader({
       {/* ── Barra de Filtros: Selector de Fecha y Selector de Casa de Apuestas ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-[#070B19] border border-[#1E2B4D]">
         {/* Selector de Fecha */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center space-x-2 text-xs text-slate-300">
             <CalendarIcon className="w-4 h-4 text-[#FDB827]" />
             <span className="font-semibold text-slate-400">Jornada:</span>
             <input
               type="date"
               value={currentDate}
+              min="2026-10-12"
+              max="2026-12-27"
               onChange={(e) => onDateChange(e.target.value)}
               className="bg-[#0D152B] border border-[#1E2B4D] rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#FDB827]"
             />
+          </div>
+
+          <div className="hidden sm:flex items-center space-x-1 text-[10px]">
+            <button
+              onClick={() => onDateChange("2026-10-12")}
+              className={cn(
+                "px-2 py-0.5 rounded transition-colors font-mono",
+                currentDate === "2026-10-12"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
+                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+              )}
+            >
+              12 Oct (Inaugural)
+            </button>
+            <button
+              onClick={() => onDateChange("2026-10-13")}
+              className={cn(
+                "px-2 py-0.5 rounded transition-colors font-mono",
+                currentDate === "2026-10-13"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
+                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+              )}
+            >
+              13 Oct (Debut CAR)
+            </button>
           </div>
 
           {/* Conmutador de Formato: Americano (-120) vs Decimal (1.83) */}

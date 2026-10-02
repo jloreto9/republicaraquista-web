@@ -1,5 +1,9 @@
 import calendarData from "@/data/calendar_2026_27.json";
-import { CalendarGameEvent } from "@/types/calendar";
+import fullCalendarData from "@/data/lvbp_full_calendar_2026_27.json";
+import { CalendarGameEvent, FullCalendarGame } from "@/types/calendar";
+
+export const SEASON_START_DATE = "2026-10-12";
+export const SEASON_END_DATE = "2026-12-27";
 
 /**
  * Retorna todos los 56 eventos oficiales del calendario de Leones del Caracas
@@ -9,7 +13,49 @@ export function getAllCalendarGames(): CalendarGameEvent[] {
 }
 
 /**
- * Obtiene el próximo juego programado en el calendario que aún no se haya jugado.
+ * Retorna todos los 226 juegos oficiales de toda la liga LVBP
+ */
+export function getAllFullCalendarGames(): FullCalendarGame[] {
+  return ((fullCalendarData as any).games || []) as FullCalendarGame[];
+}
+
+/**
+ * Retorna los juegos oficiales de la LVBP para una fecha específica (1 a 4 juegos)
+ */
+export function getFullCalendarGamesForDate(dateStr: string): FullCalendarGame[] {
+  const dates = (fullCalendarData as any).dates || {};
+  return (dates[dateStr] || []) as FullCalendarGame[];
+}
+
+/**
+ * Comprueba si una fecha es anterior al inicio oficial de la temporada (12 de Octubre de 2026)
+ */
+export function isDateBeforeSeason(dateStr: string): boolean {
+  return dateStr < SEASON_START_DATE;
+}
+
+/**
+ * Comprueba si una fecha es posterior al cierre oficial de la ronda eliminatoria
+ */
+export function isDateAfterSeason(dateStr: string): boolean {
+  return dateStr > SEASON_END_DATE;
+}
+
+/**
+ * Obtiene la próxima fecha del calendario oficial con juegos programados en toda la liga
+ */
+export function getNextScheduledLeagueDate(referenceDateStr?: string): string {
+  const refDate = referenceDateStr || new Date().toISOString().split("T")[0];
+  if (refDate < SEASON_START_DATE) {
+    return SEASON_START_DATE;
+  }
+  const dates = Object.keys((fullCalendarData as any).dates || {}).sort();
+  const nextDate = dates.find((d) => d >= refDate && (fullCalendarData as any).dates[d]?.length > 0);
+  return nextDate || SEASON_START_DATE;
+}
+
+/**
+ * Obtiene el próximo juego programado en el calendario que aún no se haya jugado (Caracas).
  * Compara contra la fecha de referencia (o la fecha de hoy).
  */
 export function getNextScheduledGame(referenceDateStr?: string): CalendarGameEvent {
@@ -63,3 +109,4 @@ export function getDaysUntilGame(gameDateStr: string, referenceDateStr?: string)
   const diffTime = gameDate.getTime() - refDate.getTime();
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
+

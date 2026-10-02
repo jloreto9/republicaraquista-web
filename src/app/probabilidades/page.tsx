@@ -7,7 +7,11 @@ import {
   extractBestOdds,
   evaluateAssessments,
 } from "@/lib/probabilidades-engine";
-import { getNextScheduledGame } from "@/lib/calendar-service";
+import {
+  getNextScheduledGame,
+  getNextScheduledLeagueDate,
+  SEASON_START_DATE,
+} from "@/lib/calendar-service";
 import {
   SportsbookId,
   SportsbookOdds,
@@ -26,17 +30,18 @@ function ProbabilidadesContent() {
   const searchParams = useSearchParams();
   const urlDate = searchParams ? searchParams.get("date") : null;
 
-  // Obtener el próximo juego del calendario como fecha por defecto
-  const defaultNextGame = useMemo(() => {
+  // Obtener la fecha inicial de la temporada regular (Juego Inaugural: 12 de Octubre de 2026)
+  const defaultInitialDate = useMemo(() => {
     try {
-      return getNextScheduledGame();
+      const today = new Date().toISOString().split("T")[0];
+      return getNextScheduledLeagueDate(today);
     } catch {
-      return { date: "2026-10-13" } as any;
+      return SEASON_START_DATE || "2026-10-12";
     }
   }, []);
 
   const [currentDate, setCurrentDate] = useState<string>(
-    urlDate || defaultNextGame.date || "2026-10-13"
+    urlDate || defaultInitialDate || "2026-10-12"
   );
 
   // Sincronizar si la URL cambia dinámicamente con ?date=...
@@ -226,23 +231,52 @@ function ProbabilidadesContent() {
         caracasProjection={caracasProjection}
       />
 
-      {/* ── Aviso contextual si la fecha seleccionada es Día de Descanso en Calendario ── */}
-      {reactiveCard.isRestDay && reactiveCard.nextScheduledGame && (
+      {/* ── Aviso contextual si la fecha seleccionada es Pretemporada ── */}
+      {reactiveCard.isPreSeason && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#0D152B] border border-amber-500/40 text-xs shadow-lg">
+          <div className="flex items-start space-x-3 text-slate-300">
+            <span className="p-2 rounded-xl bg-amber-500/20 text-[#FDB827] shrink-0 mt-0.5">
+              <Info className="w-5 h-5" />
+            </span>
+            <div>
+              <span className="font-extrabold text-sm text-slate-100 block">
+                Pretemporada / Fuera de Calendario Regular
+              </span>
+              <p className="text-slate-300 text-xs mt-1 leading-relaxed">
+                La temporada oficial 2026-2027 de la LVBP comienza el <strong>lunes 12 de octubre de 2026</strong> con el juego inaugural <strong>La Guaira en Magallanes (7:00 PM)</strong>. No existen encuentros oficiales antes de esta fecha.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setCurrentDate("2026-10-12")}
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-[#FDB827] hover:bg-[#E5A520] text-[#070B19] font-extrabold text-xs shrink-0 transition-all shadow-md self-start sm:self-auto"
+          >
+            <span>Ir al Juego Inaugural (12 Oct)</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* ── Aviso contextual si la fecha seleccionada es Día de Descanso en Temporada ── */}
+      {reactiveCard.isRestDay && !reactiveCard.isPreSeason && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-[#0D152B]/80 border border-slate-700/60 text-xs">
           <div className="flex items-center space-x-2.5 text-slate-300">
             <Info className="w-4 h-4 text-[#FDB827] shrink-0" />
             <span>
-              <strong>Día de Descanso en Calendario Oficial:</strong> Leones del Caracas no tiene juego programado el {currentDate}. Mostrando simulación sabermétrica de cartelera.
+              <strong>Día de Descanso Oficial en la LVBP:</strong> No hay encuentros programados en toda la liga para el {currentDate}.
             </span>
           </div>
 
-          <button
-            onClick={() => setCurrentDate(reactiveCard.nextScheduledGame!.date)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#FDB827]/15 hover:bg-[#FDB827]/25 border border-[#FDB827]/40 text-[#FDB827] font-bold text-xs self-start sm:self-auto transition-all"
-          >
-            <span>Ir al Próximo Juego ({reactiveCard.nextScheduledGame.date})</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          {reactiveCard.nextScheduledGame && (
+            <button
+              onClick={() => setCurrentDate(reactiveCard.nextScheduledGame!.date)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#FDB827]/15 hover:bg-[#FDB827]/25 border border-[#FDB827]/40 text-[#FDB827] font-bold text-xs self-start sm:self-auto transition-all"
+            >
+              <span>Ir al Próximo Juego ({reactiveCard.nextScheduledGame.date})</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       )}
 
@@ -251,38 +285,65 @@ function ProbabilidadesContent() {
         picks={reactiveCard.topPicks}
         mispricedAlerts={reactiveCard.mispricedAlerts}
         oddsFormat={oddsFormat}
+        totalGames={reactiveCard.projections.length}
       />
 
       {/* ── 4. Lista de Encuentros de la Jornada con Comparador ── */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center space-x-2">
-            <h2 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider">
-              Partidos de la Jornada ({reactiveCard.projections.length} Encuentros)
-            </h2>
-            {reactiveCard.isCalendarScheduled && (
+      {reactiveCard.projections.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center space-x-2">
+              <h2 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider">
+                Partidos de la Jornada ({reactiveCard.projections.length} Encuentro{reactiveCard.projections.length > 1 ? "s" : ""})
+              </h2>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                Sincronizado con Calendario Oficial
+                Calendario Oficial LVBP
               </span>
-            )}
+            </div>
+            <span className="text-xs text-slate-400 hidden sm:inline">
+              Fórmulas: Poisson / Skellam • ELO + FIP + Parques
+            </span>
           </div>
-          <span className="text-xs text-slate-400 hidden sm:inline">
-            Fórmulas: Poisson / Skellam • ELO + FIP + Parques
-          </span>
-        </div>
 
-        <div className="grid grid-cols-1 gap-4">
-          {reactiveCard.projections.map((game) => (
-            <GameProbabilityCard
-              key={game.gameId}
-              game={game}
-              selectedBook={selectedBook}
-              oddsFormat={oddsFormat}
-              onUpdateOdd={handleUpdateOdd}
-            />
-          ))}
+          <div className="grid grid-cols-1 gap-4">
+            {reactiveCard.projections.map((game) => (
+              <GameProbabilityCard
+                key={game.gameId}
+                game={game}
+                selectedBook={selectedBook}
+                oddsFormat={oddsFormat}
+                onUpdateOdd={handleUpdateOdd}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="p-8 rounded-2xl bg-[#0D152B]/60 border border-[#1E2B4D] text-center space-y-3">
+          <span className="text-3xl">⚾</span>
+          <h3 className="text-base font-bold text-slate-200">
+            Sin Encuentros Oficiales para el {currentDate}
+          </h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            {reactiveCard.isPreSeason
+              ? "La temporada regular aún no ha comenzado. Consulta las jornadas oficiales a partir del 12 de octubre de 2026."
+              : "Esta fecha corresponde a un día de descanso oficial en el calendario de la LVBP. Selecciona otra fecha para ver los partidos."}
+          </p>
+          <div className="pt-2 flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => setCurrentDate("2026-10-12")}
+              className="px-3.5 py-1.5 rounded-lg bg-[#FDB827] text-[#070B19] font-bold text-xs hover:bg-[#E5A520] transition-colors shadow-sm"
+            >
+              Juego Inaugural: La Guaira @ Magallanes (12 Oct)
+            </button>
+            <button
+              onClick={() => setCurrentDate("2026-10-13")}
+              className="px-3.5 py-1.5 rounded-lg bg-[#1E2B4D] text-[#FDB827] font-bold text-xs hover:bg-[#1E2B4D]/80 border border-[#FDB827]/30 transition-colors"
+            >
+              Debut de Caracas: Caracas @ Zulia (13 Oct)
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── 5. Descargo de Responsabilidad Legal & Sabermétrico (Disclaimer) ── */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[#0D152B]/70 border border-[#1E2B4D] text-xs space-y-2.5">

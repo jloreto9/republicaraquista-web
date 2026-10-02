@@ -152,5 +152,7 @@ export interface TipsterDailyCard {
   isCalendarScheduled?: boolean;
   calendarEventSummary?: string;
   isRestDay?: boolean;
+  isPreSeason?: boolean;
+  statusMessage?: string;
   nextScheduledGame?: NextScheduledGameSummary;
 }

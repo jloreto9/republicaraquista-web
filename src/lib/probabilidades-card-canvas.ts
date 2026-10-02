@@ -159,24 +159,44 @@ export async function generateProbabilidadesCardBlob(
   }
 
   // ── 4. Renderizado de las Tarjetas de Partido ──
-  const gamesCount = Math.min(4, projections.length);
-  const cardGap = isSquare ? 28 : 16;
-  const availH = height - currentY - (isSquare ? 140 : 100);
-  const cardH = (availH - cardGap * (gamesCount - 1)) / gamesCount;
-  const cardW = width - marginX * 2;
-
-  for (let i = 0; i < gamesCount; i++) {
-    const game = projections[i];
-    const cardY = currentY + i * (cardH + cardGap);
-
-    // Fondo de tarjeta de juego
+  if (projections.length === 0) {
+    const emptyBoxH = isSquare ? 360 : 200;
+    const emptyBoxW = width - marginX * 2;
     ctx.fillStyle = "#0D152B";
-    drawRoundedRect(ctx, marginX, cardY, cardW, cardH, 16);
+    drawRoundedRect(ctx, marginX, currentY + 40, emptyBoxW, emptyBoxH, 16);
     ctx.fill();
-
-    ctx.strokeStyle = game.topPick?.rating === "mispriced" ? "rgba(253, 184, 39, 0.4)" : "#1E2B4D";
+    ctx.strokeStyle = "#1E2B4D";
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    ctx.fillStyle = "#FDB827";
+    ctx.font = `bold ${isSquare ? 36 : 20}px 'Inter', sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText("⚾ SIN ENCUENTROS OFICIALES PROGRAMADOS", width / 2, currentY + (isSquare ? 180 : 110));
+
+    ctx.fillStyle = "#94A3B8";
+    ctx.font = `${isSquare ? 26 : 14}px 'Inter', sans-serif`;
+    ctx.fillText("Consulta la cartelera oficial a partir del 12 de octubre de 2026", width / 2, currentY + (isSquare ? 240 : 150));
+    ctx.textAlign = "left";
+  } else {
+    const gamesCount = Math.min(4, projections.length);
+    const cardGap = isSquare ? 28 : 16;
+    const availH = height - currentY - (isSquare ? 140 : 100);
+    const cardH = (availH - cardGap * (gamesCount - 1)) / gamesCount;
+    const cardW = width - marginX * 2;
+
+    for (let i = 0; i < gamesCount; i++) {
+      const game = projections[i];
+      const cardY = currentY + i * (cardH + cardGap);
+
+      // Fondo de tarjeta de juego
+      ctx.fillStyle = "#0D152B";
+      drawRoundedRect(ctx, marginX, cardY, cardW, cardH, 16);
+      ctx.fill();
+
+      ctx.strokeStyle = game.topPick?.rating === "mispriced" ? "rgba(253, 184, 39, 0.4)" : "#1E2B4D";
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
     // ── Bloque Equipos (Columna Izquierda) ──
     const homeLogo = logoMap.get(game.homeTeamId);
@@ -297,6 +317,7 @@ export async function generateProbabilidadesCardBlob(
       ctx.textAlign = "left"; // Restaurar
     }
   }
+}
 
   // ── 5. Pie de Página (Footer Oficial y Disclaimer) ──
   const footerY1 = height - (isSquare ? 65 : 42);

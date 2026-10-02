@@ -9,10 +9,13 @@ interface TopPicksBannerProps {
   picks: ValueAssessment[];
   mispricedAlerts: ValueAssessment[];
   oddsFormat: OddsFormat;
+  totalGames?: number;
   onScrollToGame?: (gameId: string) => void;
 }
 
-export function TopPicksBanner({ picks, mispricedAlerts, oddsFormat }: TopPicksBannerProps) {
+export function TopPicksBanner({ picks, mispricedAlerts, oddsFormat, totalGames = 1 }: TopPicksBannerProps) {
+  if (totalGames === 0) return null;
+
   if (picks.length === 0 && mispricedAlerts.length === 0) {
     return (
       <div className="p-4 rounded-2xl bg-[#0D152B]/70 border border-[#1E2B4D] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">

@@ -50,3 +50,19 @@ export interface CalendarApiResponse {
   events: CalendarGameEvent[];
   lastUpdated: string;
 }
+
+export interface FullCalendarGame {
+  gameId: string;
+  date: string;
+  time: string;
+  awayTeamId: number;
+  awayTeamName: string;
+  awayTeamAbbr: string;
+  homeTeamId: number;
+  homeTeamName: string;
+  homeTeamAbbr: string;
+  stadium: string;
+  city: string;
+  isCaracasGame: boolean;
+  isExhibition?: boolean;
+}

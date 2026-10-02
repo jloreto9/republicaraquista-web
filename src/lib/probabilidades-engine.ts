@@ -18,6 +18,11 @@ import {
   getGameForDate,
   getNextScheduledGame,
   getDaysUntilGame,
+  getFullCalendarGamesForDate,
+  isDateBeforeSeason,
+  isDateAfterSeason,
+  SEASON_START_DATE,
+  SEASON_END_DATE,
 } from "@/lib/calendar-service";
 
 // ── Metadatos de las 4 Casas de Apuestas Soportadas ──
@@ -728,11 +733,13 @@ export function evaluateAssessments(
 }
 
 /**
- * Jornada de Partidos Conectada al Calendario Oficial de la LVBP.
- * Si Leones del Caracas tiene juego programado en dateStr, se toma ese encuentro exacto.
- * Si es día de descanso, se ofrece simulación y aviso de próximo juego oficial.
+ * Jornada de Partidos Conectada al Calendario Oficial de la LVBP (El Emergente, 226 juegos).
+ * - Si dateStr < 2026-10-12: Pretemporada oficial (no hay juegos programados).
+ * - Si es fecha sin juegos dentro de temporada: Día de descanso oficial (sin juegos inventados).
+ * - Si hay juegos: Carga exactamente todos los encuentros oficiales de la liga para esa fecha.
  */
-export function getSampleDailyCard(dateStr = "2026-10-13"): TipsterDailyCard {
+export function getSampleDailyCard(dateStr = "2026-10-12"): TipsterDailyCard {
+  const isPre = isDateBeforeSeason(dateStr);
   const calEvent = getGameForDate(dateStr);
   const nextGame = getNextScheduledGame(dateStr);
   const daysUntil = nextGame ? getDaysUntilGame(nextGame.date, dateStr) : 0;
@@ -752,142 +759,88 @@ export function getSampleDailyCard(dateStr = "2026-10-13"): TipsterDailyCard {
       }
     : undefined;
 
-  let gamesDef: Array<{
-    id: string;
-    homeId: number;
-    awayId: number;
-    time: string;
-    stadium: string;
-    isOfficial: boolean;
-    homeSpIdx?: number;
-    awaySpIdx?: number;
-  }> = [];
-
-  if (calEvent) {
-    // 1. Encuentro Oficial de Leones del Caracas desde el Calendario
-    const caracasIsHome = calEvent.isHome;
-    const homeTeamId = caracasIsHome ? 695 : calEvent.opponentId;
-    const awayTeamId = caracasIsHome ? calEvent.opponentId : 695;
-
-    gamesDef.push({
-      id: `cal-caracas-${dateStr}`,
-      homeId: homeTeamId,
-      awayId: awayTeamId,
-      time: calEvent.timeDisplay && !calEvent.isTimePending ? calEvent.timeDisplay : "07:00 PM",
-      stadium: calEvent.stadiumName,
-      isOfficial: true,
-      homeSpIdx: 0,
-      awaySpIdx: 0,
-    });
-
-    // 2. Emparejar los 6 equipos restantes de la liga para completar los 4 juegos de la jornada
-    const ALL_LVBP_IDS = [695, 696, 698, 693, 699, 692, 694, 697];
-    const remainingTeams = ALL_LVBP_IDS.filter(
-      (id) => id !== homeTeamId && id !== awayTeamId
-    );
-
-    const complementaryPairs = [
-      { home: remainingTeams[0], away: remainingTeams[1] },
-      { home: remainingTeams[2], away: remainingTeams[3] },
-      { home: remainingTeams[4], away: remainingTeams[5] },
-    ];
-
-    complementaryPairs.forEach((pair, idx) => {
-      const stadium = DEFAULT_TEAM_HOME_STADIUM[pair.home] || "Estadio José Bernardo Pérez";
-      gamesDef.push({
-        id: `game-compl-${idx + 2}`,
-        homeId: pair.home,
-        awayId: pair.away,
-        time: "07:00 PM",
-        stadium,
-        isOfficial: false,
-        homeSpIdx: 0,
-        awaySpIdx: 0,
-      });
-    });
-  } else {
-    // Cartelera por defecto cuando no hay juego en el calendario (Día de descanso)
-    gamesDef = [
-      {
-        id: "game-1",
-        homeId: 695, // Caracas
-        awayId: 696, // Magallanes
-        time: "07:00 PM",
-        stadium: "Estadio Monumental Simón Bolívar",
-        isOfficial: false,
-        homeSpIdx: 0,
-        awaySpIdx: 0,
-      },
-      {
-        id: "game-2",
-        homeId: 698, // La Guaira
-        awayId: 693, // Lara
-        time: "07:00 PM",
-        stadium: "Estadio Jorge Luis García Carneiro",
-        isOfficial: false,
-        homeSpIdx: 0,
-        awaySpIdx: 0,
-      },
-      {
-        id: "game-3",
-        homeId: 699, // Aragua
-        awayId: 692, // Zulia
-        time: "07:00 PM",
-        stadium: "Estadio José Pérez Colmenares",
-        isOfficial: false,
-        homeSpIdx: 0,
-        awaySpIdx: 0,
-      },
-      {
-        id: "game-4",
-        homeId: 694, // Caribes
-        awayId: 697, // Bravos
-        time: "07:00 PM",
-        stadium: "Estadio Alfonso 'Chico' Carrasquel",
-        isOfficial: false,
-        homeSpIdx: 0,
-        awaySpIdx: 0,
-      },
-    ];
+  // 1. Manejo estricto de Pretemporada: antes del inicio oficial (12 de Octubre de 2026)
+  if (isPre) {
+    return {
+      date: dateStr,
+      season: 2026,
+      totalGames: 0,
+      projections: [],
+      topPicks: [],
+      mispricedAlerts: [],
+      hasLiveMarketOdds: false,
+      isCalendarScheduled: false,
+      isRestDay: false,
+      isPreSeason: true,
+      statusMessage:
+        "La temporada regular 2026-2027 de la LVBP inicia oficialmente el lunes 12 de octubre de 2026 con el juego inaugural La Guaira en Magallanes (7:00 PM). No existen encuentros oficiales antes de esta fecha.",
+      nextScheduledGame: nextScheduledGameSummary,
+    };
   }
 
-  const projections: GameProjection[] = gamesDef.map((g) => {
-    const homeTeam = getTeam(g.homeId);
-    const awayTeam = getTeam(g.awayId);
+  // 2. Extraer juegos oficiales de toda la liga para la fecha consultada
+  const leagueGames = getFullCalendarGamesForDate(dateStr);
+
+  // 3. Manejo de Día de Descanso Oficial en la LVBP
+  if (leagueGames.length === 0) {
+    return {
+      date: dateStr,
+      season: 2026,
+      totalGames: 0,
+      projections: [],
+      topPicks: [],
+      mispricedAlerts: [],
+      hasLiveMarketOdds: false,
+      isCalendarScheduled: false,
+      isRestDay: true,
+      isPreSeason: false,
+      statusMessage:
+        "Día de descanso oficial en el calendario de la LVBP. No hay encuentros programados en toda la liga para esta jornada.",
+      nextScheduledGame: nextScheduledGameSummary,
+    };
+  }
+
+  // 4. Proyecciones para cada encuentro oficial de la jornada
+  const projections: GameProjection[] = leagueGames.map((g) => {
+    const homeTeam = getTeam(g.homeTeamId);
+    const awayTeam = getTeam(g.awayTeamId);
     const park = resolveParkFactor(g.stadium);
 
-    const homePitchers = DEFAULT_STARTING_ROTATIONS[g.homeId] || [];
-    const awayPitchers = DEFAULT_STARTING_ROTATIONS[g.awayId] || [];
-    const homePitcher = homePitchers[g.homeSpIdx || 0] || {
-      id: 9991,
-      name: "Abridor Local",
-      teamId: g.homeId,
+    const homePitchers = DEFAULT_STARTING_ROTATIONS[g.homeTeamId] || [];
+    const awayPitchers = DEFAULT_STARTING_ROTATIONS[g.awayTeamId] || [];
+
+    const homePitcher = homePitchers[0] || {
+      id: 9900 + g.homeTeamId,
+      name: `Abridor ${homeTeam.name.replace(/Leones del |Navegantes del |Tiburones de |Cardenales de |Tigres de |Águilas del |Caribes de |Bravos de /i, "")}`,
+      teamId: g.homeTeamId,
       teamAbbr: homeTeam.abbreviation,
+      throws: "R",
+      era: 3.95,
+      fip: 3.85,
+      whip: 1.28,
+      k9: 7.8,
+      bb9: 2.9,
+      inningsPitched: 45.0,
+    };
+
+    const awayPitcher = awayPitchers[0] || {
+      id: 9900 + g.awayTeamId,
+      name: `Abridor ${awayTeam.name.replace(/Leones del |Navegantes del |Tiburones de |Cardenales de |Tigres de |Águilas del |Caribes de |Bravos de /i, "")}`,
+      teamId: g.awayTeamId,
+      teamAbbr: awayTeam.abbreviation,
       throws: "R",
       era: 4.10,
       fip: 4.05,
-      whip: 1.30,
+      whip: 1.32,
       k9: 7.2,
-      bb9: 3.0,
-      inningsPitched: 40.0,
-    };
-    const awayPitcher = awayPitchers[g.awaySpIdx || 0] || {
-      id: 9992,
-      name: "Abridor Visitante",
-      teamId: g.awayId,
-      teamAbbr: awayTeam.abbreviation,
-      throws: "R",
-      era: 4.25,
-      fip: 4.20,
-      whip: 1.35,
-      k9: 7.0,
       bb9: 3.1,
-      inningsPitched: 40.0,
+      inningsPitched: 42.0,
     };
 
-    const model = projectMatchup(g.homeId, g.awayId, homePitcher, awayPitcher, park);
+    const model = projectMatchup(g.homeTeamId, g.awayTeamId, homePitcher, awayPitcher, park);
     const oddsByBook = generateInitialOdds(model);
     const bestOdds = extractBestOdds(oddsByBook);
+
     const assessments = evaluateAssessments(
       model,
       oddsByBook,
@@ -901,22 +854,22 @@ export function getSampleDailyCard(dateStr = "2026-10-13"): TipsterDailyCard {
     const topPick = assessments.find((a) => a.rating === "mispriced") || assessments[0] || undefined;
 
     return {
-      gameId: g.id,
+      gameId: g.gameId,
       gameDate: dateStr,
       gameTime: g.time,
       isToday: true,
       status: "scheduled",
-      isOfficialCalendarGame: g.isOfficial,
-      homeTeamId: g.homeId,
+      isOfficialCalendarGame: true,
+      homeTeamId: g.homeTeamId,
       homeTeamName: homeTeam.name,
       homeTeamAbbr: homeTeam.abbreviation,
       homeTeamLogo: homeTeam.logoUrl,
-      awayTeamId: g.awayId,
+      awayTeamId: g.awayTeamId,
       awayTeamName: awayTeam.name,
       awayTeamAbbr: awayTeam.abbreviation,
       awayTeamLogo: awayTeam.logoUrl,
-      stadium: park.stadiumName,
-      city: park.city,
+      stadium: g.stadium,
+      city: g.city,
       parkFactor: park,
       homePitcher,
       awayPitcher,
@@ -941,9 +894,10 @@ export function getSampleDailyCard(dateStr = "2026-10-13"): TipsterDailyCard {
     topPicks,
     mispricedAlerts,
     hasLiveMarketOdds,
-    isCalendarScheduled: !!calEvent,
+    isCalendarScheduled: true,
     calendarEventSummary: calEvent?.summary,
-    isRestDay: !calEvent,
+    isRestDay: false,
+    isPreSeason: false,
     nextScheduledGame: nextScheduledGameSummary,
   };
 }
