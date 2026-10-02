@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar as CalendarIcon, Sparkles, Download, RefreshCw, Filter } from "lucide-react";
+import { Calendar as CalendarIcon, Sparkles, Download, RefreshCw, Filter, SlidersHorizontal } from "lucide-react";
 import { SportsbookId, OddsFormat } from "@/types/probabilidades";
 import { SPORTSBOOKS_META } from "@/lib/probabilidades-engine";
 import { cn } from "@/lib/utils";
@@ -33,26 +33,24 @@ export function ProbabilidadesHeader({
   mispricedCount,
 }: ProbabilidadesHeaderProps) {
   return (
-    <div className="space-y-4">
-      {/* ── Banner Superior ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-[#0D152B] border border-[#1E2B4D] shadow-lg">
-        <div>
-          <div className="flex items-center space-x-2.5">
-            <span className="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30">
-              Terminal Cuantitativa
-            </span>
-            {mispricedCount > 0 && (
-              <span className="flex items-center space-x-1 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
-                <span>⚡ {mispricedCount} Cuota{mispricedCount > 1 ? "s" : ""} Desfasada{mispricedCount > 1 ? "s" : ""}</span>
-              </span>
-            )}
+    <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-2xl p-4 sm:p-5 space-y-4 shadow-md">
+      {/* ── Fila 1: Estado del Mercado, Alertas y Acciones Rápidas ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-[#1E2B4D]/70">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-[#1E2B4D] text-[#FDB827] border border-[#FDB827]/30">
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>Panel de Control & Filtros</span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-100 mt-1 tracking-tight">
-            Líneas & Probabilidades <span className="text-[#FDB827]">Sabermétricas</span>
-          </h1>
-          <p className="text-xs md:text-sm text-slate-400 mt-1">
-            Proyección multi-factor (ELO + FIP + Parques LVBP), Cuotas Justas y detección de ineficiencias (+EV).
-          </p>
+
+          {mispricedCount > 0 ? (
+            <span className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 animate-pulse">
+              <span>⚡ {mispricedCount} Cuota{mispricedCount > 1 ? "s" : ""} Desfasada{mispricedCount > 1 ? "s" : ""}</span>
+            </span>
+          ) : (
+            <span className="hidden sm:inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-[#070B19] text-slate-400 border border-[#1E2B4D]">
+              <span>Mercado Calibrado</span>
+            </span>
+          )}
         </div>
 
         {/* Acciones Rápidas */}
@@ -60,7 +58,7 @@ export function ProbabilidadesHeader({
           {hasCustomOdds && (
             <button
               onClick={onResetOdds}
-              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors"
               title="Restaurar cuotas de mercado originales"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -70,7 +68,7 @@ export function ProbabilidadesHeader({
 
           <button
             onClick={onOpenSimulator}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#1E2B4D] text-[#FDB827] hover:bg-[#1E2B4D]/80 border border-[#FDB827]/30 transition-all shadow-[0_0_12px_rgba(253,184,39,0.1)]"
+            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#1E2B4D] text-[#FDB827] hover:bg-[#1E2B4D]/80 border border-[#FDB827]/30 transition-all shadow-[0_0_12px_rgba(253,184,39,0.1)]"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Simulador H2H</span>
@@ -78,7 +76,7 @@ export function ProbabilidadesHeader({
 
           <button
             onClick={onOpenExport}
-            className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#FDB827] text-[#070B19] hover:bg-[#E5A520] transition-colors shadow-md"
+            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#FDB827] text-[#070B19] hover:bg-[#E5A520] transition-colors shadow-md"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Exportar Tarjeta HD</span>
@@ -86,11 +84,11 @@ export function ProbabilidadesHeader({
         </div>
       </div>
 
-      {/* ── Barra de Filtros: Selector de Fecha y Selector de Casa de Apuestas ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-[#070B19] border border-[#1E2B4D]">
-        {/* Selector de Fecha */}
+      {/* ── Fila 2: Filtros de Fecha, Formato de Cuota y Casa de Apuestas ── */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        {/* Selector de Fecha y Formato */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center space-x-2 text-xs text-slate-300">
+          <div className="flex items-center space-x-2 text-xs text-slate-300 bg-[#070B19] px-2.5 py-1.5 rounded-xl border border-[#1E2B4D]">
             <CalendarIcon className="w-4 h-4 text-[#FDB827]" />
             <span className="font-semibold text-slate-400">Jornada:</span>
             <input
@@ -99,18 +97,18 @@ export function ProbabilidadesHeader({
               min="2026-10-12"
               max="2026-12-27"
               onChange={(e) => onDateChange(e.target.value)}
-              className="bg-[#0D152B] border border-[#1E2B4D] rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#FDB827]"
+              className="bg-[#0D152B] border border-[#1E2B4D] rounded-lg px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:border-[#FDB827]"
             />
           </div>
 
-          <div className="hidden sm:flex items-center space-x-1 text-[10px]">
+          <div className="hidden sm:flex items-center space-x-1 text-[11px]">
             <button
               onClick={() => onDateChange("2026-10-12")}
               className={cn(
-                "px-2 py-0.5 rounded transition-colors font-mono",
+                "px-2.5 py-1 rounded-lg transition-colors font-mono",
                 currentDate === "2026-10-12"
                   ? "bg-[#FDB827] text-[#070B19] font-bold"
-                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+                  : "bg-[#070B19] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
               )}
             >
               12 Oct (Inaugural)
@@ -118,10 +116,10 @@ export function ProbabilidadesHeader({
             <button
               onClick={() => onDateChange("2026-10-13")}
               className={cn(
-                "px-2 py-0.5 rounded transition-colors font-mono",
+                "px-2.5 py-1 rounded-lg transition-colors font-mono",
                 currentDate === "2026-10-13"
                   ? "bg-[#FDB827] text-[#070B19] font-bold"
-                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+                  : "bg-[#070B19] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
               )}
             >
               13 Oct (Debut CAR)
@@ -129,12 +127,12 @@ export function ProbabilidadesHeader({
           </div>
 
           {/* Conmutador de Formato: Americano (-120) vs Decimal (1.83) */}
-          <div className="flex items-center space-x-1 p-0.5 rounded-lg bg-[#0D152B] border border-[#1E2B4D]">
-            <span className="text-[10px] text-slate-400 font-bold uppercase px-1.5 hidden sm:inline">Línea:</span>
+          <div className="flex items-center space-x-1 p-0.5 rounded-xl bg-[#070B19] border border-[#1E2B4D]">
+            <span className="text-[10px] text-slate-400 font-bold uppercase px-2 hidden sm:inline">Línea:</span>
             <button
               onClick={() => onOddsFormatChange("american")}
               className={cn(
-                "px-2 py-0.5 rounded text-[11px] font-bold transition-all",
+                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all",
                 oddsFormat === "american"
                   ? "bg-[#FDB827] text-[#070B19] shadow-sm"
                   : "text-slate-400 hover:text-slate-200"
@@ -145,7 +143,7 @@ export function ProbabilidadesHeader({
             <button
               onClick={() => onOddsFormatChange("decimal")}
               className={cn(
-                "px-2 py-0.5 rounded text-[11px] font-bold transition-all",
+                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all",
                 oddsFormat === "decimal"
                   ? "bg-[#FDB827] text-[#070B19] shadow-sm"
                   : "text-slate-400 hover:text-slate-200"
@@ -159,17 +157,17 @@ export function ProbabilidadesHeader({
         {/* Filtro de Casa de Apuestas */}
         <div className="flex flex-wrap items-center gap-1.5">
           <div className="flex items-center space-x-1 text-slate-400 text-xs mr-1">
-            <Filter className="w-3.5 h-3.5" />
+            <Filter className="w-3.5 h-3.5 text-[#FDB827]" />
             <span>Casa:</span>
           </div>
 
           <button
             onClick={() => onSelectBook("all")}
             className={cn(
-              "px-3 py-1 rounded-lg text-xs font-bold transition-all",
+              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all",
               selectedBook === "all"
-                ? "bg-[#FDB827] text-[#070B19]"
-                : "bg-[#0D152B] text-slate-300 hover:text-white border border-[#1E2B4D]"
+                ? "bg-[#FDB827] text-[#070B19] shadow-sm"
+                : "bg-[#070B19] text-slate-300 hover:text-white border border-[#1E2B4D]"
             )}
           >
             Todas (Comparador)
@@ -184,10 +182,10 @@ export function ProbabilidadesHeader({
                 key={bId}
                 onClick={() => onSelectBook(bId)}
                 className={cn(
-                  "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border",
+                  "px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all border",
                   isSelected
                     ? "bg-[#1E2B4D] text-[#FDB827] border-[#FDB827]/40 shadow-sm"
-                    : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border-[#1E2B4D]"
+                    : "bg-[#070B19] text-slate-400 hover:text-slate-200 border-[#1E2B4D]"
                 )}
               >
                 {meta.name}
