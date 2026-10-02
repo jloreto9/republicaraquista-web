@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   getSampleDailyCard,
   extractBestOdds,
@@ -10,6 +10,7 @@ import {
   SportsbookId,
   SportsbookOdds,
   GameProjection,
+  OddsFormat,
 } from "@/types/probabilidades";
 import { ProbabilidadesHeader } from "@/components/probabilidades/probabilidades-header";
 import { TopPicksBanner } from "@/components/probabilidades/top-picks-banner";
@@ -20,41 +21,86 @@ import { ExportCardModal } from "@/components/probabilidades/export-card-modal";
 export default function ProbabilidadesPage() {
   const [currentDate, setCurrentDate] = useState("2026-10-15");
   const [selectedBook, setSelectedBook] = useState<SportsbookId | "all">("all");
+  const [oddsFormat, setOddsFormat] = useState<OddsFormat>("american");
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [liveOddsPayload, setLiveOddsPayload] = useState<any>(null);
+  const [isLoadingOdds, setIsLoadingOdds] = useState(false);
 
   // Cuotas personalizadas editadas por el usuario (gameId -> sportsbookId -> field -> value)
   const [customOddsOverrides, setCustomOddsOverrides] = useState<
     Record<string, Partial<Record<SportsbookId, Partial<SportsbookOdds>>>>
   >({});
 
+  // Cargar cuotas en vivo de la API (/api/odds) al cambiar la fecha
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLiveOdds() {
+      try {
+        setIsLoadingOdds(true);
+        const res = await fetch(`/api/odds?date=${currentDate}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (isMounted && json.success && json.data) {
+            setLiveOddsPayload(json.data);
+          }
+        }
+      } catch (err) {
+        console.warn("No se pudieron obtener cuotas en vivo desde /api/odds:", err);
+      } finally {
+        if (isMounted) setIsLoadingOdds(false);
+      }
+    }
+    loadLiveOdds();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentDate]);
+
   // Generar datos base de la jornada
   const baseCard = useMemo(() => {
     return getSampleDailyCard(currentDate);
   }, [currentDate]);
 
-  // Aplicar overrides reactivos de cuotas ingresados por el usuario
+  // Aplicar cuotas en vivo y overrides reactivos de cuotas ingresados por el usuario
   const reactiveCard = useMemo(() => {
     const updatedProjections: GameProjection[] = baseCard.projections.map((p) => {
-      const overridesForGame = customOddsOverrides[p.gameId];
-      if (!overridesForGame) return p;
+      let currentOdds = { ...p.oddsByBook };
 
-      // Clonar oddsByBook aplicando cambios
-      const updatedOdds = { ...p.oddsByBook };
-      for (const [bId, fields] of Object.entries(overridesForGame)) {
-        const bookKey = bId as SportsbookId;
-        if (updatedOdds[bookKey]) {
-          updatedOdds[bookKey] = {
-            ...updatedOdds[bookKey],
-            ...fields,
+      // 1. Fusionar cuotas reales en vivo si existen en el payload de la API
+      if (liveOddsPayload?.games && Array.isArray(liveOddsPayload.games)) {
+        const liveGame = liveOddsPayload.games.find(
+          (g: any) =>
+            (g.homeTeamId === p.homeTeamId && g.awayTeamId === p.awayTeamId) ||
+            (g.homeTeamAbbr === p.homeTeamAbbr && g.awayTeamAbbr === p.awayTeamAbbr) ||
+            g.gameId === p.gameId
+        );
+        if (liveGame?.oddsByBook) {
+          currentOdds = {
+            ...currentOdds,
+            ...liveGame.oddsByBook,
           };
         }
       }
 
-      const bestOdds = extractBestOdds(updatedOdds);
+      // 2. Aplicar overrides manuales del usuario (prioridad máxima)
+      const overridesForGame = customOddsOverrides[p.gameId];
+      if (overridesForGame) {
+        for (const [bId, fields] of Object.entries(overridesForGame)) {
+          const bookKey = bId as SportsbookId;
+          if (currentOdds[bookKey]) {
+            currentOdds[bookKey] = {
+              ...currentOdds[bookKey],
+              ...fields,
+            };
+          }
+        }
+      }
+
+      const bestOdds = extractBestOdds(currentOdds);
       const assessments = evaluateAssessments(
         p.model,
-        updatedOdds,
+        currentOdds,
         p.homeTeamAbbr,
         p.awayTeamAbbr,
         p.homePitcher,
@@ -65,7 +111,7 @@ export default function ProbabilidadesPage() {
 
       return {
         ...p,
-        oddsByBook: updatedOdds,
+        oddsByBook: currentOdds,
         bestOdds,
         assessments,
         topPick,
@@ -82,7 +128,7 @@ export default function ProbabilidadesPage() {
       topPicks,
       mispricedAlerts,
     };
-  }, [baseCard, customOddsOverrides]);
+  }, [baseCard, customOddsOverrides, liveOddsPayload]);
 
   const handleUpdateOdd = (
     gameId: string,
@@ -121,6 +167,8 @@ export default function ProbabilidadesPage() {
         onDateChange={setCurrentDate}
         selectedBook={selectedBook}
         onSelectBook={setSelectedBook}
+        oddsFormat={oddsFormat}
+        onOddsFormatChange={setOddsFormat}
         onOpenSimulator={() => setSimulatorOpen(true)}
         onOpenExport={() => setExportOpen(true)}
         onResetOdds={handleResetOdds}
@@ -132,6 +180,7 @@ export default function ProbabilidadesPage() {
       <TopPicksBanner
         picks={reactiveCard.topPicks}
         mispricedAlerts={reactiveCard.mispricedAlerts}
+        oddsFormat={oddsFormat}
       />
 
       {/* ── 3. Lista de Encuentros del Día con Comparador ── */}
@@ -151,6 +200,7 @@ export default function ProbabilidadesPage() {
               key={game.gameId}
               game={game}
               selectedBook={selectedBook}
+              oddsFormat={oddsFormat}
               onUpdateOdd={handleUpdateOdd}
             />
           ))}
@@ -178,6 +228,7 @@ export default function ProbabilidadesPage() {
       <FreeSimulatorModal
         isOpen={simulatorOpen}
         onClose={() => setSimulatorOpen(false)}
+        oddsFormat={oddsFormat}
       />
 
       <ExportCardModal
@@ -187,6 +238,7 @@ export default function ProbabilidadesPage() {
         projections={reactiveCard.projections}
         topPicks={reactiveCard.topPicks}
         mispricedAlerts={reactiveCard.mispricedAlerts}
+        oddsFormat={oddsFormat}
       />
     </div>
   );

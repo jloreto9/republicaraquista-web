@@ -1,4 +1,5 @@
-import { GameProjection, ValueAssessment } from "@/types/probabilidades";
+import { GameProjection, ValueAssessment, OddsFormat } from "@/types/probabilidades";
+import { formatOdds } from "@/lib/probabilidades-engine";
 
 /**
  * Pre-carga una imagen desde una URL con timeout seguro
@@ -55,7 +56,8 @@ export async function generateProbabilidadesCardBlob(
   projections: GameProjection[],
   topPicks: ValueAssessment[],
   mispricedAlerts: ValueAssessment[],
-  format: "square" | "story" = "square"
+  format: "square" | "story" = "square",
+  oddsFormat: OddsFormat = "american"
 ): Promise<Blob | null> {
   const isSquare = format === "square";
   const width = isSquare ? 2400 : 1080;
@@ -148,7 +150,7 @@ export async function generateProbabilidadesCardBlob(
     ctx.fillStyle = "#E2E8F0";
     ctx.font = `${isSquare ? 26 : 14}px 'Inter', sans-serif`;
     ctx.fillText(
-      `${alertSample.label} en ${alertSample.sportsbookName} paga a cuota ${alertSample.marketOdds.toFixed(2)} (Cuota Justa: ${alertSample.fairOdds.toFixed(2)}) ➔ +${alertSample.evPercent}% EV`,
+      `${alertSample.label} en ${alertSample.sportsbookName} paga a ${formatOdds(alertSample.marketOdds, oddsFormat)} (Justa: ${formatOdds(alertSample.fairOdds, oddsFormat)}) ➔ +${alertSample.evPercent}% EV`,
       marginX + (isSquare ? 30 : 16),
       currentY + (isSquare ? 78 : 48)
     );
@@ -224,7 +226,7 @@ export async function generateProbabilidadesCardBlob(
     ctx.fillStyle = game.model.awayWinProb > 0.5 ? "#FDB827" : "#CBD5E1";
     ctx.font = `bold ${isSquare ? 28 : 16}px 'Inter', sans-serif`;
     ctx.fillText(
-      `${(game.model.awayWinProb * 100).toFixed(1)}% (Cuota ${game.model.fairAwayDecimal.toFixed(2)})`,
+      `${(game.model.awayWinProb * 100).toFixed(1)}% (${formatOdds(game.model.fairAwayDecimal, oddsFormat)})`,
       centerColX,
       awayRowY
     );
@@ -233,7 +235,7 @@ export async function generateProbabilidadesCardBlob(
     ctx.fillStyle = game.model.homeWinProb > 0.5 ? "#FDB827" : "#CBD5E1";
     ctx.font = `bold ${isSquare ? 28 : 16}px 'Inter', sans-serif`;
     ctx.fillText(
-      `${(game.model.homeWinProb * 100).toFixed(1)}% (Cuota ${game.model.fairHomeDecimal.toFixed(2)})`,
+      `${(game.model.homeWinProb * 100).toFixed(1)}% (${formatOdds(game.model.fairHomeDecimal, oddsFormat)})`,
       centerColX,
       homeRowY
     );
@@ -249,7 +251,7 @@ export async function generateProbabilidadesCardBlob(
     ctx.fillStyle = "#10B981"; // Verde esmeralda
     ctx.font = `bold ${isSquare ? 26 : 15}px 'Inter', sans-serif`;
     ctx.fillText(
-      `${game.bestOdds.bestAwayMl.odds.toFixed(2)} (${game.bestOdds.bestAwayMl.sportsbookName.slice(0, 8)})`,
+      `${formatOdds(game.bestOdds.bestAwayMl.odds, oddsFormat)} (${game.bestOdds.bestAwayMl.sportsbookName.slice(0, 8)})`,
       rightColX,
       awayRowY
     );
@@ -258,7 +260,7 @@ export async function generateProbabilidadesCardBlob(
     ctx.fillStyle = "#10B981";
     ctx.font = `bold ${isSquare ? 26 : 15}px 'Inter', sans-serif`;
     ctx.fillText(
-      `${game.bestOdds.bestHomeMl.odds.toFixed(2)} (${game.bestOdds.bestHomeMl.sportsbookName.slice(0, 8)})`,
+      `${formatOdds(game.bestOdds.bestHomeMl.odds, oddsFormat)} (${game.bestOdds.bestHomeMl.sportsbookName.slice(0, 8)})`,
       rightColX,
       homeRowY
     );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { GameProjection, ValueAssessment } from "@/types/probabilidades";
+import { GameProjection, ValueAssessment, OddsFormat } from "@/types/probabilidades";
 import { generateProbabilidadesCardBlob } from "@/lib/probabilidades-card-canvas";
 import { X, Download, Loader2, Image as ImageIcon, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ interface ExportCardModalProps {
   projections: GameProjection[];
   topPicks: ValueAssessment[];
   mispricedAlerts: ValueAssessment[];
+  oddsFormat: OddsFormat;
 }
 
 export function ExportCardModal({
@@ -22,6 +23,7 @@ export function ExportCardModal({
   projections,
   topPicks,
   mispricedAlerts,
+  oddsFormat,
 }: ExportCardModalProps) {
   const [format, setFormat] = useState<"square" | "story">("square");
   const [loading, setLoading] = useState(false);
@@ -44,7 +46,8 @@ export function ExportCardModal({
       projections,
       topPicks,
       mispricedAlerts,
-      format
+      format,
+      oddsFormat
     ).then((b) => {
       if (!isMounted) return;
       if (b) {

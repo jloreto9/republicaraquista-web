@@ -10,6 +10,7 @@ import {
   GameProjection,
   TipsterDailyCard,
   EvRating,
+  OddsFormat,
 } from "@/types/probabilidades";
 import { LVBP_TEAMS, getTeam } from "@/lib/constants";
 
@@ -244,6 +245,32 @@ export function decimalToAmerican(decimal: number): number {
     return Math.round(-100 / (decimal - 1));
   }
   return 100;
+}
+
+/**
+ * Convierte Cuota Americana a Decimal
+ * Ej: +120 -> 2.20, -120 -> 1.83
+ */
+export function americanToDecimal(american: number): number {
+  if (american >= 100) {
+    return Number((1 + american / 100).toFixed(2));
+  } else if (american <= -100) {
+    return Number((1 + 100 / Math.abs(american)).toFixed(2));
+  }
+  return 1.91;
+}
+
+/**
+ * Formatea una cuota decimal en el formato seleccionado (Americano por defecto)
+ * Ej: formatOdds(2.20, "american") -> "+120"
+ * Ej: formatOdds(1.83, "american") -> "-120"
+ */
+export function formatOdds(decimal: number, format: OddsFormat = "american"): string {
+  if (format === "decimal") {
+    return decimal.toFixed(2);
+  }
+  const am = decimalToAmerican(decimal);
+  return am > 0 ? `+${am}` : `${am}`;
 }
 
 /**

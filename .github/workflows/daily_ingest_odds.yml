@@ -1,0 +1,47 @@
+name: Ingesta Automática de Cuotas LVBP (Tipster Sabermétrico)
+
+on:
+  schedule:
+    # 15:30 UTC = 11:30 AM AST (Apertura de líneas de la jornada)
+    - cron: '30 15 * * *'
+    # 20:30 UTC = 04:30 PM AST (Ajustes vespertinos)
+    - cron: '30 20 * * *'
+    # 22:30 UTC = 06:30 PM AST (Última hora / Lineups confirmados)
+    - cron: '30 22 * * *'
+  workflow_dispatch:
+
+jobs:
+  ingest_odds:
+    name: Extracción & Sincronización de Cuotas
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Ingest Script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python scripts/ingest_lvbp_odds.py
+
+      - name: Commit and Push Snapshot (si hubo cambios)
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/data/lvbp_odds_latest.json
+          if git diff --staged --quiet; then
+            echo "No hay cambios en el snapshot de cuotas."
+          else
+            git commit -m "chore(odds): actualización automática de cuotas LVBP [skip ci]"
+            git push origin main
+          fi

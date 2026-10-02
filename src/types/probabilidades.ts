@@ -5,6 +5,8 @@ export type SportsbookId =
   | "apuestasroyal"
   | "custom";
 
+export type OddsFormat = "american" | "decimal";
+
 export interface SportsbookMeta {
   id: SportsbookId;
   name: string;

@@ -1,17 +1,18 @@
 "use client";
 
-import { ValueAssessment } from "@/types/probabilidades";
-import { SPORTSBOOKS_META } from "@/lib/probabilidades-engine";
+import { ValueAssessment, OddsFormat } from "@/types/probabilidades";
+import { SPORTSBOOKS_META, formatOdds } from "@/lib/probabilidades-engine";
 import { Zap, TrendingUp, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TopPicksBannerProps {
   picks: ValueAssessment[];
   mispricedAlerts: ValueAssessment[];
+  oddsFormat: OddsFormat;
   onScrollToGame?: (gameId: string) => void;
 }
 
-export function TopPicksBanner({ picks, mispricedAlerts }: TopPicksBannerProps) {
+export function TopPicksBanner({ picks, mispricedAlerts, oddsFormat }: TopPicksBannerProps) {
   if (picks.length === 0 && mispricedAlerts.length === 0) return null;
 
   return (
@@ -58,10 +59,10 @@ export function TopPicksBanner({ picks, mispricedAlerts }: TopPicksBannerProps) 
                       </div>
                       <div className="flex items-baseline space-x-3 mt-1.5">
                         <span className="text-lg font-black text-amber-400">
-                          Cuota {alert.marketOdds.toFixed(2)}
+                          {formatOdds(alert.marketOdds, oddsFormat)}
                         </span>
                         <span className="text-xs text-slate-400">
-                          Cuota Justa: <span className="font-semibold text-slate-200">{alert.fairOdds.toFixed(2)}</span>
+                          Justa: <span className="font-semibold text-slate-200">{formatOdds(alert.fairOdds, oddsFormat)}</span>
                         </span>
                         <span className="text-xs font-black text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded">
                           +{alert.evPercent}% EV
@@ -140,11 +141,11 @@ export function TopPicksBanner({ picks, mispricedAlerts }: TopPicksBannerProps) 
 
                   <div className="flex items-baseline justify-between mt-1 text-xs">
                     <span className="text-slate-400">Cuota Mercado:</span>
-                    <span className="font-extrabold text-white text-sm">{pick.marketOdds.toFixed(2)}</span>
+                    <span className="font-extrabold text-white text-sm">{formatOdds(pick.marketOdds, oddsFormat)}</span>
                   </div>
                   <div className="flex items-baseline justify-between text-[11px] text-slate-400">
                     <span>Cuota Justa:</span>
-                    <span className="font-semibold text-slate-300">{pick.fairOdds.toFixed(2)}</span>
+                    <span className="font-semibold text-slate-300">{formatOdds(pick.fairOdds, oddsFormat)}</span>
                   </div>
                 </div>
 

@@ -13,20 +13,23 @@ import {
   projectMatchup,
   probToDecimal,
   probToAmerican,
+  formatOdds,
+  americanToDecimal,
   calculateEv,
   calculateKellyStake,
   evaluateRating,
 } from "@/lib/probabilidades-engine";
-import { ProbablePitcher, ParkFactor } from "@/types/probabilidades";
+import { ProbablePitcher, ParkFactor, OddsFormat } from "@/types/probabilidades";
 import { X, Sparkles, TrendingUp, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FreeSimulatorModalProps {
   isOpen: boolean;
   onClose: () => void;
+  oddsFormat: OddsFormat;
 }
 
-export function FreeSimulatorModal({ isOpen, onClose }: FreeSimulatorModalProps) {
+export function FreeSimulatorModal({ isOpen, onClose, oddsFormat }: FreeSimulatorModalProps) {
   const [homeId, setHomeId] = useState<number>(695); // Caracas
   const [awayId, setAwayId] = useState<number>(696); // Magallanes
   const [stadiumKey, setStadiumKey] = useState<string>("Estadio Universitario de Caracas");
@@ -279,8 +282,11 @@ export function FreeSimulatorModal({ isOpen, onClose }: FreeSimulatorModalProps)
               <div className="text-2xl font-black text-white mt-1">
                 {(model.awayWinProb * 100).toFixed(1)}%
               </div>
-              <div className="text-xs text-[#FDB827] font-mono mt-0.5">
-                Cuota Justa: {model.fairAwayDecimal.toFixed(2)} ({model.fairAwayAmerican > 0 ? `+${model.fairAwayAmerican}` : model.fairAwayAmerican})
+              <div className="text-xs text-[#FDB827] font-mono mt-0.5 font-bold">
+                Cuota Justa: {formatOdds(model.fairAwayDecimal, oddsFormat)}
+                <span className="text-[10px] text-slate-400 font-normal ml-1">
+                  ({oddsFormat === "american" ? model.fairAwayDecimal.toFixed(2) : formatOdds(model.fairAwayDecimal, "american")})
+                </span>
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
                 xR: <strong>{model.awayExpectedRuns.toFixed(2)}</strong> carreras
@@ -292,8 +298,11 @@ export function FreeSimulatorModal({ isOpen, onClose }: FreeSimulatorModalProps)
               <div className="text-2xl font-black text-white mt-1">
                 {(model.homeWinProb * 100).toFixed(1)}%
               </div>
-              <div className="text-xs text-[#FDB827] font-mono mt-0.5">
-                Cuota Justa: {model.fairHomeDecimal.toFixed(2)} ({model.fairHomeAmerican > 0 ? `+${model.fairHomeAmerican}` : model.fairHomeAmerican})
+              <div className="text-xs text-[#FDB827] font-mono mt-0.5 font-bold">
+                Cuota Justa: {formatOdds(model.fairHomeDecimal, oddsFormat)}
+                <span className="text-[10px] text-slate-400 font-normal ml-1">
+                  ({oddsFormat === "american" ? model.fairHomeDecimal.toFixed(2) : formatOdds(model.fairHomeDecimal, "american")})
+                </span>
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
                 xR: <strong>{model.homeExpectedRuns.toFixed(2)}</strong> carreras
@@ -308,12 +317,21 @@ export function FreeSimulatorModal({ isOpen, onClose }: FreeSimulatorModalProps)
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-400">Cuota Mercado ({awayTeam.abbreviation}):</span>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
-                  value={testAwayOdds}
-                  onChange={(e) => setTestAwayOdds(parseFloat(e.target.value) || 1.01)}
-                  className="w-16 px-1.5 py-0.5 text-center font-bold rounded bg-[#070B19] border border-[#1E2B4D] text-xs text-white"
+                  type="text"
+                  value={formatOdds(testAwayOdds, oddsFormat)}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    if (oddsFormat === "american") {
+                      const parsed = parseInt(val.replace("+", ""), 10);
+                      if (!isNaN(parsed) && Math.abs(parsed) >= 100) {
+                        setTestAwayOdds(americanToDecimal(parsed));
+                      }
+                    } else {
+                      const parsed = parseFloat(val);
+                      if (!isNaN(parsed) && parsed > 1.0) setTestAwayOdds(parsed);
+                    }
+                  }}
+                  className="w-18 px-1.5 py-0.5 text-center font-bold font-mono rounded bg-[#070B19] border border-[#1E2B4D] text-xs text-white"
                 />
               </div>
               <div className="flex items-center justify-between text-xs pt-1 border-t border-[#1E2B4D]/60">
@@ -342,12 +360,21 @@ export function FreeSimulatorModal({ isOpen, onClose }: FreeSimulatorModalProps)
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-400">Cuota Mercado ({homeTeam.abbreviation}):</span>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
-                  value={testHomeOdds}
-                  onChange={(e) => setTestHomeOdds(parseFloat(e.target.value) || 1.01)}
-                  className="w-16 px-1.5 py-0.5 text-center font-bold rounded bg-[#070B19] border border-[#1E2B4D] text-xs text-white"
+                  type="text"
+                  value={formatOdds(testHomeOdds, oddsFormat)}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    if (oddsFormat === "american") {
+                      const parsed = parseInt(val.replace("+", ""), 10);
+                      if (!isNaN(parsed) && Math.abs(parsed) >= 100) {
+                        setTestHomeOdds(americanToDecimal(parsed));
+                      }
+                    } else {
+                      const parsed = parseFloat(val);
+                      if (!isNaN(parsed) && parsed > 1.0) setTestHomeOdds(parsed);
+                    }
+                  }}
+                  className="w-18 px-1.5 py-0.5 text-center font-bold font-mono rounded bg-[#070B19] border border-[#1E2B4D] text-xs text-white"
                 />
               </div>
               <div className="flex items-center justify-between text-xs pt-1 border-t border-[#1E2B4D]/60">

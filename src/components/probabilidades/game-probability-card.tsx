@@ -6,8 +6,14 @@ import {
   GameProjection,
   SportsbookId,
   SportsbookOdds,
+  OddsFormat,
 } from "@/types/probabilidades";
-import { SPORTSBOOKS_META } from "@/lib/probabilidades-engine";
+import {
+  SPORTSBOOKS_META,
+  formatOdds,
+  decimalToAmerican,
+  americanToDecimal,
+} from "@/lib/probabilidades-engine";
 import {
   MapPin,
   TrendingUp,
@@ -22,6 +28,7 @@ import { cn } from "@/lib/utils";
 interface GameProbabilityCardProps {
   game: GameProjection;
   selectedBook: SportsbookId | "all";
+  oddsFormat: OddsFormat;
   onUpdateOdd: (
     gameId: string,
     sportsbookId: SportsbookId,
@@ -33,6 +40,7 @@ interface GameProbabilityCardProps {
 export function GameProbabilityCard({
   game,
   selectedBook,
+  oddsFormat,
   onUpdateOdd,
 }: GameProbabilityCardProps) {
   const [showDetails, setShowDetails] = useState(false);
@@ -182,13 +190,15 @@ export function GameProbabilityCard({
             <div className="flex items-center space-x-1.5">
               <span className="text-slate-300">{game.awayTeamAbbr} {awayWinPct}%</span>
               <span className="text-[11px] font-normal text-slate-400">
-                (Cuota Justa: <strong className="text-[#FDB827]">{game.model.fairAwayDecimal.toFixed(2)}</strong> / {game.model.fairAwayAmerican > 0 ? `+${game.model.fairAwayAmerican}` : game.model.fairAwayAmerican})
+                (Cuota Justa: <strong className="text-[#FDB827]">{formatOdds(game.model.fairAwayDecimal, oddsFormat)}</strong>
+                {oddsFormat === "american" ? ` • ${game.model.fairAwayDecimal.toFixed(2)}` : ` • ${formatOdds(game.model.fairAwayDecimal, "american")}`})
               </span>
             </div>
 
             <div className="flex items-center space-x-1.5">
               <span className="text-[11px] font-normal text-slate-400">
-                (Cuota Justa: <strong className="text-[#FDB827]">{game.model.fairHomeDecimal.toFixed(2)}</strong> / {game.model.fairHomeAmerican > 0 ? `+${game.model.fairHomeAmerican}` : game.model.fairHomeAmerican})
+                (Cuota Justa: <strong className="text-[#FDB827]">{formatOdds(game.model.fairHomeDecimal, oddsFormat)}</strong>
+                {oddsFormat === "american" ? ` • ${game.model.fairHomeDecimal.toFixed(2)}` : ` • ${formatOdds(game.model.fairHomeDecimal, "american")}`})
               </span>
               <span className="text-slate-300">{game.homeTeamAbbr} {homeWinPct}%</span>
             </div>
@@ -217,7 +227,7 @@ export function GameProbabilityCard({
               <span>Comparador de Mercado & Cuotas en Vivo</span>
             </span>
             <span className="text-[10px] text-slate-400">
-              * Haz clic en cualquier cuota para editarla y recalcular tu +EV
+              * Formato activo: <strong className="text-[#FDB827]">{oddsFormat === "american" ? "Americano (-120/+110)" : "Decimal (1.83/2.10)"}</strong> • Clic para editar
             </span>
           </div>
 
@@ -274,15 +284,24 @@ export function GameProbabilityCard({
                       <td className="p-2.5 text-center">
                         <div className="inline-flex items-center space-x-1">
                           <input
-                            type="number"
-                            step="0.01"
-                            min="1.01"
-                            value={ob.awayMl}
-                            onChange={(e) =>
-                              onUpdateOdd(game.gameId, bId, "awayMl", parseFloat(e.target.value) || 1.01)
-                            }
+                            type="text"
+                            value={formatOdds(ob.awayMl, oddsFormat)}
+                            onChange={(e) => {
+                              const val = e.target.value.trim();
+                              if (oddsFormat === "american") {
+                                const parsed = parseInt(val.replace("+", ""), 10);
+                                if (!isNaN(parsed) && Math.abs(parsed) >= 100) {
+                                  onUpdateOdd(game.gameId, bId, "awayMl", americanToDecimal(parsed));
+                                }
+                              } else {
+                                const parsed = parseFloat(val);
+                                if (!isNaN(parsed) && parsed > 1.0) {
+                                  onUpdateOdd(game.gameId, bId, "awayMl", parsed);
+                                }
+                              }
+                            }}
                             className={cn(
-                              "w-16 px-1.5 py-0.5 text-center font-bold font-mono rounded bg-[#070B19] border text-xs focus:outline-none focus:border-[#FDB827]",
+                              "w-18 px-1.5 py-0.5 text-center font-bold font-mono rounded bg-[#070B19] border text-xs focus:outline-none focus:border-[#FDB827]",
                               isBestAway
                                 ? "border-emerald-500 text-emerald-300 bg-emerald-950/20"
                                 : "border-[#1E2B4D] text-slate-200"
@@ -298,15 +317,24 @@ export function GameProbabilityCard({
                       <td className="p-2.5 text-center">
                         <div className="inline-flex items-center space-x-1">
                           <input
-                            type="number"
-                            step="0.01"
-                            min="1.01"
-                            value={ob.homeMl}
-                            onChange={(e) =>
-                              onUpdateOdd(game.gameId, bId, "homeMl", parseFloat(e.target.value) || 1.01)
-                            }
+                            type="text"
+                            value={formatOdds(ob.homeMl, oddsFormat)}
+                            onChange={(e) => {
+                              const val = e.target.value.trim();
+                              if (oddsFormat === "american") {
+                                const parsed = parseInt(val.replace("+", ""), 10);
+                                if (!isNaN(parsed) && Math.abs(parsed) >= 100) {
+                                  onUpdateOdd(game.gameId, bId, "homeMl", americanToDecimal(parsed));
+                                }
+                              } else {
+                                const parsed = parseFloat(val);
+                                if (!isNaN(parsed) && parsed > 1.0) {
+                                  onUpdateOdd(game.gameId, bId, "homeMl", parsed);
+                                }
+                              }
+                            }}
                             className={cn(
-                              "w-16 px-1.5 py-0.5 text-center font-bold font-mono rounded bg-[#070B19] border text-xs focus:outline-none focus:border-[#FDB827]",
+                              "w-18 px-1.5 py-0.5 text-center font-bold font-mono rounded bg-[#070B19] border text-xs focus:outline-none focus:border-[#FDB827]",
                               isBestHome
                                 ? "border-emerald-500 text-emerald-300 bg-emerald-950/20"
                                 : "border-[#1E2B4D] text-slate-200"
@@ -321,28 +349,46 @@ export function GameProbabilityCard({
                       {/* Over */}
                       <td className="p-2.5 text-center font-mono">
                         <input
-                          type="number"
-                          step="0.01"
-                          min="1.01"
-                          value={ob.overOdds ?? 1.9}
-                          onChange={(e) =>
-                            onUpdateOdd(game.gameId, bId, "overOdds", parseFloat(e.target.value) || 1.01)
-                          }
-                          className="w-14 px-1.5 py-0.5 text-center font-bold rounded bg-[#070B19] border border-[#1E2B4D] text-slate-300 text-xs focus:outline-none focus:border-[#FDB827]"
+                          type="text"
+                          value={formatOdds(ob.overOdds ?? 1.9, oddsFormat)}
+                          onChange={(e) => {
+                            const val = e.target.value.trim();
+                            if (oddsFormat === "american") {
+                              const parsed = parseInt(val.replace("+", ""), 10);
+                              if (!isNaN(parsed) && Math.abs(parsed) >= 100) {
+                                onUpdateOdd(game.gameId, bId, "overOdds", americanToDecimal(parsed));
+                              }
+                            } else {
+                              const parsed = parseFloat(val);
+                              if (!isNaN(parsed) && parsed > 1.0) {
+                                onUpdateOdd(game.gameId, bId, "overOdds", parsed);
+                              }
+                            }
+                          }}
+                          className="w-16 px-1.5 py-0.5 text-center font-bold rounded bg-[#070B19] border border-[#1E2B4D] text-slate-300 text-xs focus:outline-none focus:border-[#FDB827]"
                         />
                       </td>
 
                       {/* Under */}
                       <td className="p-2.5 text-center font-mono">
                         <input
-                          type="number"
-                          step="0.01"
-                          min="1.01"
-                          value={ob.underOdds ?? 1.9}
-                          onChange={(e) =>
-                            onUpdateOdd(game.gameId, bId, "underOdds", parseFloat(e.target.value) || 1.01)
-                          }
-                          className="w-14 px-1.5 py-0.5 text-center font-bold rounded bg-[#070B19] border border-[#1E2B4D] text-slate-300 text-xs focus:outline-none focus:border-[#FDB827]"
+                          type="text"
+                          value={formatOdds(ob.underOdds ?? 1.9, oddsFormat)}
+                          onChange={(e) => {
+                            const val = e.target.value.trim();
+                            if (oddsFormat === "american") {
+                              const parsed = parseInt(val.replace("+", ""), 10);
+                              if (!isNaN(parsed) && Math.abs(parsed) >= 100) {
+                                onUpdateOdd(game.gameId, bId, "underOdds", americanToDecimal(parsed));
+                              }
+                            } else {
+                              const parsed = parseFloat(val);
+                              if (!isNaN(parsed) && parsed > 1.0) {
+                                onUpdateOdd(game.gameId, bId, "underOdds", parsed);
+                              }
+                            }
+                          }}
+                          className="w-16 px-1.5 py-0.5 text-center font-bold rounded bg-[#070B19] border border-[#1E2B4D] text-slate-300 text-xs focus:outline-none focus:border-[#FDB827]"
                         />
                       </td>
 

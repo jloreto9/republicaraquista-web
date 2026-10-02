@@ -1,7 +1,7 @@
 "use client";
 
 import { Calendar as CalendarIcon, Sparkles, Download, RefreshCw, Filter } from "lucide-react";
-import { SportsbookId } from "@/types/probabilidades";
+import { SportsbookId, OddsFormat } from "@/types/probabilidades";
 import { SPORTSBOOKS_META } from "@/lib/probabilidades-engine";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,8 @@ interface ProbabilidadesHeaderProps {
   onDateChange: (date: string) => void;
   selectedBook: SportsbookId | "all";
   onSelectBook: (book: SportsbookId | "all") => void;
+  oddsFormat: OddsFormat;
+  onOddsFormatChange: (fmt: OddsFormat) => void;
   onOpenSimulator: () => void;
   onOpenExport: () => void;
   onResetOdds: () => void;
@@ -22,6 +24,8 @@ export function ProbabilidadesHeader({
   onDateChange,
   selectedBook,
   onSelectBook,
+  oddsFormat,
+  onOddsFormatChange,
   onOpenSimulator,
   onOpenExport,
   onResetOdds,
@@ -85,15 +89,44 @@ export function ProbabilidadesHeader({
       {/* ── Barra de Filtros: Selector de Fecha y Selector de Casa de Apuestas ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-[#070B19] border border-[#1E2B4D]">
         {/* Selector de Fecha */}
-        <div className="flex items-center space-x-2 text-xs text-slate-300">
-          <CalendarIcon className="w-4 h-4 text-[#FDB827]" />
-          <span className="font-semibold text-slate-400">Jornada:</span>
-          <input
-            type="date"
-            value={currentDate}
-            onChange={(e) => onDateChange(e.target.value)}
-            className="bg-[#0D152B] border border-[#1E2B4D] rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#FDB827]"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center space-x-2 text-xs text-slate-300">
+            <CalendarIcon className="w-4 h-4 text-[#FDB827]" />
+            <span className="font-semibold text-slate-400">Jornada:</span>
+            <input
+              type="date"
+              value={currentDate}
+              onChange={(e) => onDateChange(e.target.value)}
+              className="bg-[#0D152B] border border-[#1E2B4D] rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-[#FDB827]"
+            />
+          </div>
+
+          {/* Conmutador de Formato: Americano (-120) vs Decimal (1.83) */}
+          <div className="flex items-center space-x-1 p-0.5 rounded-lg bg-[#0D152B] border border-[#1E2B4D]">
+            <span className="text-[10px] text-slate-400 font-bold uppercase px-1.5 hidden sm:inline">Línea:</span>
+            <button
+              onClick={() => onOddsFormatChange("american")}
+              className={cn(
+                "px-2 py-0.5 rounded text-[11px] font-bold transition-all",
+                oddsFormat === "american"
+                  ? "bg-[#FDB827] text-[#070B19] shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              Americana (-120)
+            </button>
+            <button
+              onClick={() => onOddsFormatChange("decimal")}
+              className={cn(
+                "px-2 py-0.5 rounded text-[11px] font-bold transition-all",
+                oddsFormat === "decimal"
+                  ? "bg-[#FDB827] text-[#070B19] shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              Decimal (1.83)
+            </button>
+          </div>
         </div>
 
         {/* Filtro de Casa de Apuestas */}
