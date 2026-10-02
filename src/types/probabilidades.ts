@@ -123,6 +123,20 @@ export interface GameProjection {
   model: ModelProbabilities;
   assessments: ValueAssessment[];
   topPick?: ValueAssessment;
+  isOfficialCalendarGame?: boolean;
+}
+
+export interface NextScheduledGameSummary {
+  date: string;
+  opponentId: number;
+  opponentName: string;
+  opponentAbbr: string;
+  opponentLogo: string;
+  isHome: boolean;
+  stadiumName: string;
+  timeDisplay: string;
+  transmission: string;
+  daysUntil: number;
 }
 
 export interface TipsterDailyCard {
@@ -132,4 +146,8 @@ export interface TipsterDailyCard {
   projections: GameProjection[];
   topPicks: ValueAssessment[];
   mispricedAlerts: ValueAssessment[];
+  isCalendarScheduled?: boolean;
+  calendarEventSummary?: string;
+  isRestDay?: boolean;
+  nextScheduledGame?: NextScheduledGameSummary;
 }

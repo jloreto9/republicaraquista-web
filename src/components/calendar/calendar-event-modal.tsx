@@ -12,6 +12,7 @@ import {
   Calendar,
   GitCompare,
   Trophy,
+  TrendingUp,
 } from "lucide-react";
 
 interface CalendarEventModalProps {
@@ -179,18 +180,29 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
         </div>
 
         {/* Botones de Acción */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#1E2B4D]">
-          <Link
-            href={`/matchup`}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-[#131E3D] hover:bg-[#1a2852] border border-[#1E2B4D] hover:border-[#FDB827]/40 text-slate-200 text-xs font-semibold transition-all group"
-          >
-            <GitCompare className="w-4 h-4 text-[#FDB827] group-hover:scale-110 transition-transform" />
-            <span>Comparar en Matchup 360</span>
-          </Link>
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2.5 border-t border-[#1E2B4D]">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <Link
+              href={`/probabilidades?date=${event.date}`}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#FDB827]/15 hover:bg-[#FDB827]/25 border border-[#FDB827]/40 text-[#FDB827] text-xs font-bold transition-all group shadow-sm"
+              title="Ver proyección sabermétrica y cuotas de este encuentro"
+            >
+              <TrendingUp className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+              <span>Ver Líneas & Probabilidades</span>
+            </Link>
+
+            <Link
+              href={`/matchup`}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#131E3D] hover:bg-[#1a2852] border border-[#1E2B4D] hover:border-[#FDB827]/40 text-slate-200 text-xs font-semibold transition-all group"
+            >
+              <GitCompare className="w-3.5 h-3.5 text-[#FDB827] group-hover:scale-110 transition-transform" />
+              <span>Matchup 360</span>
+            </Link>
+          </div>
 
           <button
             onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#FDB827] hover:bg-[#FDB827]/90 text-[#070B19] text-xs font-bold transition-colors"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
           >
             Cerrar
           </button>

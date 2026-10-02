@@ -11,8 +11,14 @@ import {
   TipsterDailyCard,
   EvRating,
   OddsFormat,
+  NextScheduledGameSummary,
 } from "@/types/probabilidades";
 import { LVBP_TEAMS, getTeam } from "@/lib/constants";
+import {
+  getGameForDate,
+  getNextScheduledGame,
+  getDaysUntilGame,
+} from "@/lib/calendar-service";
 
 // ── Metadatos de las 4 Casas de Apuestas Soportadas ──
 export const SPORTSBOOKS_META: Record<SportsbookId, SportsbookMeta> = {
@@ -60,6 +66,14 @@ export const SPORTSBOOKS_META: Record<SportsbookId, SportsbookMeta> = {
 
 // ── Factores de Parque de la LVBP ──
 export const LVBP_PARK_FACTORS: Record<string, ParkFactor> = {
+  "Estadio Monumental Simón Bolívar": {
+    stadiumName: "Estadio Monumental Simón Bolívar",
+    city: "Caracas (La Rinconada)",
+    runFactor: 1.02,
+    hrFactor: 0.98,
+    elevationMeters: 950,
+    description: "Sede principal de Leones del Caracas. Parque amplio de estándar MLB con altitud caraquista.",
+  },
   "Estadio Universitario de Caracas": {
     stadiumName: "Estadio Universitario de Caracas",
     city: "Caracas",
@@ -134,6 +148,59 @@ export const DEFAULT_PARK_FACTOR: ParkFactor = {
   elevationMeters: 400,
   description: "Condiciones estándar promedio de la liga.",
 };
+
+export const DEFAULT_TEAM_HOME_STADIUM: Record<number, string> = {
+  695: "Estadio Monumental Simón Bolívar",
+  696: "Estadio José Bernardo Pérez",
+  698: "Estadio Jorge Luis García Carneiro",
+  693: "Estadio Antonio Herrera Gutiérrez",
+  699: "Estadio José Pérez Colmenares",
+  692: "Estadio Luis Aparicio 'El Grande'",
+  694: "Estadio Alfonso 'Chico' Carrasquel",
+  697: "Estadio Nueva Esparta",
+};
+
+/**
+ * Normaliza y resuelve el factor de parque adecuado para cualquier nombre de estadio
+ */
+export function resolveParkFactor(stadiumName?: string): ParkFactor {
+  if (!stadiumName) return DEFAULT_PARK_FACTOR;
+  const norm = stadiumName
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/['"“”]/g, "");
+
+  if (norm.includes("monumental") || norm.includes("rinconada")) {
+    return LVBP_PARK_FACTORS["Estadio Monumental Simón Bolívar"];
+  }
+  if (norm.includes("universitario")) {
+    return LVBP_PARK_FACTORS["Estadio Universitario de Caracas"];
+  }
+  if (norm.includes("bernardo perez") || norm.includes("valencia")) {
+    return LVBP_PARK_FACTORS["Estadio José Bernardo Pérez"];
+  }
+  if (norm.includes("herrera") || norm.includes("barquisimeto")) {
+    return LVBP_PARK_FACTORS["Estadio Antonio Herrera Gutiérrez"];
+  }
+  if (norm.includes("perez colmenares") || norm.includes("maracay")) {
+    return LVBP_PARK_FACTORS["Estadio José Pérez Colmenares"];
+  }
+  if (norm.includes("aparicio") || norm.includes("maracaibo") || norm.includes("zulia")) {
+    return LVBP_PARK_FACTORS["Estadio Luis Aparicio 'El Grande'"];
+  }
+  if (norm.includes("carrasquel") || norm.includes("chico") || norm.includes("anzoategui") || norm.includes("puerto")) {
+    return LVBP_PARK_FACTORS["Estadio Alfonso 'Chico' Carrasquel"];
+  }
+  if (norm.includes("garcia carneiro") || norm.includes("la guaira") || norm.includes("forum")) {
+    return LVBP_PARK_FACTORS["Estadio Jorge Luis García Carneiro"];
+  }
+  if (norm.includes("esparta") || norm.includes("guatamare") || norm.includes("margarita")) {
+    return LVBP_PARK_FACTORS["Estadio Nueva Esparta"];
+  }
+
+  return LVBP_PARK_FACTORS[stadiumName] || DEFAULT_PARK_FACTOR;
+}
 
 // ── Rotación de Abridores Proyectados por Equipo ──
 export const DEFAULT_STARTING_ROTATIONS: Record<number, ProbablePitcher[]> = {
@@ -704,56 +771,137 @@ export function evaluateAssessments(
 }
 
 /**
- * Jornada de Partidos Preconfigurada con los 4 Duelos Clásicos de la LVBP
+ * Jornada de Partidos Conectada al Calendario Oficial de la LVBP.
+ * Si Leones del Caracas tiene juego programado en dateStr, se toma ese encuentro exacto.
+ * Si es día de descanso, se ofrece simulación y aviso de próximo juego oficial.
  */
-export function getSampleDailyCard(dateStr = "2026-10-15"): TipsterDailyCard {
-  const gamesDef = [
-    {
-      id: "game-1",
-      homeId: 695, // Caracas
-      awayId: 696, // Magallanes
-      time: "07:00 PM",
-      stadium: "Estadio Universitario de Caracas",
+export function getSampleDailyCard(dateStr = "2026-10-13"): TipsterDailyCard {
+  const calEvent = getGameForDate(dateStr);
+  const nextGame = getNextScheduledGame(dateStr);
+  const daysUntil = nextGame ? getDaysUntilGame(nextGame.date, dateStr) : 0;
+
+  const nextScheduledGameSummary: NextScheduledGameSummary | undefined = nextGame
+    ? {
+        date: nextGame.date,
+        opponentId: nextGame.opponentId,
+        opponentName: nextGame.opponentName,
+        opponentAbbr: nextGame.opponentAbbr,
+        opponentLogo: nextGame.opponentLogo,
+        isHome: nextGame.isHome,
+        stadiumName: nextGame.stadiumName,
+        timeDisplay: nextGame.timeDisplay,
+        transmission: nextGame.transmission,
+        daysUntil,
+      }
+    : undefined;
+
+  let gamesDef: Array<{
+    id: string;
+    homeId: number;
+    awayId: number;
+    time: string;
+    stadium: string;
+    isOfficial: boolean;
+    homeSpIdx?: number;
+    awaySpIdx?: number;
+  }> = [];
+
+  if (calEvent) {
+    // 1. Encuentro Oficial de Leones del Caracas desde el Calendario
+    const caracasIsHome = calEvent.isHome;
+    const homeTeamId = caracasIsHome ? 695 : calEvent.opponentId;
+    const awayTeamId = caracasIsHome ? calEvent.opponentId : 695;
+
+    gamesDef.push({
+      id: `cal-caracas-${dateStr}`,
+      homeId: homeTeamId,
+      awayId: awayTeamId,
+      time: calEvent.timeDisplay && !calEvent.isTimePending ? calEvent.timeDisplay : "07:00 PM",
+      stadium: calEvent.stadiumName,
+      isOfficial: true,
       homeSpIdx: 0,
       awaySpIdx: 0,
-    },
-    {
-      id: "game-2",
-      homeId: 698, // La Guaira
-      awayId: 693, // Lara
-      time: "07:00 PM",
-      stadium: "Estadio Jorge Luis García Carneiro",
-      homeSpIdx: 0,
-      awaySpIdx: 0,
-    },
-    {
-      id: "game-3",
-      homeId: 699, // Aragua
-      awayId: 692, // Zulia
-      time: "07:00 PM",
-      stadium: "Estadio José Pérez Colmenares",
-      homeSpIdx: 0,
-      awaySpIdx: 0,
-    },
-    {
-      id: "game-4",
-      homeId: 694, // Caribes
-      awayId: 697, // Bravos
-      time: "07:00 PM",
-      stadium: "Estadio Alfonso 'Chico' Carrasquel",
-      homeSpIdx: 0,
-      awaySpIdx: 0,
-    },
-  ];
+    });
+
+    // 2. Emparejar los 6 equipos restantes de la liga para completar los 4 juegos de la jornada
+    const ALL_LVBP_IDS = [695, 696, 698, 693, 699, 692, 694, 697];
+    const remainingTeams = ALL_LVBP_IDS.filter(
+      (id) => id !== homeTeamId && id !== awayTeamId
+    );
+
+    const complementaryPairs = [
+      { home: remainingTeams[0], away: remainingTeams[1] },
+      { home: remainingTeams[2], away: remainingTeams[3] },
+      { home: remainingTeams[4], away: remainingTeams[5] },
+    ];
+
+    complementaryPairs.forEach((pair, idx) => {
+      const stadium = DEFAULT_TEAM_HOME_STADIUM[pair.home] || "Estadio José Bernardo Pérez";
+      gamesDef.push({
+        id: `game-compl-${idx + 2}`,
+        homeId: pair.home,
+        awayId: pair.away,
+        time: "07:00 PM",
+        stadium,
+        isOfficial: false,
+        homeSpIdx: 0,
+        awaySpIdx: 0,
+      });
+    });
+  } else {
+    // Cartelera por defecto cuando no hay juego en el calendario (Día de descanso)
+    gamesDef = [
+      {
+        id: "game-1",
+        homeId: 695, // Caracas
+        awayId: 696, // Magallanes
+        time: "07:00 PM",
+        stadium: "Estadio Monumental Simón Bolívar",
+        isOfficial: false,
+        homeSpIdx: 0,
+        awaySpIdx: 0,
+      },
+      {
+        id: "game-2",
+        homeId: 698, // La Guaira
+        awayId: 693, // Lara
+        time: "07:00 PM",
+        stadium: "Estadio Jorge Luis García Carneiro",
+        isOfficial: false,
+        homeSpIdx: 0,
+        awaySpIdx: 0,
+      },
+      {
+        id: "game-3",
+        homeId: 699, // Aragua
+        awayId: 692, // Zulia
+        time: "07:00 PM",
+        stadium: "Estadio José Pérez Colmenares",
+        isOfficial: false,
+        homeSpIdx: 0,
+        awaySpIdx: 0,
+      },
+      {
+        id: "game-4",
+        homeId: 694, // Caribes
+        awayId: 697, // Bravos
+        time: "07:00 PM",
+        stadium: "Estadio Alfonso 'Chico' Carrasquel",
+        isOfficial: false,
+        homeSpIdx: 0,
+        awaySpIdx: 0,
+      },
+    ];
+  }
 
   const projections: GameProjection[] = gamesDef.map((g) => {
     const homeTeam = getTeam(g.homeId);
     const awayTeam = getTeam(g.awayId);
-    const park = LVBP_PARK_FACTORS[g.stadium] || DEFAULT_PARK_FACTOR;
+    const park = resolveParkFactor(g.stadium);
 
     const homePitchers = DEFAULT_STARTING_ROTATIONS[g.homeId] || [];
     const awayPitchers = DEFAULT_STARTING_ROTATIONS[g.awayId] || [];
-    const homePitcher = homePitchers[g.homeSpIdx] || {
+    const homePitcher = homePitchers[g.homeSpIdx || 0] || {
       id: 9991,
       name: "Abridor Local",
       teamId: g.homeId,
@@ -766,7 +914,7 @@ export function getSampleDailyCard(dateStr = "2026-10-15"): TipsterDailyCard {
       bb9: 3.0,
       inningsPitched: 40.0,
     };
-    const awayPitcher = awayPitchers[g.awaySpIdx] || {
+    const awayPitcher = awayPitchers[g.awaySpIdx || 0] || {
       id: 9992,
       name: "Abridor Visitante",
       teamId: g.awayId,
@@ -801,6 +949,7 @@ export function getSampleDailyCard(dateStr = "2026-10-15"): TipsterDailyCard {
       gameTime: g.time,
       isToday: true,
       status: "scheduled",
+      isOfficialCalendarGame: g.isOfficial,
       homeTeamId: g.homeId,
       homeTeamName: homeTeam.name,
       homeTeamAbbr: homeTeam.abbreviation,
@@ -833,5 +982,9 @@ export function getSampleDailyCard(dateStr = "2026-10-15"): TipsterDailyCard {
     projections,
     topPicks,
     mispricedAlerts,
+    isCalendarScheduled: !!calEvent,
+    calendarEventSummary: calEvent?.summary,
+    isRestDay: !calEvent,
+    nextScheduledGame: nextScheduledGameSummary,
   };
 }

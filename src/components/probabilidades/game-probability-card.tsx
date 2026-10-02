@@ -77,6 +77,11 @@ export function GameProbabilityCard({
         </div>
 
         <div className="flex items-center space-x-2">
+          {game.isOfficialCalendarGame && (
+            <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/40 shadow-sm">
+              <span>📅 Juego Oficial LVBP</span>
+            </span>
+          )}
           {mispricedInGame.length > 0 && (
             <span className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
               <Zap className="w-3 h-3" />

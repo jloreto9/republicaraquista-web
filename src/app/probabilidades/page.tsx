@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   getSampleDailyCard,
   extractBestOdds,
   evaluateAssessments,
 } from "@/lib/probabilidades-engine";
+import { getNextScheduledGame } from "@/lib/calendar-service";
 import {
   SportsbookId,
   SportsbookOdds,
@@ -13,13 +15,37 @@ import {
   OddsFormat,
 } from "@/types/probabilidades";
 import { ProbabilidadesHeader } from "@/components/probabilidades/probabilidades-header";
+import { NextGameBanner } from "@/components/probabilidades/next-game-banner";
 import { TopPicksBanner } from "@/components/probabilidades/top-picks-banner";
 import { GameProbabilityCard } from "@/components/probabilidades/game-probability-card";
 import { FreeSimulatorModal } from "@/components/probabilidades/free-simulator-modal";
 import { ExportCardModal } from "@/components/probabilidades/export-card-modal";
+import { Calendar, Info, ArrowRight } from "lucide-react";
 
-export default function ProbabilidadesPage() {
-  const [currentDate, setCurrentDate] = useState("2026-10-15");
+function ProbabilidadesContent() {
+  const searchParams = useSearchParams();
+  const urlDate = searchParams ? searchParams.get("date") : null;
+
+  // Obtener el próximo juego del calendario como fecha por defecto
+  const defaultNextGame = useMemo(() => {
+    try {
+      return getNextScheduledGame();
+    } catch {
+      return { date: "2026-10-13" } as any;
+    }
+  }, []);
+
+  const [currentDate, setCurrentDate] = useState<string>(
+    urlDate || defaultNextGame.date || "2026-10-13"
+  );
+
+  // Sincronizar si la URL cambia dinámicamente con ?date=...
+  useEffect(() => {
+    if (urlDate && urlDate !== currentDate) {
+      setCurrentDate(urlDate);
+    }
+  }, [urlDate]);
+
   const [selectedBook, setSelectedBook] = useState<SportsbookId | "all">("all");
   const [oddsFormat, setOddsFormat] = useState<OddsFormat>("american");
   const [simulatorOpen, setSimulatorOpen] = useState(false);
@@ -57,7 +83,7 @@ export default function ProbabilidadesPage() {
     };
   }, [currentDate]);
 
-  // Generar datos base de la jornada
+  // Generar datos base de la jornada vinculados al calendario oficial
   const baseCard = useMemo(() => {
     return getSampleDailyCard(currentDate);
   }, [currentDate]);
@@ -159,6 +185,11 @@ export default function ProbabilidadesPage() {
 
   const hasCustomOdds = Object.keys(customOddsOverrides).length > 0;
 
+  // Proyección del juego de Caracas si existe en la jornada actual
+  const caracasProjection = reactiveCard.projections.find(
+    (p) => p.homeTeamId === 695 || p.awayTeamId === 695
+  );
+
   return (
     <div className="space-y-6 pb-16">
       {/* ── 1. Encabezado y Filtros Globales ── */}
@@ -176,20 +207,56 @@ export default function ProbabilidadesPage() {
         mispricedCount={reactiveCard.mispricedAlerts.length}
       />
 
-      {/* ── 2. Top Picks del Día & Alertas de Cuotas Desfasadas ── */}
+      {/* ── 2. Banner del Próximo Juego Oficial en Calendario ── */}
+      <NextGameBanner
+        nextGame={reactiveCard.nextScheduledGame}
+        currentDate={currentDate}
+        onSelectDate={setCurrentDate}
+        oddsFormat={oddsFormat}
+        caracasProjection={caracasProjection}
+      />
+
+      {/* ── Aviso contextual si la fecha seleccionada es Día de Descanso en Calendario ── */}
+      {reactiveCard.isRestDay && reactiveCard.nextScheduledGame && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-[#0D152B]/80 border border-slate-700/60 text-xs">
+          <div className="flex items-center space-x-2.5 text-slate-300">
+            <Info className="w-4 h-4 text-[#FDB827] shrink-0" />
+            <span>
+              <strong>Día de Descanso en Calendario Oficial:</strong> Leones del Caracas no tiene juego programado el {currentDate}. Mostrando simulación sabermétrica de cartelera.
+            </span>
+          </div>
+
+          <button
+            onClick={() => setCurrentDate(reactiveCard.nextScheduledGame!.date)}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#FDB827]/15 hover:bg-[#FDB827]/25 border border-[#FDB827]/40 text-[#FDB827] font-bold text-xs self-start sm:self-auto transition-all"
+          >
+            <span>Ir al Próximo Juego ({reactiveCard.nextScheduledGame.date})</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* ── 3. Top Picks del Día & Alertas de Cuotas Desfasadas ── */}
       <TopPicksBanner
         picks={reactiveCard.topPicks}
         mispricedAlerts={reactiveCard.mispricedAlerts}
         oddsFormat={oddsFormat}
       />
 
-      {/* ── 3. Lista de Encuentros del Día con Comparador ── */}
+      {/* ── 4. Lista de Encuentros de la Jornada con Comparador ── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider">
-            Partidos de la Jornada ({reactiveCard.projections.length} Encuentros)
-          </h2>
-          <span className="text-xs text-slate-400">
+          <div className="flex items-center space-x-2">
+            <h2 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider">
+              Partidos de la Jornada ({reactiveCard.projections.length} Encuentros)
+            </h2>
+            {reactiveCard.isCalendarScheduled && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                Sincronizado con Calendario Oficial
+              </span>
+            )}
+          </div>
+          <span className="text-xs text-slate-400 hidden sm:inline">
             Fórmulas: Poisson / Skellam • ELO + FIP + Parques
           </span>
         </div>
@@ -207,7 +274,7 @@ export default function ProbabilidadesPage() {
         </div>
       </div>
 
-      {/* ── 4. Descargo de Responsabilidad Legal & Sabermétrico (Disclaimer) ── */}
+      {/* ── 5. Descargo de Responsabilidad Legal & Sabermétrico (Disclaimer) ── */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[#0D152B]/70 border border-[#1E2B4D] text-xs space-y-2.5">
         <div className="flex items-center space-x-2 text-slate-300 font-bold uppercase tracking-wider text-[11px]">
           <span className="p-1 rounded bg-slate-800 text-[#FDB827]">⚖️</span>
@@ -224,7 +291,7 @@ export default function ProbabilidadesPage() {
         </p>
       </div>
 
-      {/* ── 5. Modales: Simulador Libre & Exportación Gráfica HD ── */}
+      {/* ── 6. Modales: Simulador Libre & Exportación Gráfica HD ── */}
       <FreeSimulatorModal
         isOpen={simulatorOpen}
         onClose={() => setSimulatorOpen(false)}
@@ -241,5 +308,22 @@ export default function ProbabilidadesPage() {
         oddsFormat={oddsFormat}
       />
     </div>
+  );
+}
+
+export default function ProbabilidadesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center space-y-3">
+          <div className="w-8 h-8 border-2 border-[#FDB827] border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs uppercase tracking-wider font-bold">
+            Sincronizando Calendario y Líneas Sabermétricas...
+          </span>
+        </div>
+      }
+    >
+      <ProbabilidadesContent />
+    </Suspense>
   );
 }
