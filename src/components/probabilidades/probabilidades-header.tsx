@@ -71,7 +71,7 @@ export function ProbabilidadesHeader({
             className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#1E2B4D] text-[#FDB827] hover:bg-[#1E2B4D]/80 border border-[#FDB827]/30 transition-all shadow-[0_0_12px_rgba(253,184,39,0.1)]"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Simulador H2H</span>
+            <span>Simulador de Juego</span>
           </button>
 
           <button

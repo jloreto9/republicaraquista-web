@@ -109,7 +109,7 @@ export function FreeSimulatorModal({ isOpen, onClose, oddsFormat }: FreeSimulato
             </span>
             <div>
               <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
-                <span>Simulador Sabermétrico Head-to-Head</span>
+                <span>Simulador de Juego</span>
                 <span className="text-xs px-2 py-0.5 rounded bg-[#FDB827] text-[#070B19] font-black uppercase">
                   Libre
                 </span>
