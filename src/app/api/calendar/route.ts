@@ -4,6 +4,7 @@ import {
   parseIcsContent,
   attachSupabaseResults,
   buildCalendarResponse,
+  enrichWithVerifiedSchedule,
 } from "@/lib/calendar-parser";
 import fallbackData from "@/data/calendar_2026_27.json";
 import { CalendarApiResponse } from "@/types/calendar";
@@ -13,7 +14,7 @@ export const revalidate = 3600; // Revalidar cada 1 hora en Vercel Edge
 export async function GET() {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
 
     let rawIcs = "";
     try {
@@ -39,6 +40,9 @@ export async function GET() {
     if (!events || events.length === 0) {
       events = fallbackData.events as any;
     }
+
+    // Garantizar que todos los eventos contengan los horarios oficiales de El Emergente
+    events = enrichWithVerifiedSchedule(events);
 
     // Cruce de resultados con Supabase
     const eventsWithResults = await attachSupabaseResults(events);

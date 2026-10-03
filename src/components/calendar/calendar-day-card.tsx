@@ -119,11 +119,11 @@ export function CalendarDayCard({
       </div>
 
       {/* Pie de la celda: Hora / Resultado / Transmisión */}
-      <div className="pt-1 border-t border-[#1E2B4D]/60 flex items-center justify-between text-[9px] font-mono z-10">
+      <div className="pt-1.5 border-t border-[#1E2B4D]/60 flex items-center justify-between text-[10px] font-mono z-10">
         {hasResult ? (
           <div className="flex items-center gap-1 w-full justify-between">
             <span
-              className={`px-1.5 py-0.2 rounded font-bold ${
+              className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${
                 won
                   ? "bg-emerald-950 text-emerald-400 border border-emerald-700/50"
                   : "bg-rose-950 text-rose-400 border border-rose-700/50"
@@ -135,18 +135,22 @@ export function CalendarDayCard({
           </div>
         ) : (
           <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-1 text-slate-300">
-              <Clock className="w-2.5 h-2.5 text-slate-400" />
-              <span className="truncate max-w-[70px] sm:max-w-[85px]">
-                {event.isTimePending ? "Por conf." : event.timeDisplay}
+            <div className="flex items-center gap-1.5 text-slate-200">
+              <Clock className="w-3 h-3 text-[#FDB827] shrink-0" />
+              <span className="text-[10px] sm:text-[11px] font-mono font-bold tracking-tight text-slate-100">
+                {event.timeDisplay}
               </span>
             </div>
 
             {event.transmission && event.transmission !== "Por confirmar" ? (
-              <span className="text-[8px] px-1 py-0.5 rounded bg-[#131E3D] text-[#FDB827] font-semibold truncate max-w-[45px]">
+              <span className="text-[8px] px-1.5 py-0.5 rounded bg-[#131E3D] text-[#FDB827] font-semibold border border-[#FDB827]/20 truncate max-w-[50px]">
                 {event.transmission}
               </span>
-            ) : null}
+            ) : (
+              <span className="text-[8px] font-mono text-slate-400 truncate max-w-[55px]">
+                {event.city}
+              </span>
+            )}
           </div>
         )}
       </div>

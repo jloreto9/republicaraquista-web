@@ -5,6 +5,15 @@ import {
   MonthCalendarData,
 } from "@/types/calendar";
 import { supabase } from "./supabase";
+import fallbackCalendar from "@/data/calendar_2026_27.json";
+
+// Mapeo indexado de juegos oficiales verificados de El Emergente (56 juegos con horarios reales)
+const VERIFIED_BY_DATE = new Map<string, (typeof fallbackCalendar.events)[0]>();
+for (const ev of fallbackCalendar.events) {
+  if (ev.date) {
+    VERIFIED_BY_DATE.set(ev.date, ev);
+  }
+}
 
 interface SupabaseGameMatch {
   game_date?: string;
@@ -148,6 +157,13 @@ export function parseIcsContent(icsContent: string): CalendarGameEvent[] {
       }
     }
 
+    // Si la hora aún está pendiente o no se pudo extraer de DTSTART, consultar la hora oficial verificada de El Emergente
+    const verified = VERIFIED_BY_DATE.get(dateIso);
+    if (verified && (isTimePending || timeDisplay === "Hora por confirmar")) {
+      timeDisplay = verified.timeDisplay;
+      isTimePending = false;
+    }
+
     // Transmisión
     let transmission = "Por confirmar";
     const descLower = description.replace(/\\n/g, "\n");
@@ -160,6 +176,9 @@ export function parseIcsContent(icsContent: string): CalendarGameEvent[] {
     }
 
     const { stadium, city } = extractCityAndStadium(location);
+    const finalStadium = stadium && stadium !== "Estadio por confirmar" ? stadium : (verified?.stadiumName || stadium);
+    const finalCity = city && city !== "Venezuela" ? city : (verified?.city || city);
+    const cleanSummary = summary.replace(/\[HORA PENDIENTE\]\s*/i, "").trim();
 
     events.push({
       uid: uid || `caracas-${dateIso}-${opponentId}`,
@@ -168,14 +187,14 @@ export function parseIcsContent(icsContent: string): CalendarGameEvent[] {
       dayNumber,
       month,
       year,
-      summary,
+      summary: cleanSummary || verified?.summary || summary,
       isHome,
       opponentId,
       opponentName: opponentTeam.name,
       opponentAbbr: opponentTeam.abbreviation,
       opponentLogo: opponentTeam.logoUrl,
-      stadiumName: stadium,
-      city,
+      stadiumName: finalStadium,
+      city: finalCity,
       timeDisplay,
       isTimePending,
       transmission,
@@ -185,7 +204,31 @@ export function parseIcsContent(icsContent: string): CalendarGameEvent[] {
 
   // Ordenar cronológicamente por fecha ISO
   events.sort((a, b) => a.date.localeCompare(b.date));
-  return events;
+  return enrichWithVerifiedSchedule(events);
+}
+
+/**
+ * Garantiza que todos los eventos del calendario contengan el horario oficial de El Emergente
+ */
+export function enrichWithVerifiedSchedule(events: CalendarGameEvent[]): CalendarGameEvent[] {
+  return events.map((ev) => {
+    const verified = VERIFIED_BY_DATE.get(ev.date);
+    if (!verified) return ev;
+
+    const timeDisplay =
+      !ev.isTimePending && ev.timeDisplay && ev.timeDisplay !== "Hora por confirmar"
+        ? ev.timeDisplay
+        : verified.timeDisplay;
+
+    return {
+      ...ev,
+      timeDisplay,
+      isTimePending: false,
+      summary: (ev.summary || verified.summary).replace(/\[HORA PENDIENTE\]\s*/i, "").trim(),
+      stadiumName: ev.stadiumName && ev.stadiumName !== "Estadio por confirmar" ? ev.stadiumName : verified.stadiumName,
+      city: ev.city && ev.city !== "Venezuela" ? ev.city : verified.city,
+    };
+  });
 }
 
 /**

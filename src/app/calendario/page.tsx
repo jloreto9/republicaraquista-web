@@ -5,6 +5,7 @@ import {
   parseIcsContent,
   attachSupabaseResults,
   buildCalendarResponse,
+  enrichWithVerifiedSchedule,
 } from "@/lib/calendar-parser";
 import { CALENDAR_FEED_URLS } from "@/lib/constants";
 import fallbackData from "@/data/calendar_2026_27.json";
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 async function getCalendarData(): Promise<CalendarApiResponse> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     let rawIcs = "";
     try {
@@ -46,6 +47,9 @@ async function getCalendarData(): Promise<CalendarApiResponse> {
     if (!events || events.length === 0) {
       events = fallbackData.events as any;
     }
+
+    // Garantizar que todos los eventos contengan los horarios oficiales de El Emergente
+    events = enrichWithVerifiedSchedule(events);
 
     const eventsWithResults = await attachSupabaseResults(events);
     return buildCalendarResponse(eventsWithResults);
