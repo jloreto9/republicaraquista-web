@@ -210,11 +210,11 @@ export function resolveParkFactor(stadiumName?: string): ParkFactor {
 // ── Rotación de Abridores Proyectados por Equipo ──
 export const DEFAULT_STARTING_ROTATIONS: Record<number, ProbablePitcher[]> = {
   695: [
-    { id: 672580, name: "Albert Suárez", teamId: 695, teamAbbr: "CAR", throws: "R", era: 3.12, fip: 2.95, whip: 1.15, k9: 8.8, bb9: 2.1, inningsPitched: 52.0 },
-    { id: 518553, name: "Jhoulys Chacín", teamId: 695, teamAbbr: "CAR", throws: "R", era: 3.65, fip: 3.50, whip: 1.25, k9: 7.2, bb9: 2.8, inningsPitched: 49.1 },
-    { id: 605330, name: "Erick Leal", teamId: 695, teamAbbr: "CAR", throws: "R", era: 3.40, fip: 3.25, whip: 1.18, k9: 8.4, bb9: 2.5, inningsPitched: 55.0 },
-    { id: 642544, name: "Ronald Herrera", teamId: 695, teamAbbr: "CAR", throws: "R", era: 4.15, fip: 4.05, whip: 1.32, k9: 6.9, bb9: 3.1, inningsPitched: 41.0 },
-    { id: 672804, name: "Jesús Vargas", teamId: 695, teamAbbr: "CAR", throws: "R", era: 4.45, fip: 4.25, whip: 1.38, k9: 6.5, bb9: 3.2, inningsPitched: 38.1 },
+    { id: 605330, name: "Erick Leal", teamId: 695, teamAbbr: "CAR", throws: "R", era: 4.55, fip: 4.35, whip: 1.34, k9: 7.8, bb9: 3.1, inningsPitched: 46.0 },
+    { id: 518553, name: "Jhoulys Chacín", teamId: 695, teamAbbr: "CAR", throws: "R", era: 4.40, fip: 4.20, whip: 1.30, k9: 7.0, bb9: 2.9, inningsPitched: 48.0 },
+    { id: 672804, name: "Jesús Vargas", teamId: 695, teamAbbr: "CAR", throws: "R", era: 4.70, fip: 4.45, whip: 1.38, k9: 6.6, bb9: 3.2, inningsPitched: 40.0 },
+    { id: 642544, name: "Ronald Herrera", teamId: 695, teamAbbr: "CAR", throws: "R", era: 4.85, fip: 4.55, whip: 1.40, k9: 6.4, bb9: 3.3, inningsPitched: 38.0 },
+    { id: 672580, name: "Albert Suárez", teamId: 695, teamAbbr: "CAR", throws: "R", era: 3.80, fip: 3.65, whip: 1.25, k9: 8.0, bb9: 2.5, inningsPitched: 30.0 },
   ],
   696: [
     { id: 502674, name: "Yohander Méndez", teamId: 696, teamAbbr: "MAG", throws: "L", era: 3.55, fip: 3.42, whip: 1.22, k9: 8.1, bb9: 2.9, inningsPitched: 48.0 },
@@ -259,14 +259,14 @@ interface TeamSeasonBasics {
 }
 
 const TEAM_BASICS: Record<number, TeamSeasonBasics> = {
-  695: { rPerGame: 5.4, raPerGame: 4.5, bullpenFip: 3.85, elo: 1545 }, // Caracas
-  696: { rPerGame: 5.1, raPerGame: 4.8, bullpenFip: 4.10, elo: 1515 }, // Magallanes
-  698: { rPerGame: 5.5, raPerGame: 4.6, bullpenFip: 3.90, elo: 1535 }, // La Guaira
-  693: { rPerGame: 5.2, raPerGame: 4.3, bullpenFip: 3.75, elo: 1540 }, // Lara
-  699: { rPerGame: 4.8, raPerGame: 5.0, bullpenFip: 4.30, elo: 1485 }, // Aragua
-  692: { rPerGame: 4.7, raPerGame: 4.9, bullpenFip: 4.25, elo: 1480 }, // Zulia
-  694: { rPerGame: 4.9, raPerGame: 5.4, bullpenFip: 4.60, elo: 1460 }, // Caribes
-  697: { rPerGame: 5.0, raPerGame: 4.7, bullpenFip: 4.05, elo: 1505 }, // Bravos
+  693: { rPerGame: 6.10, raPerGame: 5.30, bullpenFip: 4.05, elo: 1540 }, // Lara (1er lugar regular 2024-2025: 30-26)
+  696: { rPerGame: 5.50, raPerGame: 4.95, bullpenFip: 4.00, elo: 1545 }, // Magallanes (Campeón/Finalista)
+  697: { rPerGame: 5.45, raPerGame: 5.25, bullpenFip: 4.10, elo: 1505 }, // Bravos (29-27)
+  694: { rPerGame: 6.15, raPerGame: 5.75, bullpenFip: 4.55, elo: 1500 }, // Caribes (28-28)
+  699: { rPerGame: 5.05, raPerGame: 5.00, bullpenFip: 4.20, elo: 1495 }, // Aragua (28-28)
+  698: { rPerGame: 5.60, raPerGame: 5.65, bullpenFip: 4.30, elo: 1490 }, // La Guaira (27-29)
+  692: { rPerGame: 4.70, raPerGame: 5.85, bullpenFip: 4.40, elo: 1480 }, // Zulia (29-27)
+  695: { rPerGame: 5.65, raPerGame: 6.30, bullpenFip: 4.75, elo: 1460 }, // Caracas (8vo lugar / Sótano 2024-2025: 24-32, peor pitcheo de la liga con 6.36 RA/G)
 };
 
 const LEAGUE_AVG_FIP = 4.15;
