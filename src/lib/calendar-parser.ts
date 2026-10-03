@@ -209,24 +209,25 @@ export function parseIcsContent(icsContent: string): CalendarGameEvent[] {
 
 /**
  * Garantiza que todos los eventos del calendario contengan el horario oficial de El Emergente
+ * y la condición de localía (28 Casa / 28 Visita) estrictamente auditada.
  */
 export function enrichWithVerifiedSchedule(events: CalendarGameEvent[]): CalendarGameEvent[] {
   return events.map((ev) => {
     const verified = VERIFIED_BY_DATE.get(ev.date);
     if (!verified) return ev;
 
-    const timeDisplay =
-      !ev.isTimePending && ev.timeDisplay && ev.timeDisplay !== "Hora por confirmar"
-        ? ev.timeDisplay
-        : verified.timeDisplay;
-
     return {
       ...ev,
-      timeDisplay,
+      isHome: verified.isHome,
+      summary: verified.summary,
+      timeDisplay: verified.timeDisplay,
       isTimePending: false,
-      summary: (ev.summary || verified.summary).replace(/\[HORA PENDIENTE\]\s*/i, "").trim(),
-      stadiumName: ev.stadiumName && ev.stadiumName !== "Estadio por confirmar" ? ev.stadiumName : verified.stadiumName,
-      city: ev.city && ev.city !== "Venezuela" ? ev.city : verified.city,
+      stadiumName: verified.stadiumName,
+      city: verified.city,
+      opponentId: verified.opponentId,
+      opponentName: verified.opponentName,
+      opponentAbbr: verified.opponentAbbr,
+      opponentLogo: verified.opponentLogo,
     };
   });
 }

@@ -2,16 +2,14 @@ import { Metadata } from "next";
 import { Header } from "@/components/layout/header";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import {
-  parseIcsContent,
   attachSupabaseResults,
   buildCalendarResponse,
   enrichWithVerifiedSchedule,
 } from "@/lib/calendar-parser";
-import { CALENDAR_FEED_URLS } from "@/lib/constants";
 import fallbackData from "@/data/calendar_2026_27.json";
-import { CalendarApiResponse } from "@/types/calendar";
+import { CalendarApiResponse, CalendarGameEvent } from "@/types/calendar";
 
-export const revalidate = 3600; // ISR cada 1 hora en Vercel Edge
+export const revalidate = 300; // ISR cada 5 minutos en Vercel Edge para actualización de resultados
 
 export const metadata: Metadata = {
   title: "Calendario Oficial LVBP | Leones del Caracas | REPUBLICARAQUISTAPP",
@@ -21,37 +19,10 @@ export const metadata: Metadata = {
 
 async function getCalendarData(): Promise<CalendarApiResponse> {
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-    let rawIcs = "";
-    try {
-      const response = await fetch(CALENDAR_FEED_URLS.rawIcs, {
-        signal: controller.signal,
-        next: { revalidate: 3600 },
-        headers: {
-          "User-Agent": "RepubliCaraquistApp/1.0",
-        },
-      });
-
-      if (response.ok) {
-        rawIcs = await response.text();
-      }
-    } catch {
-      // Ignorar error de red y usar fallback local pre-calculado
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    let events = rawIcs ? parseIcsContent(rawIcs) : (fallbackData.events as any);
-    if (!events || events.length === 0) {
-      events = fallbackData.events as any;
-    }
-
-    // Garantizar que todos los eventos contengan los horarios oficiales de El Emergente
-    events = enrichWithVerifiedSchedule(events);
-
-    const eventsWithResults = await attachSupabaseResults(events);
+    // Usar directamente los 56 juegos oficiales auditados (28 Casa / 28 Visita)
+    const baseEvents = fallbackData.events as CalendarGameEvent[];
+    const verifiedEvents = enrichWithVerifiedSchedule(baseEvents);
+    const eventsWithResults = await attachSupabaseResults(verifiedEvents);
     return buildCalendarResponse(eventsWithResults);
   } catch (error) {
     console.error("Error al obtener calendario:", error);

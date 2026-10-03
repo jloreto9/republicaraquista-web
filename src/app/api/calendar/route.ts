@@ -1,57 +1,25 @@
 import { NextResponse } from "next/server";
-import { CALENDAR_FEED_URLS } from "@/lib/constants";
 import {
-  parseIcsContent,
   attachSupabaseResults,
   buildCalendarResponse,
   enrichWithVerifiedSchedule,
 } from "@/lib/calendar-parser";
 import fallbackData from "@/data/calendar_2026_27.json";
-import { CalendarApiResponse } from "@/types/calendar";
+import { CalendarApiResponse, CalendarGameEvent } from "@/types/calendar";
 
-export const revalidate = 3600; // Revalidar cada 1 hora en Vercel Edge
+export const revalidate = 300; // Revalidar cada 5 minutos en Vercel Edge
 
 export async function GET() {
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
-
-    let rawIcs = "";
-    try {
-      const response = await fetch(CALENDAR_FEED_URLS.rawIcs, {
-        signal: controller.signal,
-        next: { revalidate: 3600 },
-        headers: {
-          "User-Agent": "RepubliCaraquistApp/1.0 (Next.js)",
-        },
-      });
-
-      if (response.ok) {
-        rawIcs = await response.text();
-      }
-    } catch (fetchErr) {
-      console.warn("No se pudo obtener el feed .ics remoto; usando fallback local:", fetchErr);
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    let events = rawIcs ? parseIcsContent(rawIcs) : (fallbackData.events as any);
-
-    if (!events || events.length === 0) {
-      events = fallbackData.events as any;
-    }
-
-    // Garantizar que todos los eventos contengan los horarios oficiales de El Emergente
-    events = enrichWithVerifiedSchedule(events);
-
-    // Cruce de resultados con Supabase
-    const eventsWithResults = await attachSupabaseResults(events);
+    const baseEvents = fallbackData.events as CalendarGameEvent[];
+    const verifiedEvents = enrichWithVerifiedSchedule(baseEvents);
+    const eventsWithResults = await attachSupabaseResults(verifiedEvents);
     const responsePayload: CalendarApiResponse = buildCalendarResponse(eventsWithResults);
 
     return NextResponse.json(responsePayload, {
       status: 200,
       headers: {
-        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=86400",
       },
     });
   } catch (error) {
@@ -59,3 +27,4 @@ export async function GET() {
     return NextResponse.json(fallbackData, { status: 200 });
   }
 }
+
