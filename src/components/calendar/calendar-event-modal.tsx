@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarGameEvent } from "@/types/calendar";
 import { getTeam } from "@/lib/constants";
+import { parseChannels, ChannelBadgeCard } from "./channel-logo";
 import {
   X,
   MapPin,
@@ -146,57 +147,51 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
           </div>
         </div>
 
-        {/* Fila de Detalles: Hora, Transmisión, Estadio */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          {/* Horario */}
-          <div className="p-3 rounded-xl bg-[#070B19]/70 border border-[#1E2B4D]/60 flex items-start gap-2.5">
-            <Clock className="w-4 h-4 text-[#FDB827] shrink-0 mt-0.5" />
-            <div>
-              <span className="text-[10px] text-slate-400 block font-mono">Horario Oficial</span>
-              <span className="font-semibold text-slate-200">{event.timeDisplay}</span>
+        {/* Fila de Detalles: Hora, Estadio, Transmisiones */}
+        <div className="space-y-3 text-xs">
+          {/* Fila 1: Horario Oficial y Sede/Estadio */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3 rounded-xl bg-[#070B19]/70 border border-[#1E2B4D]/60 flex items-start gap-2.5">
+              <Clock className="w-4 h-4 text-[#FDB827] shrink-0 mt-0.5" />
+              <div>
+                <span className="text-[10px] text-slate-400 block font-mono">Horario Oficial</span>
+                <span className="font-semibold text-slate-100 text-sm">{event.timeDisplay}</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#070B19]/70 border border-[#1E2B4D]/60 flex items-start gap-2.5">
+              <MapPin className="w-4 h-4 text-[#FDB827] shrink-0 mt-0.5" />
+              <div>
+                <span className="text-[10px] text-slate-400 block font-mono">Sede / Estadio</span>
+                <span className="font-semibold text-slate-200">{event.stadiumName}</span>
+                {event.city && (
+                  <span className="text-[11px] text-slate-400 block">{event.city}</span>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Transmisión TV & Streaming */}
-          <div className="p-3 rounded-xl bg-[#070B19]/70 border border-[#1E2B4D]/60 flex items-start gap-2.5">
-            <Tv className="w-4 h-4 text-[#FDB827] shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] text-slate-400 block font-mono">Transmisión TV & Streaming</span>
-              {event.transmission && event.transmission !== "Por confirmar" ? (
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {event.transmission.split(",").map((chan) => {
-                    const c = chan.trim();
-                    const isStreaming = c.toLowerCase().includes("beisbolplay") || c.toLowerCase().includes("youtube");
-                    return (
-                      <span
-                        key={c}
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
-                          isStreaming
-                            ? "bg-[#1E2B4D]/60 text-slate-300 border-[#1E2B4D]"
-                            : "bg-[#131E3D] text-[#FDB827] border-[#FDB827]/30 shadow-xs"
-                        }`}
-                      >
-                        {c}
-                      </span>
-                    );
-                  })}
+          {/* Fila 2: Transmisión TV & Streaming con Logotipos Oficiales */}
+          <div className="p-3.5 rounded-xl bg-[#070B19]/80 border border-[#1E2B4D] space-y-2.5">
+            <div className="flex items-center gap-2">
+              <Tv className="w-4 h-4 text-[#FDB827] shrink-0" />
+              <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider font-semibold">
+                Transmisión Oficial de TV & Streaming
+              </span>
+            </div>
+
+            {(() => {
+              const channels = parseChannels(event.transmission);
+              return channels.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {channels.map((ch) => (
+                    <ChannelBadgeCard key={ch.id} channel={ch} />
+                  ))}
                 </div>
               ) : (
-                <span className="font-semibold text-slate-200">Por confirmar</span>
-              )}
-            </div>
-          </div>
-
-          {/* Estadio y Ciudad */}
-          <div className="sm:col-span-2 p-3 rounded-xl bg-[#070B19]/70 border border-[#1E2B4D]/60 flex items-start gap-2.5">
-            <MapPin className="w-4 h-4 text-[#FDB827] shrink-0 mt-0.5" />
-            <div>
-              <span className="text-[10px] text-slate-400 block font-mono">Sede / Estadio</span>
-              <span className="font-semibold text-slate-200">{event.stadiumName}</span>
-              {event.city && (
-                <span className="text-[11px] text-slate-400 block">{event.city}</span>
-              )}
-            </div>
+                <span className="font-semibold text-slate-300 block text-xs">Por confirmar</span>
+              );
+            })()}
           </div>
         </div>
 
