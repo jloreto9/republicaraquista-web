@@ -222,6 +222,7 @@ export function enrichWithVerifiedSchedule(events: CalendarGameEvent[]): Calenda
       summary: verified.summary,
       timeDisplay: verified.timeDisplay,
       isTimePending: false,
+      transmission: verified.transmission || ev.transmission,
       stadiumName: verified.stadiumName,
       city: verified.city,
       opponentId: verified.opponentId,
@@ -230,6 +231,28 @@ export function enrichWithVerifiedSchedule(events: CalendarGameEvent[]): Calenda
       opponentLogo: verified.opponentLogo,
     };
   });
+}
+
+/**
+ * Retorna la etiqueta compacta priorizada para celdas mensuales pequeñas
+ */
+export function getPrimaryBroadcastBadge(trans?: string): string {
+  if (!trans || trans === "Por confirmar") return "";
+  const channels = trans.split(",").map((s) => s.trim());
+  const linear = channels.filter((c) => !c.toLowerCase().includes("beisbolplay"));
+  if (linear.length === 0) return "BeisbolPlay";
+  if (linear.length === 1) return linear[0];
+
+  return linear
+    .map((c) => {
+      if (c === "1Baseball") return "1Base";
+      if (c === "Meridiano TV") return "Mer";
+      if (c === "ByM Sport") return "ByM";
+      if (c === "Venevisión") return "Ven";
+      if (c === "LVBP YouTube") return "YouTube";
+      return c;
+    })
+    .join(" / ");
 }
 
 /**

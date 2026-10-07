@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { CalendarGameEvent } from "@/types/calendar";
+import { getPrimaryBroadcastBadge } from "@/lib/calendar-parser";
 import { Clock, Tv, MapPin } from "lucide-react";
 
 interface CalendarDayCardProps {
@@ -143,8 +144,11 @@ export function CalendarDayCard({
             </div>
 
             {event.transmission && event.transmission !== "Por confirmar" ? (
-              <span className="text-[8px] px-1.5 py-0.5 rounded bg-[#131E3D] text-[#FDB827] font-semibold border border-[#FDB827]/20 truncate max-w-[50px]">
-                {event.transmission}
+              <span
+                className="text-[8px] px-1.5 py-0.5 rounded bg-[#131E3D] text-[#FDB827] font-semibold border border-[#FDB827]/20 truncate max-w-[85px] sm:max-w-[105px]"
+                title={event.transmission}
+              >
+                {getPrimaryBroadcastBadge(event.transmission)}
               </span>
             ) : (
               <span className="text-[8px] font-mono text-slate-400 truncate max-w-[55px]">

@@ -3608,7 +3608,8 @@
       "stadium": "Estadio Luis Aparicio 'El Grande'",
       "city": "Maracaibo",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-14-mar-lar",
@@ -3653,7 +3654,8 @@
       "stadium": "Estadio Luis Aparicio 'El Grande'",
       "city": "Maracaibo",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-15-lag-anz",
@@ -3698,7 +3700,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-15-mag-ara",
@@ -3758,7 +3761,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-16-ara-mag",
@@ -3788,7 +3792,8 @@
       "stadium": "Estadio Alfonso 'Chico' Carrasquel",
       "city": "Puerto La Cruz",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Televen, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-17-mar-zul",
@@ -3848,7 +3853,8 @@
       "stadium": "Estadio Alfonso 'Chico' Carrasquel",
       "city": "Puerto La Cruz",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Televen, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-18-lag-ara",
@@ -3923,7 +3929,8 @@
       "stadium": "Estadio Universitario de Caracas",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-20-anz-mar",
@@ -4073,7 +4080,8 @@
       "stadium": "Estadio José Pérez Colmenares",
       "city": "Maracay",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-23-zul-lar",
@@ -4163,7 +4171,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, Meridiano TV, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-25-anz-lag",
@@ -4223,7 +4232,8 @@
       "stadium": "Estadio José Bernardo Pérez",
       "city": "Valencia",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, Venevisión, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-26-ara-car",
@@ -4238,7 +4248,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, LVBP YouTube, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-27-lar-mar",
@@ -4328,7 +4339,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-28-mag-ara",
@@ -4358,7 +4370,8 @@
       "stadium": "Estadio Nueva Esparta",
       "city": "Porlamar",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-29-mag-anz",
@@ -4418,7 +4431,8 @@
       "stadium": "Estadio Nueva Esparta",
       "city": "Porlamar",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, Meridiano TV, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-30-mag-anz",
@@ -4453,7 +4467,7 @@
     {
       "gameId": "lvbp-2026-10-31-anz-car",
       "date": "2026-10-31",
-      "time": "5:00 PM",
+      "time": "4:00 PM",
       "awayTeamId": 694,
       "awayTeamName": "Caribes de Anzoátegui",
       "awayTeamAbbr": "ANZ",
@@ -4463,7 +4477,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-10-31-zul-mag",
@@ -4538,7 +4553,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Televen, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-01-zul-mag",
@@ -4613,7 +4629,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-03-mar-mag",
@@ -4688,7 +4705,8 @@
       "stadium": "Estadio Universitario de Caracas",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Meridiano TV, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-05-mar-car",
@@ -4703,7 +4721,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Meridiano TV, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-05-anz-lar",
@@ -4763,7 +4782,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, Meridiano TV, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-06-mag-zul",
@@ -4808,7 +4828,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-07-mag-lar",
@@ -4868,7 +4889,8 @@
       "stadium": "Estadio José Pérez Colmenares",
       "city": "Maracay",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Venevisión, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-08-mar-anz",
@@ -4928,7 +4950,8 @@
       "stadium": "Estadio Antonio Herrera Gutiérrez",
       "city": "Barquisimeto",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, LVBP YouTube, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-10-mag-mar",
@@ -5018,7 +5041,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-12-zul-mar",
@@ -5078,7 +5102,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-13-zul-mar",
@@ -5113,7 +5138,7 @@
     {
       "gameId": "lvbp-2026-11-14-zul-car",
       "date": "2026-11-14",
-      "time": "4:00 PM",
+      "time": "8:00 PM",
       "awayTeamId": 692,
       "awayTeamName": "Águilas del Zulia",
       "awayTeamAbbr": "ZUL",
@@ -5123,7 +5148,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-14-lar-anz",
@@ -5188,7 +5214,7 @@
     {
       "gameId": "lvbp-2026-11-15-zul-car",
       "date": "2026-11-15",
-      "time": "1:00 PM",
+      "time": "4:00 PM",
       "awayTeamId": 692,
       "awayTeamName": "Águilas del Zulia",
       "awayTeamAbbr": "ZUL",
@@ -5198,7 +5224,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Televen, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-15-lar-anz",
@@ -5243,7 +5270,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, LVBP YouTube, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-17-mag-car",
@@ -5258,7 +5286,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Venevisión, ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-17-mar-lag",
@@ -5408,7 +5437,8 @@
       "stadium": "Estadio Antonio Herrera Gutiérrez",
       "city": "Barquisimeto",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, Meridiano TV, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-20-lag-zul",
@@ -5458,7 +5488,7 @@
     {
       "gameId": "lvbp-2026-11-21-car-mag",
       "date": "2026-11-21",
-      "time": "6:00 PM",
+      "time": "8:00 PM",
       "awayTeamId": 695,
       "awayTeamName": "Leones del Caracas",
       "awayTeamAbbr": "CAR",
@@ -5468,7 +5498,8 @@
       "stadium": "Estadio José Bernardo Pérez",
       "city": "Valencia",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, Televen, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-21-mar-zul",
@@ -5558,7 +5589,8 @@
       "stadium": "Estadio José Bernardo Pérez",
       "city": "Valencia",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, ByM Sport, Meridiano TV, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-25-mag-lag",
@@ -5633,7 +5665,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-26-zul-lag",
@@ -5693,7 +5726,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-27-zul-lag",
@@ -5738,7 +5772,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Televen, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-28-zul-anz",
@@ -5783,7 +5818,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Venevisión, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-11-29-zul-anz",
@@ -5858,7 +5894,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Televen, IVC, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-03-anz-lar",
@@ -5888,7 +5925,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-03-ara-lag",
@@ -5948,7 +5986,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Venevisión, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-04-mar-mag",
@@ -6038,7 +6077,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-06-mar-lag",
@@ -6083,7 +6123,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Televen, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-06-mag-ara",
@@ -6143,7 +6184,8 @@
       "stadium": "Estadio Alfonso 'Chico' Carrasquel",
       "city": "Puerto La Cruz",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-08-ara-mag",
@@ -6188,7 +6230,8 @@
       "stadium": "Estadio Alfonso 'Chico' Carrasquel",
       "city": "Puerto La Cruz",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-10-ara-lar",
@@ -6218,7 +6261,8 @@
       "stadium": "Estadio Nueva Esparta",
       "city": "Porlamar",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "1Baseball, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-10-lag-anz",
@@ -6263,7 +6307,8 @@
       "stadium": "Estadio Nueva Esparta",
       "city": "Porlamar",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-11-lag-anz",
@@ -6338,7 +6383,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Televen, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-12-anz-mar",
@@ -6368,7 +6414,8 @@
       "stadium": "Estadio Universitario de Caracas",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Venevisión, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-13-anz-mar",
@@ -6443,7 +6490,8 @@
       "stadium": "Estadio Monumental Simón Bolívar",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, Televen, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-15-ara-zul",
@@ -6518,7 +6566,8 @@
       "stadium": "Estadio José Bernardo Pérez",
       "city": "Valencia",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Venevisión, 1Baseball, ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-18-anz-lag",
@@ -6548,7 +6597,8 @@
       "stadium": "Estadio José Pérez Colmenares",
       "city": "Maracay",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Venevisión, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-18-mag-zul",
@@ -6613,7 +6663,7 @@
     {
       "gameId": "lvbp-2026-12-19-car-lar",
       "date": "2026-12-19",
-      "time": "6:00 PM",
+      "time": "8:00 PM",
       "awayTeamId": 695,
       "awayTeamName": "Leones del Caracas",
       "awayTeamAbbr": "CAR",
@@ -6623,7 +6673,8 @@
       "stadium": "Estadio Antonio Herrera Gutiérrez",
       "city": "Barquisimeto",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-19-mar-lag",
@@ -6653,7 +6704,8 @@
       "stadium": "Estadio Antonio Herrera Gutiérrez",
       "city": "Barquisimeto",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Venevisión, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-20-mar-ara",
@@ -6713,7 +6765,8 @@
       "stadium": "Estadio José Pérez Colmenares",
       "city": "Maracay",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "Meridiano TV, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-21-zul-mag",
@@ -6773,7 +6826,8 @@
       "stadium": "Estadio Universitario de Caracas",
       "city": "Caracas",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-22-anz-ara",
@@ -6878,12 +6932,13 @@
       "stadium": "Estadio Luis Aparicio 'El Grande'",
       "city": "Maracaibo",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "IVC, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-27-car-zul",
       "date": "2026-12-27",
-      "time": "1:00 PM",
+      "time": "5:30 PM",
       "awayTeamId": 695,
       "awayTeamName": "Leones del Caracas",
       "awayTeamAbbr": "CAR",
@@ -6893,7 +6948,8 @@
       "stadium": "Estadio Luis Aparicio 'El Grande'",
       "city": "Maracaibo",
       "isCaracasGame": true,
-      "isExhibition": false
+      "isExhibition": false,
+      "transmission": "ByM Sport, BeisbolPlay"
     },
     {
       "gameId": "lvbp-2026-12-27-lag-lar",

@@ -157,12 +157,33 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
             </div>
           </div>
 
-          {/* Transmisión TV */}
+          {/* Transmisión TV & Streaming */}
           <div className="p-3 rounded-xl bg-[#070B19]/70 border border-[#1E2B4D]/60 flex items-start gap-2.5">
             <Tv className="w-4 h-4 text-[#FDB827] shrink-0 mt-0.5" />
-            <div>
-              <span className="text-[10px] text-slate-400 block font-mono">Transmisión TV</span>
-              <span className="font-semibold text-slate-200">{event.transmission}</span>
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] text-slate-400 block font-mono">Transmisión TV & Streaming</span>
+              {event.transmission && event.transmission !== "Por confirmar" ? (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {event.transmission.split(",").map((chan) => {
+                    const c = chan.trim();
+                    const isStreaming = c.toLowerCase().includes("beisbolplay") || c.toLowerCase().includes("youtube");
+                    return (
+                      <span
+                        key={c}
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                          isStreaming
+                            ? "bg-[#1E2B4D]/60 text-slate-300 border-[#1E2B4D]"
+                            : "bg-[#131E3D] text-[#FDB827] border-[#FDB827]/30 shadow-xs"
+                        }`}
+                      >
+                        {c}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span className="font-semibold text-slate-200">Por confirmar</span>
+              )}
             </div>
           </div>
 
