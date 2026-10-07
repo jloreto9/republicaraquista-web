@@ -22,5 +22,14 @@
 - [ ] T013 [P] [US3] Actualizar navegación móvil (drawer y barra inferior) con Calendario en la 3ra posición en `src/components/layout/mobile-nav.tsx`
 
 ## Phase 5: Verification & Polish
-- [ ] T014 Ejecutar `npm run lint` y verificar que no existan advertencias ni errores
-- [ ] T015 Ejecutar `npm run build` y certificar compilación limpia de Next.js
+- [X] T014 Ejecutar `npm run lint` y verificar que no existan advertencias ni errores
+- [X] T015 Ejecutar `npm run build` y certificar compilación limpia de Next.js
+
+## Phase 6: User Story 6 - Logos Oficiales de Canales y Plataformas (P1)
+- [X] T016 [P] [US6] Descargar y optimizar logos transparentes PNG/WebP en `public/assets/channels/` (Televen, Venevisión, Meridiano, IVC, ByM Sport, 1Baseball, BeisbolPlay, YouTube, SimpleTV)
+- [X] T017 [P] [US6] Actualizar catálogo `CHANNELS` con paths de logos locales y metadatos en `src/components/calendar/channel-logo.tsx`
+- [X] T018 [US6] Integrar renderizado de logos oficiales en `ChannelLogo` con Next.js Image y fallback a SVG en `src/components/calendar/channel-logo.tsx`
+- [X] T019 [US6] Adaptar `ChannelIconStack` en `CalendarDayCard` con contenedores Dark Navy circulares y tooltips en `src/components/calendar/calendar-day-card.tsx`
+- [X] T020 [US6] Adaptar `ChannelBadgeCard` en `CalendarEventModal` con grid de logos oficiales enriquecidos en `src/components/calendar/calendar-event-modal.tsx`
+- [X] T021 [US6] Validar lint, type-check y build de Next.js en production mode
+

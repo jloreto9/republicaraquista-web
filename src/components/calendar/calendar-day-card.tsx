@@ -147,7 +147,7 @@ export function CalendarDayCard({
             {event.transmission && event.transmission !== "Por confirmar" ? (
               <ChannelIconStack
                 transmission={event.transmission}
-                maxIcons={2}
+                maxIcons={3}
                 iconSize={18}
               />
             ) : (

@@ -38,3 +38,9 @@ El módulo permite a los fanáticos consultar los 56 encuentros de la ronda regu
    - Sincronización automática de marcadores finales de juegos disputados.
 5. **User Story 5 - Integración de Navegación (P1)**:
    - Acceso desde la 3ra posición del menú en escritorio y móvil (`/calendario`).
+6. **User Story 6 - Logos Oficiales de Canales y Plataformas (P1)**:
+   - Logos gráficos oficiales de alta resolución con fondo transparente alojados localmente en `public/assets/channels/` (Televen, Venevisión, Meridiano TV, IVC, ByM Sport, 1Baseball Network, BeisbolPlay, YouTube, SimpleTV).
+   - Contenedores Dark Navy redondeados (`#070B19` / `#131E3D` con borde `#1E2B4D`) que preservan la identidad de República Caraquista y aseguran alto contraste.
+   - En cuadrícula mensual (`CalendarDayCard`), stack de mini-logos circulares limpios con tooltip interactivo y contador `+1` si son > 3 canales.
+   - En modal de partido (`CalendarEventModal`), tarjetas de canal enriquecidas con logo oficial ampliado (36px), nombre de la señal y badge clasificador ("Señal Abierta", "Cable / TV Paga", "Streaming").
+
