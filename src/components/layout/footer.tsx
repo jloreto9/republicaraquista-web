@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 export function Footer() {
   return (
@@ -36,7 +37,16 @@ export function Footer() {
       </div>
 
       <div className="max-w-7xl mx-auto mt-4 pt-4 border-t border-[#1E2B4D]/50 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-400 font-mono gap-2 text-center sm:text-left">
-        <span>© 2026 Jorge Leonardo Loreto • Todos los derechos reservados</span>
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1">
+          <span>© 2026 Jorge Leonardo Loreto • Todos los derechos reservados</span>
+          <span className="text-slate-600 hidden sm:inline">•</span>
+          <Link
+            href="/privacidad"
+            className="text-slate-400 hover:text-[#FDB827] underline underline-offset-2 transition-colors"
+          >
+            Política de Privacidad
+          </Link>
+        </div>
         <span className="text-[#FDB827]/80">Econ. & Data Scientist • Sabermetría LVBP</span>
       </div>
     </footer>
