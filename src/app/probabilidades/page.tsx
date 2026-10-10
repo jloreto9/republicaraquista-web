@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { Suspense } from "react";
 import { Header } from "@/components/layout/header";
 import { ProbabilidadesView } from "@/components/probabilidades/probabilidades-view";
-import { ACTIVE_SEASON } from "@/lib/constants";
+import { getActiveSeason } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Líneas & Probabilidades Sabermétricas | REPUBLICARAQUISTAPP",
@@ -12,13 +12,15 @@ export const metadata: Metadata = {
 
 export const revalidate = 300; // ISR cada 5 minutos
 
-export default function ProbabilidadesPage() {
+export default async function ProbabilidadesPage() {
+  const activeSeason = await getActiveSeason();
+
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <Header
         title="Líneas & Probabilidades"
         subtitle="Proyecciones Sabermétricas • Cuotas de Mercado • Detección +EV"
-        season={ACTIVE_SEASON}
+        season={activeSeason}
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">

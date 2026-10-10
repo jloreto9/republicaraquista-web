@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLeonesSituationalData } from "@/lib/situational-engine";
+import { getActiveSeason } from "@/lib/season-service";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const season = parseInt(searchParams.get("season") || "2025", 10);
+    const activeSeason = await getActiveSeason();
+    const season = searchParams.get("season")
+      ? parseInt(searchParams.get("season")!, 10)
+      : activeSeason;
 
     const data = getLeonesSituationalData();
     return NextResponse.json({

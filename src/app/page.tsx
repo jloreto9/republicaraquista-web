@@ -6,17 +6,18 @@ import { StandingsTable } from "@/components/standings/standings-table";
 import { DashboardTabs } from "@/components/dashboard/dashboard-tabs";
 import { getSeasonKPIs, getRecentGames, getStandings } from "@/lib/supabase";
 import { getDashboardTabsData } from "@/lib/leones-stats-service";
-import { ACTIVE_SEASON, SEASON_LABELS } from "@/lib/constants";
+import { getActiveSeason, SEASON_LABELS } from "@/lib/constants";
 import { ArrowRight, Trophy, Calendar } from "lucide-react";
 
 export const revalidate = 300; // ISR cada 5 minutos en Edge de Vercel
 
 export default async function DashboardPage() {
+  const activeSeason = await getActiveSeason();
   const [kpis, recentGames, standings, tabsData] = await Promise.all([
-    getSeasonKPIs(ACTIVE_SEASON),
-    getRecentGames(ACTIVE_SEASON, 6),
-    getStandings(ACTIVE_SEASON, "regular"),
-    getDashboardTabsData(ACTIVE_SEASON),
+    getSeasonKPIs(activeSeason),
+    getRecentGames(activeSeason, 6),
+    getStandings(activeSeason, "regular"),
+    getDashboardTabsData(activeSeason),
   ]);
 
   return (
@@ -24,7 +25,7 @@ export default async function DashboardPage() {
       <Header
         title="Centro de Mando"
         subtitle={`Temporada Regular LVBP • Leones del Caracas`}
-        season={ACTIVE_SEASON}
+        season={activeSeason}
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
@@ -73,7 +74,7 @@ export default async function DashboardPage() {
         {/* Suite de Pestañas: Último Juego, Tendencias, Líderes del Equipo y Leones Stats */}
         <DashboardTabs
           data={tabsData}
-          seasonLabel={SEASON_LABELS[ACTIVE_SEASON] || "25-26"}
+          seasonLabel={SEASON_LABELS[activeSeason] || `${activeSeason}-${(activeSeason + 1).toString().slice(-2)}`}
           defaultTab="leones-stats"
         />
 

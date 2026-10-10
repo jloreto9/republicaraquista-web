@@ -14,9 +14,10 @@ import {
 
 interface SituacionalViewProps {
   initialData: SituationalData;
+  season?: number;
 }
 
-export function SituacionalView({ initialData }: SituacionalViewProps) {
+export function SituacionalView({ initialData, season = 2025 }: SituacionalViewProps) {
   const [activeTab, setActiveTab] = useState<"splits" | "lob" | "bvp">("splits");
   const [bvpSearch, setBvpSearch] = useState("");
 
@@ -132,7 +133,7 @@ export function SituacionalView({ initialData }: SituacionalViewProps) {
               Rendimiento Colectivo por Situación de Juego
             </h3>
             <span className="text-[10px] font-mono px-2 py-1 rounded bg-[#070B19] border border-[#1E2B4D] text-[#FDB827]">
-              Temporada 2025
+              Temporada {season}-{String(season + 1).slice(-2)}
             </span>
           </div>
 

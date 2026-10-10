@@ -17,14 +17,18 @@ import { PitchingGameLogsTable } from "./pitching-game-logs-table";
 import { downloadPitchingCard } from "@/lib/pitch-card-canvas";
 import { Loader2, AlertCircle, Sparkles, BarChart3 } from "lucide-react";
 
-export function PitchingView() {
+interface PitchingViewProps {
+  initialSeason?: number;
+}
+
+export function PitchingView({ initialSeason = 2025 }: PitchingViewProps) {
   const [selectedPitcher, setSelectedPitcher] = useState<PitcherProfile>(
     CARACAS_FEATURED_PITCHERS[0]
   );
   const [branch, setBranch] = useState<"lvbp" | "mlb">("lvbp");
   const [timeMode, setTimeMode] = useState<TimeMode>("game");
   const [activeTab, setActiveTab] = useState<"card" | "telemetry">("card");
-  const [season, setSeason] = useState<number>(2025);
+  const [season, setSeason] = useState<number>(initialSeason);
   const [phase, setPhase] = useState<string>("all");
 
   const [gameLogs, setGameLogs] = useState<PitcherGameLog[]>([]);

@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { Header } from "@/components/layout/header";
 import { WpaView } from "@/components/wpa/wpa-view";
 import { processGameWpa, getSeasonWpaLeaders, LEONES_ALL_GAMES } from "@/lib/wpa-engine";
-import { ACTIVE_SEASON } from "@/lib/constants";
+import { getActiveSeason } from "@/lib/constants";
 
 export const revalidate = 300; // 5 minutos ISR
 
@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function WpaPage() {
+  const activeSeason = await getActiveSeason();
   const initialGameData = await processGameWpa(LEONES_ALL_GAMES[0].id);
   const seasonLeaders = getSeasonWpaLeaders();
 
@@ -21,7 +22,7 @@ export default async function WpaPage() {
       <Header
         title="Win Expectancy & WPA"
         subtitle="Probabilidad de Victoria • Matriz Tango RE24 • Apalancamiento (Leverage Index)"
-        season={ACTIVE_SEASON}
+        season={activeSeason}
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
@@ -29,6 +30,7 @@ export default async function WpaPage() {
           initialGameData={initialGameData}
           seasonLeaders={seasonLeaders}
           games={LEONES_ALL_GAMES}
+          season={activeSeason}
         />
       </main>
     </div>

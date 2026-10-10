@@ -71,15 +71,15 @@ export const LVBP_TEAMS: Record<number, Team> = {
 
 export const LVBP_TEAM_IDS = [695, 696, 698, 699, 693, 692, 694, 697];
 
-// Temporada activa en la base de datos con partidos disputados y estadísticas completas
-export const ACTIVE_SEASON = 2025; // 2025-2026
+// Temporada base de respaldo y re-exportación del servicio dinámico
+export const ACTIVE_SEASON = 2025; // 2025-2026 (fallback sincrónico)
+export { getActiveSeason, getAvailableSeasons, FALLBACK_SEASON } from "./season-service";
 
 // Temporada entrante con calendario oficial publicado (inicia en octubre 2026)
 export const UPCOMING_SEASON = 2026; // 2026-2027
 
 // Temporadas con datos reales verificados en Supabase
-// (Se validó que 2022, 2023 y 2024 tienen 0 registros en Supabase; solo 2025 tiene data)
-export const AVAILABLE_SEASONS = [2025];
+export const AVAILABLE_SEASONS = [2026, 2025];
 
 export const SEASON_LABELS: Record<number, string> = {
   2025: "2025-26",

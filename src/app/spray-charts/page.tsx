@@ -7,7 +7,7 @@ import {
   getPlayerStrikeZoneData,
   LEONES_SPRAY_PLAYERS,
 } from "@/lib/spray-engine";
-import { ACTIVE_SEASON } from "@/lib/constants";
+import { getActiveSeason } from "@/lib/constants";
 
 export const revalidate = 300; // 5 minutos ISR
 
@@ -17,7 +17,8 @@ export const metadata: Metadata = {
     "Gráficos espaciales en diamante geométrico con modelo determinístico BIS de dureza y análisis de disciplina en zona de strike 3x3.",
 };
 
-export default function SprayChartsPage() {
+export default async function SprayChartsPage() {
+  const activeSeason = await getActiveSeason();
   const initialPlayerId = LEONES_SPRAY_PLAYERS[0].id;
   const initialBalls = getPlayerBattedBalls(initialPlayerId);
   const initialStats = computeSprayStats(initialBalls);
@@ -28,7 +29,7 @@ export default function SprayChartsPage() {
       <Header
         title="Spray Charts & Strike Zone"
         subtitle="Geometría Espacial en Diamante • Modelo BIS de Dureza • Zona 3x3"
-        season={ACTIVE_SEASON}
+        season={activeSeason}
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">

@@ -3,7 +3,7 @@ import {
   getPlayerSplitsProfile,
   getAllAvailablePlayersForSplits,
 } from "@/lib/player-splits-service";
-import { ACTIVE_SEASON } from "@/lib/constants";
+import { ACTIVE_SEASON, getActiveSeason } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode");
-    const season = parseInt(searchParams.get("season") || String(ACTIVE_SEASON), 10);
+    const season = searchParams.get("season")
+      ? parseInt(searchParams.get("season")!, 10)
+      : await getActiveSeason();
 
     if (mode === "list") {
       const players = await getAllAvailablePlayersForSplits(season);

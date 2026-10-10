@@ -27,11 +27,13 @@ import {
 interface PlayerSplitsViewProps {
   initialPlayerId?: number;
   initialType?: "batter" | "pitcher";
+  season?: number;
 }
 
 export function PlayerSplitsView({
   initialPlayerId,
   initialType = "batter",
+  season = 2025,
 }: PlayerSplitsViewProps) {
   const [playerType, setPlayerType] = useState<"batter" | "pitcher">(initialType);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(
@@ -54,7 +56,7 @@ export function PlayerSplitsView({
     async function fetchPlayers() {
       setLoadingList(true);
       try {
-        const res = await fetch("/api/stats/player-splits?mode=list&season=2025");
+        const res = await fetch(`/api/stats/player-splits?mode=list&season=${season}`);
         if (res.ok) {
           const json = await res.json();
           if (isMounted && json.players) {
@@ -78,7 +80,7 @@ export function PlayerSplitsView({
     return () => {
       isMounted = false;
     };
-  }, [playerType, selectedPlayerId]);
+  }, [playerType, selectedPlayerId, season]);
 
   // Cargar perfil del jugador seleccionado
   useEffect(() => {
@@ -88,7 +90,7 @@ export function PlayerSplitsView({
       setLoadingProfile(true);
       try {
         const res = await fetch(
-          `/api/stats/player-splits?player_id=${selectedPlayerId}&type=${playerType}&season=2025`
+          `/api/stats/player-splits?player_id=${selectedPlayerId}&type=${playerType}&season=${season}`
         );
         if (res.ok) {
           const json = await res.json();

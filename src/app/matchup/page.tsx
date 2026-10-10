@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { Header } from "@/components/layout/header";
 import { getBattingStats, getPitchingStats } from "@/lib/supabase";
 import { MatchupView } from "@/components/matchup/matchup-view";
-import { ACTIVE_SEASON } from "@/lib/constants";
+import { getActiveSeason } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Matchup 360 (H2H) — República Caraquista",
@@ -13,9 +13,10 @@ export const metadata: Metadata = {
 export const revalidate = 300;
 
 export default async function MatchupPage() {
+  const activeSeason = await getActiveSeason();
   const [batters, pitchers] = await Promise.all([
-    getBattingStats(ACTIVE_SEASON, "R", "all", 200, 0),
-    getPitchingStats(ACTIVE_SEASON, "R", "all", 200, 0),
+    getBattingStats(activeSeason, "R", "all", 200, 0),
+    getPitchingStats(activeSeason, "R", "all", 200, 0),
   ]);
 
   return (
@@ -23,14 +24,14 @@ export default async function MatchupPage() {
       <Header
         title="Matchup 360 (H2H)"
         subtitle="Comparador Sabermétrico Cara a Cara • Radar Polar 8D • LVBP"
-        season={ACTIVE_SEASON}
+        season={activeSeason}
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
         <MatchupView
           initialBatters={batters}
           initialPitchers={pitchers}
-          season={ACTIVE_SEASON}
+          season={activeSeason}
         />
       </main>
     </div>

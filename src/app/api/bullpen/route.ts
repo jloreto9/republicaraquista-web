@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBullpenAndLineups } from "@/lib/bullpen";
+import { getActiveSeason } from "@/lib/season-service";
 
 export const revalidate = 300;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const season = parseInt(searchParams.get("season") || "2025", 10);
+  const activeSeason = await getActiveSeason();
+  const season = searchParams.get("season")
+    ? parseInt(searchParams.get("season")!, 10)
+    : activeSeason;
   const teamId = parseInt(searchParams.get("teamId") || "695", 10);
 
   try {

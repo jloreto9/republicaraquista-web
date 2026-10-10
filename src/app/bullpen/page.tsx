@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { Header } from "@/components/layout/header";
 import { getBullpenAndLineups } from "@/lib/bullpen";
 import { BullpenView } from "@/components/bullpen/bullpen-view";
-import { ACTIVE_SEASON } from "@/lib/constants";
+import { getActiveSeason } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Bullpen & Tracker de Alineaciones — República Caraquista",
@@ -13,18 +13,19 @@ export const metadata: Metadata = {
 export const revalidate = 300;
 
 export default async function BullpenPage() {
-  const data = getBullpenAndLineups(ACTIVE_SEASON, 695);
+  const activeSeason = await getActiveSeason();
+  const data = getBullpenAndLineups(activeSeason, 695);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <Header
         title="Bullpen & Lineups"
         subtitle="Herencia de Corredores (IR/IRS) • Dugout Scorecard 1-9 • Matriz de Alineaciones"
-        season={ACTIVE_SEASON}
+        season={activeSeason}
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
-        <BullpenView initialData={data} season={ACTIVE_SEASON} />
+        <BullpenView initialData={data} season={activeSeason} />
       </main>
     </div>
   );

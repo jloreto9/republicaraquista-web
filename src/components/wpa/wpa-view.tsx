@@ -19,12 +19,14 @@ interface WpaViewProps {
   initialGameData: GameWpaData | null;
   seasonLeaders: SeasonWpaLeader[];
   games?: GameOption[];
+  season?: number;
 }
 
 export function WpaView({
   initialGameData,
   seasonLeaders,
   games = LEONES_ALL_GAMES,
+  season = 2025,
 }: WpaViewProps) {
   const gamesList = games && games.length > 0 ? games : LEONES_ALL_GAMES;
   const [selectedGameId, setSelectedGameId] = useState<number>(
@@ -320,7 +322,7 @@ export function WpaView({
             <div>
               <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                 <Award className="w-4 h-4 text-[#FDB827]" />
-                Líderes de Probabilidad de Victoria (WPA & Clutch) — Temporada 2025
+                Líderes de Probabilidad de Victoria (WPA & Clutch) — Temporada {season}-{String(season + 1).slice(-2)}
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 Clutch = WPA − (WPA/LI). Mide el desempeño en situaciones de alta presión comparado con situaciones neutrales.

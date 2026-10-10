@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSeasonKPIs } from "@/lib/supabase";
+import { getActiveSeason } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const season = searchParams.get("season")
       ? parseInt(searchParams.get("season")!, 10)
-      : 2025;
+      : await getActiveSeason();
 
     const kpis = await getSeasonKPIs(season);
 

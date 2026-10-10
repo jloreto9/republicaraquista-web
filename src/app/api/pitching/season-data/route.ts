@@ -9,6 +9,7 @@ import {
   computePitchMetrics,
   sumInnings,
 } from "@/lib/pitch-parser";
+import { getActiveSeason, getAvailableSeasons } from "@/lib/season-service";
 
 const HEADERS = {
   "User-Agent":
@@ -140,7 +141,8 @@ async function fetchLogsForSeason(
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const pitcherIdParam = searchParams.get("pitcher_id");
-  const seasonParam = searchParams.get("season") || "2025";
+  const activeSeason = await getActiveSeason();
+  const seasonParam = searchParams.get("season");
   const branch = (searchParams.get("branch") || "lvbp").toLowerCase();
   const phase = searchParams.get("phase") || "all";
 
@@ -152,7 +154,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const season = Number(seasonParam) || 2025;
+  const season = seasonParam ? Number(seasonParam) || activeSeason : activeSeason;
   const isLvbp = branch === "lvbp";
 
   // 1. Obtener todas las salidas de la temporada solicitada
@@ -162,7 +164,8 @@ export async function GET(request: NextRequest) {
 
   // Fallback inteligente si la temporada actual no tiene salidas (modo 'all')
   if (logs.length === 0 && phase === "all") {
-    const fallbackCandidates = [2025, 2024, 2023, 2022].filter((s) => s !== season);
+    const available = await getAvailableSeasons();
+    const fallbackCandidates = available.filter((s) => s !== season);
     for (const fallbackS of fallbackCandidates) {
       const candidateLogs = await fetchLogsForSeason(pitcherId, fallbackS, isLvbp, phase);
       if (candidateLogs.length > 0) {

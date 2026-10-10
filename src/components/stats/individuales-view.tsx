@@ -11,12 +11,15 @@ import { Flame, Target, Shield, Loader2, Sparkles, Zap } from "lucide-react";
 interface IndividualesViewProps {
   initialBattingStats: BattingStats[];
   initialPitchingStats: PitchingStats[];
+  initialSeason?: number;
 }
 
 export function IndividualesView({
   initialBattingStats,
   initialPitchingStats,
+  initialSeason = 2025,
 }: IndividualesViewProps) {
+  const [season, setSeason] = useState<number>(initialSeason);
   const [activeTab, setActiveTab] = useState<"batting" | "pitching" | "splits" | "fielding">(
     "batting"
   );
@@ -43,7 +46,7 @@ export function IndividualesView({
         const teamParam = selectedTeam === "all" ? "all" : selectedTeam;
         if (activeTab === "batting") {
           const res = await fetch(
-            `/api/stats/batting?season=2025&phase=${selectedPhase}&team_id=${teamParam}&limit=60`
+            `/api/stats/batting?season=${season}&phase=${selectedPhase}&team_id=${teamParam}&limit=60`
           );
           if (res.ok) {
             const json = await res.json();
@@ -51,7 +54,7 @@ export function IndividualesView({
           }
         } else if (activeTab === "pitching") {
           const res = await fetch(
-            `/api/stats/pitching?season=2025&phase=${selectedPhase}&team_id=${teamParam}&limit=60`
+            `/api/stats/pitching?season=${season}&phase=${selectedPhase}&team_id=${teamParam}&limit=60`
           );
           if (res.ok) {
             const json = await res.json();
@@ -148,7 +151,7 @@ export function IndividualesView({
         {/* Badge Informativo */}
         <div className="flex items-center justify-center sm:justify-start space-x-2 text-[10px] sm:text-[11px] font-mono text-slate-400 bg-[#070B19] px-3 py-1.5 rounded-lg border border-[#1E2B4D]">
           <Sparkles className="w-3.5 h-3.5 text-[#FDB827]" />
-          <span>Líderes Oficiales • Temporada 2025</span>
+          <span>Líderes Oficiales • Temporada {season}-{String(season + 1).slice(-2)}</span>
         </div>
       </div>
 
@@ -196,6 +199,7 @@ export function IndividualesView({
         <PlayerSplitsView
           initialPlayerId={targetSplitPlayer?.id}
           initialType={targetSplitPlayer?.type}
+          season={season}
         />
       ) : (
         <div className="p-12 text-center rounded-xl bg-[#0D152B] border border-[#1E2B4D] space-y-3">
