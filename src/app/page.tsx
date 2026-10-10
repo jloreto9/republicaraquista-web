@@ -3,17 +3,20 @@ import { Header } from "@/components/layout/header";
 import { KPISummary } from "@/components/dashboard/kpi-summary";
 import { Scoreboard } from "@/components/dashboard/scoreboard";
 import { StandingsTable } from "@/components/standings/standings-table";
+import { DashboardTabs } from "@/components/dashboard/dashboard-tabs";
 import { getSeasonKPIs, getRecentGames, getStandings } from "@/lib/supabase";
-import { ACTIVE_SEASON } from "@/lib/constants";
+import { getDashboardTabsData } from "@/lib/leones-stats-service";
+import { ACTIVE_SEASON, SEASON_LABELS } from "@/lib/constants";
 import { ArrowRight, Trophy, Calendar } from "lucide-react";
 
 export const revalidate = 300; // ISR cada 5 minutos en Edge de Vercel
 
 export default async function DashboardPage() {
-  const [kpis, recentGames, standings] = await Promise.all([
+  const [kpis, recentGames, standings, tabsData] = await Promise.all([
     getSeasonKPIs(ACTIVE_SEASON),
     getRecentGames(ACTIVE_SEASON, 6),
     getStandings(ACTIVE_SEASON, "regular"),
+    getDashboardTabsData(ACTIVE_SEASON),
   ]);
 
   return (
@@ -66,6 +69,13 @@ export default async function DashboardPage() {
           </div>
           <KPISummary kpis={kpis} />
         </section>
+
+        {/* Suite de Pestañas: Último Juego, Tendencias, Líderes del Equipo y Leones Stats */}
+        <DashboardTabs
+          data={tabsData}
+          seasonLabel={SEASON_LABELS[ACTIVE_SEASON] || "25-26"}
+          defaultTab="leones-stats"
+        />
 
         {/* Scoreboard Cara a Cara */}
         <section>
