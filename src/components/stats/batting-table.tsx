@@ -7,11 +7,12 @@ import { ArrowUpDown } from "lucide-react";
 
 interface BattingTableProps {
   stats: BattingStats[];
+  onSelectPlayerForSplits?: (playerId: number) => void;
 }
 
 type SortField = keyof BattingStats;
 
-export function BattingTable({ stats }: BattingTableProps) {
+export function BattingTable({ stats, onSelectPlayerForSplits }: BattingTableProps) {
   const [sortField, setSortField] = useState<SortField>("ops");
   const [sortAsc, setSortAsc] = useState<boolean>(false);
 
@@ -198,9 +199,20 @@ export function BattingTable({ stats }: BattingTableProps) {
                           }}
                         />
                       </div>
-                      <span className={isCaracas ? "text-[#FDB827]" : "text-slate-100"}>
-                        {player.playerName}
-                      </span>
+                      <div className="flex items-center space-x-1.5">
+                        <span className={isCaracas ? "text-[#FDB827]" : "text-slate-100"}>
+                          {player.playerName}
+                        </span>
+                        {onSelectPlayerForSplits && (
+                          <button
+                            onClick={() => onSelectPlayerForSplits(player.playerId)}
+                            title={`Ver splits de ${player.playerName}`}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-[#070B19] hover:bg-[#FDB827] text-slate-400 hover:text-[#070B19] border border-[#1E2B4D] transition-colors"
+                          >
+                            <span>⚡ Splits</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="py-2.5 px-2 text-center">

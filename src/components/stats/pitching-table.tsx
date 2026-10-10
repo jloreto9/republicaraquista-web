@@ -8,11 +8,12 @@ import { ArrowUpDown } from "lucide-react";
 
 interface PitchingTableProps {
   stats: PitchingStats[];
+  onSelectPlayerForSplits?: (playerId: number) => void;
 }
 
 type SortField = keyof PitchingStats;
 
-export function PitchingTable({ stats }: PitchingTableProps) {
+export function PitchingTable({ stats, onSelectPlayerForSplits }: PitchingTableProps) {
   const [sortField, setSortField] = useState<SortField>("era");
   const [sortAsc, setSortAsc] = useState<boolean>(true); // Menor ERA es mejor
 
@@ -188,18 +189,29 @@ export function PitchingTable({ stats }: PitchingTableProps) {
                           }}
                         />
                       </div>
-                      <Link
-                        href="/pitching"
-                        title={`Ver Pitching Summary de ${pitcher.playerName}`}
-                        className={`hover:underline flex items-center gap-1 group ${
-                          isCaracas ? "text-[#FDB827]" : "text-slate-100"
-                        }`}
-                      >
-                        <span>{pitcher.playerName}</span>
-                        <span className="text-[10px] text-slate-400 opacity-50 group-hover:opacity-100 group-hover:text-[#FDB827]">
-                          ↗
-                        </span>
-                      </Link>
+                      <div className="flex items-center space-x-1.5">
+                        <Link
+                          href="/pitching"
+                          title={`Ver Pitching Summary de ${pitcher.playerName}`}
+                          className={`hover:underline flex items-center gap-1 group ${
+                            isCaracas ? "text-[#FDB827]" : "text-slate-100"
+                          }`}
+                        >
+                          <span>{pitcher.playerName}</span>
+                          <span className="text-[10px] text-slate-400 opacity-50 group-hover:opacity-100 group-hover:text-[#FDB827]">
+                            ↗
+                          </span>
+                        </Link>
+                        {onSelectPlayerForSplits && (
+                          <button
+                            onClick={() => onSelectPlayerForSplits(pitcher.playerId)}
+                            title={`Ver splits de ${pitcher.playerName}`}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-[#070B19] hover:bg-[#FDB827] text-slate-400 hover:text-[#070B19] border border-[#1E2B4D] transition-colors"
+                          >
+                            <span>⚡ Splits</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="py-2.5 px-2 text-center">

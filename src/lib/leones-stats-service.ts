@@ -265,10 +265,10 @@ export async function getCaracasTeamLeaders(season = ACTIVE_SEASON): Promise<{
             playerId: b.playerId,
             playerName: b.playerName,
             avatarUrl: b.playerAvatar,
-            avg: b.avg,
+            avg: b.avg ? b.avg.toFixed(3).replace(/^0+/, "") : ".000",
             hr: b.homeRuns,
             rbi: b.rbi,
-            ops: b.ops,
+            ops: b.ops ? b.ops.toFixed(3).replace(/^0+/, "") : ".000",
             ab: b.atBats,
             h: b.hits,
           }))

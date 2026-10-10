@@ -5,7 +5,8 @@ import { BattingStats, PitchingStats } from "@/types/sports";
 import { StatsFilters } from "@/components/stats/stats-filters";
 import { BattingTable } from "@/components/stats/batting-table";
 import { PitchingTable } from "@/components/stats/pitching-table";
-import { Flame, Target, Shield, Loader2, Sparkles } from "lucide-react";
+import { PlayerSplitsView } from "@/components/stats/splits/player-splits-view";
+import { Flame, Target, Shield, Loader2, Sparkles, Zap } from "lucide-react";
 
 interface IndividualesViewProps {
   initialBattingStats: BattingStats[];
@@ -16,7 +17,9 @@ export function IndividualesView({
   initialBattingStats,
   initialPitchingStats,
 }: IndividualesViewProps) {
-  const [activeTab, setActiveTab] = useState<"batting" | "pitching" | "fielding">("batting");
+  const [activeTab, setActiveTab] = useState<"batting" | "pitching" | "splits" | "fielding">(
+    "batting"
+  );
   const [selectedPhase, setSelectedPhase] = useState<string>("R");
   const [selectedTeam, setSelectedTeam] = useState<string | number>("all");
 
@@ -24,10 +27,17 @@ export function IndividualesView({
   const [pitchingStats, setPitchingStats] = useState<PitchingStats[]>(initialPitchingStats);
   const [loading, setLoading] = useState<boolean>(false);
 
+  // Estado para pre-seleccionar jugador al navegar a splits desde las tablas
+  const [targetSplitPlayer, setTargetSplitPlayer] = useState<{
+    id: number;
+    type: "batter" | "pitcher";
+  } | null>(null);
+
   // Carga reactiva de estadísticas al cambiar filtros
   useEffect(() => {
     let isMounted = true;
     async function fetchStats() {
+      if (activeTab === "splits") return;
       setLoading(true);
       try {
         const teamParam = selectedTeam === "all" ? "all" : selectedTeam;
@@ -55,8 +65,11 @@ export function IndividualesView({
       }
     }
 
-    // Si los filtros cambiaron con respecto al estado inicial
-    if (selectedPhase !== "R" || selectedTeam !== "all" || (activeTab === "pitching" && pitchingStats.length === 0)) {
+    if (
+      selectedPhase !== "R" ||
+      selectedTeam !== "all" ||
+      (activeTab === "pitching" && pitchingStats.length === 0)
+    ) {
       fetchStats();
     }
     return () => {
@@ -64,20 +77,30 @@ export function IndividualesView({
     };
   }, [activeTab, selectedPhase, selectedTeam, pitchingStats.length]);
 
+  const handleSelectBatterForSplits = (playerId: number) => {
+    setTargetSplitPlayer({ id: playerId, type: "batter" });
+    setActiveTab("splits");
+  };
+
+  const handleSelectPitcherForSplits = (playerId: number) => {
+    setTargetSplitPlayer({ id: playerId, type: "pitcher" });
+    setActiveTab("splits");
+  };
+
   return (
     <div className="space-y-6">
       {/* Selector de Pestañas Principales */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-[#1E2B4D] pb-3 sm:pb-4">
-        <div className="grid grid-cols-3 sm:flex items-center gap-1.5 sm:space-x-2 w-full sm:w-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-4 sm:flex items-center gap-1.5 sm:space-x-2 w-full sm:w-auto">
           <button
             onClick={() => setActiveTab("batting")}
             className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
               activeTab === "batting"
-                ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)]"
+                ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)] font-bold"
                 : "bg-[#0D152B] text-slate-300 hover:text-slate-100 hover:bg-[#131E3D] border border-[#1E2B4D]"
             }`}
           >
-            <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <Flame className="w-3.5 h-3.5 shrink-0" />
             <span className="hidden sm:inline">Bateo Sabermétrico</span>
             <span className="sm:hidden">Bateo</span>
           </button>
@@ -86,24 +109,37 @@ export function IndividualesView({
             onClick={() => setActiveTab("pitching")}
             className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
               activeTab === "pitching"
-                ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)]"
+                ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)] font-bold"
                 : "bg-[#0D152B] text-slate-300 hover:text-slate-100 hover:bg-[#131E3D] border border-[#1E2B4D]"
             }`}
           >
-            <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <Target className="w-3.5 h-3.5 shrink-0" />
             <span className="hidden sm:inline">Pitcheo & Efectividad</span>
             <span className="sm:hidden">Pitcheo</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("splits")}
+            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === "splits"
+                ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)] font-bold"
+                : "bg-[#0D152B] text-slate-300 hover:text-slate-100 hover:bg-[#131E3D] border border-[#1E2B4D]"
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 shrink-0 text-[#FDB827]" />
+            <span className="hidden sm:inline">Splits Situacionales</span>
+            <span className="sm:hidden">Splits</span>
           </button>
 
           <button
             onClick={() => setActiveTab("fielding")}
             className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
               activeTab === "fielding"
-                ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)]"
+                ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)] font-bold"
                 : "bg-[#0D152B] text-slate-300 hover:text-slate-100 hover:bg-[#131E3D] border border-[#1E2B4D]"
             }`}
           >
-            <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <Shield className="w-3.5 h-3.5 shrink-0" />
             <span className="hidden sm:inline">Fildeo & Defensa</span>
             <span className="sm:hidden">Fildeo</span>
           </button>
@@ -116,13 +152,15 @@ export function IndividualesView({
         </div>
       </div>
 
-      {/* Barra de Filtros */}
-      <StatsFilters
-        selectedPhase={selectedPhase}
-        onSelectPhase={setSelectedPhase}
-        selectedTeam={selectedTeam}
-        onSelectTeam={setSelectedTeam}
-      />
+      {/* Barra de Filtros General (para Bateo y Pitcheo) */}
+      {activeTab !== "splits" && (
+        <StatsFilters
+          selectedPhase={selectedPhase}
+          onSelectPhase={setSelectedPhase}
+          selectedTeam={selectedTeam}
+          onSelectTeam={setSelectedTeam}
+        />
+      )}
 
       {/* Contenedor de Datos con Spinner */}
       {loading ? (
@@ -138,7 +176,10 @@ export function IndividualesView({
             <span>Mostrando {battingStats.length} bateadores clasificados</span>
             <span className="text-[#FDB827]">Orden por defecto: OPS descendente</span>
           </div>
-          <BattingTable stats={battingStats} />
+          <BattingTable
+            stats={battingStats}
+            onSelectPlayerForSplits={handleSelectBatterForSplits}
+          />
         </div>
       ) : activeTab === "pitching" ? (
         <div className="space-y-2">
@@ -146,8 +187,16 @@ export function IndividualesView({
             <span>Mostrando {pitchingStats.length} lanzadores clasificados</span>
             <span className="text-[#FDB827]">Orden por defecto: ERA ascendente</span>
           </div>
-          <PitchingTable stats={pitchingStats} />
+          <PitchingTable
+            stats={pitchingStats}
+            onSelectPlayerForSplits={handleSelectPitcherForSplits}
+          />
         </div>
+      ) : activeTab === "splits" ? (
+        <PlayerSplitsView
+          initialPlayerId={targetSplitPlayer?.id}
+          initialType={targetSplitPlayer?.type}
+        />
       ) : (
         <div className="p-12 text-center rounded-xl bg-[#0D152B] border border-[#1E2B4D] space-y-3">
           <Shield className="w-8 h-8 text-[#FDB827] mx-auto opacity-80" />
