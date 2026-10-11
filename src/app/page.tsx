@@ -100,7 +100,7 @@ export default async function DashboardPage() {
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
-          <StandingsTable standings={standings.slice(0, 5)} showPythagorean={false} />
+          <StandingsTable standings={standings} showPythagorean={false} />
         </section>
       </main>
     </div>

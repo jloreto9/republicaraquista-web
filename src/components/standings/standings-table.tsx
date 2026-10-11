@@ -75,6 +75,10 @@ export function StandingsTable({
                     isCaracas
                       ? "bg-[#002D62]/30 hover:bg-[#002D62]/45 font-semibold text-slate-100"
                       : "hover:bg-[#131E3D]/50 text-slate-300"
+                  } ${
+                    idx === 4 && standings.length > 5
+                      ? "border-b-2 border-[#FDB827]/40"
+                      : ""
                   }`}
                 >
                   <td className="py-3 px-4 text-center">
