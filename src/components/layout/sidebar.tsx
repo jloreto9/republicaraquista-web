@@ -141,12 +141,12 @@ export function Sidebar() {
             >
               @JorgeLoreto
             </a>
-            <span className="text-slate-600">•</span>
+            <span className="text-[#FDB827]/50">•</span>
             <a
               href="https://x.com/RepubCaraquista"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-slate-400 hover:text-[#FDB827] transition-colors"
+              className="text-[#FDB827] hover:underline"
               title="Comunidad República Caraquista en X"
             >
               @RepubCaraquista
