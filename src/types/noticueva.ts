@@ -24,3 +24,14 @@ export interface UpdatePostInput {
   imageUrl?: string;
   published?: boolean;
 }
+
+export interface EmbeddedTweet {
+  id: string;
+  url: string;
+  authorName: string;
+  handle: string;
+  text: string;
+  date: string;
+  likes?: number;
+  retweets?: number;
+}

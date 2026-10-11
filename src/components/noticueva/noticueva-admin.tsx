@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { NotiCuevaPost } from "@/types/noticueva";
+import { NotiCuevaPost, EmbeddedTweet } from "@/types/noticueva";
 import { FormattedContent } from "./formatted-content";
 import {
   Lock,
@@ -23,6 +23,8 @@ import {
   Quote,
   Minus,
   Eye,
+  Plus,
+  MessageSquare,
 } from "lucide-react";
 
 export function NotiCuevaAdmin() {
@@ -42,6 +44,12 @@ export function NotiCuevaAdmin() {
   const [posts, setPosts] = useState<NotiCuevaPost[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Estados para Tuits Embebidos
+  const [tweets, setTweets] = useState<EmbeddedTweet[]>([]);
+  const [tweetText, setTweetText] = useState("");
+  const [tweetUrl, setTweetUrl] = useState("");
+  const [isAddingTweet, setIsAddingTweet] = useState(false);
 
   // Recordar sesión en sessionStorage
   useEffect(() => {
@@ -66,6 +74,7 @@ export function NotiCuevaAdmin() {
         setIsAuthenticated(true);
         sessionStorage.setItem("noticueva_admin_key", passToTest);
         loadPosts();
+        loadTweets();
       } else {
         setIsAuthenticated(false);
         setAuthError(data.error || "Contraseña incorrecta.");
@@ -102,6 +111,75 @@ export function NotiCuevaAdmin() {
       }
     } catch (err) {
       console.warn("Error al cargar posts:", err);
+    }
+  };
+
+  const loadTweets = async () => {
+    try {
+      const res = await fetch("/api/noticueva/tweets");
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setTweets(json.data);
+      }
+    } catch (err) {
+      console.warn("Error al cargar tuits:", err);
+    }
+  };
+
+  const handleAddTweet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tweetText.trim()) {
+      setFeedback({ type: "error", message: "El texto del tuit es obligatorio." });
+      return;
+    }
+
+    try {
+      setIsAddingTweet(true);
+      const res = await fetch("/api/noticueva/tweets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": password,
+        },
+        body: JSON.stringify({
+          text: tweetText.trim(),
+          url: tweetUrl.trim() || "https://x.com/RepubCaraquista",
+          authorName: "RepubliCaraquista ®©",
+          handle: "@RepubCaraquista",
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setFeedback({ type: "success", message: "¡Tuit agregado exitosamente al feed!" });
+        setTweetText("");
+        setTweetUrl("");
+        loadTweets();
+      } else {
+        setFeedback({ type: "error", message: json.error || "No se pudo agregar el tuit." });
+      }
+    } catch {
+      setFeedback({ type: "error", message: "Error al comunicarse con el servidor." });
+    } finally {
+      setIsAddingTweet(false);
+    }
+  };
+
+  const handleDeleteTweet = async (id: string) => {
+    if (!confirm("¿Deseas eliminar este tuit del feed?")) return;
+
+    try {
+      const res = await fetch(`/api/noticueva/tweets?id=${id}&password=${encodeURIComponent(password)}`, {
+        method: "DELETE",
+        headers: { "x-admin-key": password },
+      });
+      if (res.ok) {
+        setFeedback({ type: "success", message: "Tuit eliminado del feed." });
+        loadTweets();
+      } else {
+        setFeedback({ type: "error", message: "No se pudo eliminar el tuit." });
+      }
+    } catch {
+      setFeedback({ type: "error", message: "Error al eliminar tuit." });
     }
   };
 
@@ -693,6 +771,108 @@ export function NotiCuevaAdmin() {
                 </button>
                 <button
                   onClick={() => handleDeleteClick(p.id, p.title)}
+                  className="px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 text-xs font-mono flex items-center space-x-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Eliminar</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Gestor de Tuits Embebidos de @RepubCaraquista */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-[#0D152B]/90 border border-[#1E2B4D] shadow-lg space-y-5">
+        <div className="border-b border-[#1E2B4D] pb-3 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
+              <span className="text-slate-100 font-black">𝕏</span>
+              <span>Tuits Embebidos de @RepubCaraquista ({tweets.length})</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              Agrega publicaciones clave de X para que aparezcan de inmediato en el feed de la NotiCueva.
+            </p>
+          </div>
+        </div>
+
+        {/* Formulario para agregar tuit */}
+        <form onSubmit={handleAddTweet} className="space-y-3.5 p-4 rounded-xl bg-[#070B19]/60 border border-[#1E2B4D]">
+          <h4 className="text-xs font-bold text-[#FDB827] uppercase tracking-wider font-mono flex items-center gap-1.5">
+            <Plus className="w-3.5 h-3.5" />
+            <span>Agregar Nuevo Tuit al Feed</span>
+          </h4>
+
+          <div>
+            <label className="block text-xs font-mono text-slate-300 mb-1 font-bold">
+              Texto del Tuit: <span className="text-rose-400">*</span>
+            </label>
+            <textarea
+              value={tweetText}
+              onChange={(e) => setTweetText(e.target.value)}
+              rows={3}
+              placeholder="Copia y pega el texto del tuit de @RepubCaraquista aquí..."
+              className="w-full px-3.5 py-2 rounded-xl bg-[#0D152B] border border-[#1E2B4D] text-slate-100 placeholder-slate-500 text-xs leading-relaxed focus:outline-none focus:border-[#FDB827]/70"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono text-slate-300 mb-1 flex items-center justify-between">
+              <span>Enlace del Tuit en 𝕏 (Opcional):</span>
+              <span className="text-[10px] text-slate-500 font-mono">Por defecto enlaza a @RepubCaraquista</span>
+            </label>
+            <input
+              type="url"
+              value={tweetUrl}
+              onChange={(e) => setTweetUrl(e.target.value)}
+              placeholder="https://x.com/RepubCaraquista/status/..."
+              className="w-full px-3.5 py-2 rounded-xl bg-[#0D152B] border border-[#1E2B4D] text-slate-200 placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-[#FDB827]/70"
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={isAddingTweet}
+              className="px-4 py-2 rounded-xl bg-[#131E3D] hover:bg-[#1E2B4D] border border-[#FDB827]/40 text-[#FDB827] font-bold text-xs font-mono transition-all flex items-center space-x-1.5 shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{isAddingTweet ? "Guardando..." : "Agregar Tuit al Feed"}</span>
+            </button>
+          </div>
+        </form>
+
+        {/* Lista de Tuits Embebidos actuales */}
+        <div className="divide-y divide-[#1E2B4D]/60 pt-1">
+          {tweets.map((t) => (
+            <div
+              key={t.id}
+              className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#131E3D]/30 px-2 rounded-xl transition-colors"
+            >
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="text-xs text-slate-200 line-clamp-2">
+                  {t.text}
+                </p>
+                <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
+                  <span className="text-[#FDB827]">{t.handle}</span>
+                  <span>•</span>
+                  <span>{t.date}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 shrink-0">
+                <a
+                  href={t.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-lg bg-[#131E3D] hover:bg-[#1a2852] border border-[#1E2B4D] text-slate-300 hover:text-white text-xs font-mono flex items-center space-x-1"
+                >
+                  <span>Ver</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+                <button
+                  onClick={() => handleDeleteTweet(t.id)}
                   className="px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 text-xs font-mono flex items-center space-x-1"
                 >
                   <Trash2 className="w-3 h-3" />
