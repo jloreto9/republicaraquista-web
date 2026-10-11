@@ -198,6 +198,7 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
         {/* Botones de Acción */}
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2.5 border-t border-[#1E2B4D]">
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {/* Oculto temporalmente mientras se conecta fuente fiable de abridores y cuotas
             <Link
               href={`/probabilidades?date=${event.date}`}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#FDB827]/15 hover:bg-[#FDB827]/25 border border-[#FDB827]/40 text-[#FDB827] text-xs font-bold transition-all group shadow-sm"
@@ -206,6 +207,7 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
               <TrendingUp className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
               <span>Ver Líneas & Probabilidades</span>
             </Link>
+            */}
 
             <Link
               href={`/matchup`}

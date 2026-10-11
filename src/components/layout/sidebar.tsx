@@ -32,7 +32,7 @@ const navigationItems: NavItem[] = [
   { name: "Centro de Mando", href: "/", icon: LayoutDashboard },
   { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
   { name: "Calendario Oficial", href: "/calendario", icon: Calendar },
-  { name: "Líneas & Probabilidades", href: "/probabilidades", icon: TrendingUp },
+  // { name: "Líneas & Probabilidades", href: "/probabilidades", icon: TrendingUp }, // Temporalmente oculto
   { name: "Líderes Individuales", href: "/individuales", icon: Users },
   { name: "Pitching Summary", href: "/pitching", icon: Radio },
   { name: "Matchup 360 (H2H)", href: "/matchup", icon: GitCompare },
