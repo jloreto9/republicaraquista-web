@@ -27,6 +27,7 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   badge?: string;
+  isPending?: boolean;
 }
 
 const navigationItems: NavItem[] = [
@@ -79,7 +80,7 @@ export function Sidebar() {
         {navigationItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
-          const isPending = Boolean(item.badge);
+          const isPending = Boolean(item.isPending);
 
           return (
             <Link
@@ -105,7 +106,7 @@ export function Sidebar() {
                 <span>{item.name}</span>
               </div>
               {item.badge && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#1E2B4D] text-slate-300 font-mono">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30 font-mono">
                   {item.badge}
                 </span>
               )}

@@ -154,7 +154,7 @@ export function MobileNav() {
                   <span>{item.name}</span>
                 </div>
                 {item.badge && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-[#131E3D] text-slate-400 border border-[#1E2B4D]">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30 font-mono">
                     {item.badge}
                   </span>
                 )}
