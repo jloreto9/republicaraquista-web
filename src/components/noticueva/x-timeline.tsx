@@ -43,13 +43,13 @@ export function XTimeline() {
               <span>Feed Oficial de X</span>
             </h3>
             <p className="text-[11px] font-mono text-[#FDB827]">
-              @republicaraquista
+              @RepubCaraquista
             </p>
           </div>
         </div>
 
         <a
-          href="https://x.com/republicaraquista"
+          href="https://x.com/RepubCaraquista"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-[#131E3D] hover:bg-[#1a2852] border border-[#1E2B4D] hover:border-[#FDB827]/40 text-xs text-slate-300 hover:text-white transition-all font-mono"
@@ -66,9 +66,9 @@ export function XTimeline() {
           data-theme="dark"
           data-chrome="noheader nofooter noborders transparent"
           data-height="700"
-          href="https://x.com/republicaraquista?ref_src=twsrc%5Etfw"
+          href="https://x.com/RepubCaraquista?ref_src=twsrc%5Etfw"
         >
-          Cargando tuits de @republicaraquista...
+          Cargando tuits de @RepubCaraquista...
         </a>
 
         {/* Fallback si el script de X está bloqueado por extensiones */}
@@ -77,12 +77,12 @@ export function XTimeline() {
             <MessageSquare className="w-8 h-8 text-[#FDB827] mx-auto opacity-70" />
             <p>Visita nuestra cuenta oficial en X para ver las últimas publicaciones:</p>
             <a
-              href="https://x.com/republicaraquista"
+              href="https://x.com/RepubCaraquista"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-[#FDB827] text-[#070B19] font-bold font-mono text-xs hover:bg-[#FDB827]/90 transition-all"
             >
-              <span>Abrir @republicaraquista en 𝕏</span>
+              <span>Abrir @RepubCaraquista en 𝕏</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>

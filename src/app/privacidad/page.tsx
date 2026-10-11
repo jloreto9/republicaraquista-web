@@ -60,7 +60,7 @@ export default function PrivacidadPage() {
             <p className="text-xs text-slate-300 leading-relaxed">
               <strong>REPUBLICARAQUISTAPP</strong> es una plataforma analítica y sabermétrica desarrollada y mantenida por{" "}
               <strong>Jorge Leonardo Loreto</strong> (Economista y AI Data Scientist) bajo la marca y comunidad deportiva{" "}
-              <strong>República Caraquista</strong> (<span className="text-[#FDB827] font-mono">@republicaraquista</span>).
+              <strong>República Caraquista</strong> (<span className="text-[#FDB827] font-mono">@RepubCaraquista</span>).
             </p>
             <p className="text-xs text-slate-400 leading-relaxed">
               El objetivo de la plataforma es estrictamente estadístico, deportivo y de divulgación sabermétrica sobre los
@@ -181,12 +181,12 @@ export default function PrivacidadPage() {
               </div>
               <div className="flex items-center gap-3 font-mono text-[#FDB827]">
                 <a
-                  href="https://twitter.com/republicaraquista"
+                  href="https://x.com/RepubCaraquista"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:underline"
                 >
-                  @republicaraquista
+                  @RepubCaraquista
                 </a>
               </div>
             </div>

@@ -10,7 +10,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "NotiCueva por Gilberto Méndez | REPUBLICARAQUISTAPP",
   description:
-    "Espacio editorial de República Caraquista: noticias, notas exclusivas e impresiones del dugout de los Leones del Caracas por Gilberto Méndez, junto al feed en vivo de X (@republicaraquista).",
+    "Espacio editorial de República Caraquista: noticias, notas exclusivas e impresiones del dugout de los Leones del Caracas por Gilberto Méndez, junto al feed en vivo de X (@RepubCaraquista).",
 };
 
 export const revalidate = 60; // ISR: Actualización cada 60 segundos en Edge
@@ -81,7 +81,7 @@ export default async function NotiCuevaPage() {
             <NotiCuevaFeed initialPosts={posts} />
           </div>
 
-          {/* Columna Lateral: Feed Oficial de X (@republicaraquista) */}
+          {/* Columna Lateral: Feed Oficial de X (@RepubCaraquista) */}
           <div className="lg:col-span-5 xl:col-span-4 sticky top-20">
             <XTimeline />
           </div>

@@ -31,7 +31,7 @@ export function Footer() {
             <span className="font-bold text-[#FDB827]">Jorge Leonardo Loreto</span>
           </div>
           <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-            @republicaraquista • Datos vía MLB Stats API
+            @RepubCaraquista • Datos vía MLB Stats API
           </div>
         </div>
       </div>
