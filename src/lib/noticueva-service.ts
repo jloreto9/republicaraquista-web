@@ -6,21 +6,8 @@ import path from "path";
 export const NOTICUEVA_AUTHOR = "Gilberto Méndez";
 export const NOTICUEVA_ADMIN_PASSWORD = process.env.NOTICUEVA_ADMIN_PASSWORD || "Leones21.";
 
-// Post inicial de bienvenida de Gilberto Méndez
-const DEFAULT_INITIAL_POSTS: NotiCuevaPost[] = [
-  {
-    id: "bienvenida-gilberto-mendez",
-    title: "¡Bienvenidos a la NotiCueva!",
-    slug: "bienvenidos-a-la-noticueva",
-    content:
-      "Saludos a toda la fanaticada caraquista. Arranca la temporada 2026-2027 y desde esta NotiCueva les estaré compartiendo de primera mano las notas, impresiones desde el dugout, novedades de incorporaciones y el pulso real de los Leones del Caracas tanto en el Monumental como en la carretera.\n\nEl compromiso es total con la camiseta y aquí tendrán la información directa y sin rodeos. ¡Ruge el león!",
-    author: NOTICUEVA_AUTHOR,
-    imageUrl: "/assets/logo.png",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    published: true,
-  },
-];
+// Notas iniciales vacías: únicamente Gilberto Méndez redacta las notas oficiales
+const DEFAULT_INITIAL_POSTS: NotiCuevaPost[] = [];
 
 function getLocalPostsPath(): string {
   return path.join(process.cwd(), "public", "data", "noticueva_posts.json");

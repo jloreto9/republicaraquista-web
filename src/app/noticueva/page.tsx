@@ -66,10 +66,12 @@ export default async function NotiCuevaPage() {
           <div className="lg:col-span-7 xl:col-span-8 space-y-4">
             <div className="flex items-center justify-between border-b border-[#1E2B4D] pb-2">
               <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider flex items-center space-x-2">
-                <span>Últimas Notas</span>
-                <span className="text-xs font-mono text-slate-400 font-normal">
-                  ({posts.length})
-                </span>
+                <span>Notas Publicadas</span>
+                {posts.length > 0 && (
+                  <span className="text-xs font-mono text-slate-400 font-normal">
+                    ({posts.length})
+                  </span>
+                )}
               </h3>
               <span className="text-[11px] font-mono text-[#FDB827]">
                 Actualización continua

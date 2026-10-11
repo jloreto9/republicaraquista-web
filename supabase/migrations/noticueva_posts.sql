@@ -34,16 +34,3 @@ ON public.noticueva_posts
 FOR ALL 
 USING (true) 
 WITH CHECK (true);
-
--- Nota de Bienvenida Inicial de Gilberto Méndez
-INSERT INTO public.noticueva_posts (title, slug, content, author, image_url, created_at, published)
-VALUES (
-    '¡Bienvenidos a la NotiCueva!',
-    'bienvenidos-a-la-noticueva',
-    'Saludos, caraquistas. Arranca una nueva temporada y desde este espacio les traeré el pulso directo de la cueva melenuda: impresiones del dugout, reportes de bajas, incorporaciones del roster y lo que de verdad se vive en el Monumental y en la carretera. ¡Vamos con todo por el campeonato número 22!',
-    'Gilberto Méndez',
-    'https://midfield.mlbstatic.com/v1/team/695/spots/120',
-    NOW(),
-    true
-)
-ON CONFLICT (slug) DO NOTHING;
