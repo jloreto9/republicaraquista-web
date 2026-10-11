@@ -106,15 +106,6 @@ export default async function NotiCuevaPage() {
                 Voz editorial y cobertura exclusiva de la cueva caraquista. Impresiones del dugout, movimientos de róster, declaraciones de los protagonistas y análisis directo desde el terreno.
               </p>
 
-              <div className="pt-2">
-                <Link
-                  href="/admin"
-                  className="w-full py-2 px-3 rounded-xl bg-[#131E3D] hover:bg-[#1a2852] border border-[#1E2B4D] hover:border-[#FDB827]/40 text-slate-300 hover:text-white text-xs font-mono flex items-center justify-center space-x-1.5 transition-all"
-                >
-                  <Lock className="w-3 h-3 text-[#FDB827]" />
-                  <span>Panel de Redacción</span>
-                </Link>
-              </div>
             </div>
 
             {/* Tarjeta de la Cuenta Oficial en 𝕏 (@RepubCaraquista) */}
