@@ -71,7 +71,7 @@ export async function getNotiCuevaPosts(): Promise<NotiCuevaPost[]> {
           slug: row.slug,
           content: row.content,
           author: row.author || NOTICUEVA_AUTHOR,
-          imageUrl: row.image_url,
+          imageUrl: row.image_url || "/assets/logo.png",
           createdAt: row.created_at,
           updatedAt: row.updated_at,
           published: Boolean(row.published),
@@ -82,7 +82,10 @@ export async function getNotiCuevaPosts(): Promise<NotiCuevaPost[]> {
     }
   }
 
-  return readLocalPosts();
+  return readLocalPosts().map((p) => ({
+    ...p,
+    imageUrl: p.imageUrl || "/assets/logo.png",
+  }));
 }
 
 /**
@@ -103,7 +106,7 @@ export async function createNotiCuevaPost(input: CreatePostInput): Promise<NotiC
     slug: generateSlug(input.title),
     content: input.content.trim(),
     author: input.author?.trim() || NOTICUEVA_AUTHOR,
-    imageUrl: input.imageUrl?.trim() || null,
+    imageUrl: input.imageUrl?.trim() || "/assets/logo.png",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     published: true,
@@ -156,7 +159,7 @@ export async function updateNotiCuevaPost(
       if (input.title !== undefined) updateData.title = input.title.trim();
       if (input.content !== undefined) updateData.content = input.content.trim();
       if (input.author !== undefined) updateData.author = input.author.trim();
-      if (input.imageUrl !== undefined) updateData.image_url = input.imageUrl?.trim() || null;
+      if (input.imageUrl !== undefined) updateData.image_url = input.imageUrl?.trim() || "/assets/logo.png";
       if (input.published !== undefined) updateData.published = input.published;
 
       await supabase.from("noticueva_posts").update(updateData).eq("id", id);
@@ -171,6 +174,7 @@ export async function updateNotiCuevaPost(
     posts[idx] = {
       ...posts[idx],
       ...input,
+      imageUrl: input.imageUrl !== undefined ? (input.imageUrl?.trim() || "/assets/logo.png") : posts[idx].imageUrl,
       updatedAt: new Date().toISOString(),
     };
     writeLocalPosts(posts);

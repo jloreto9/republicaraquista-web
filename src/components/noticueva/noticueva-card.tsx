@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { NotiCuevaPost } from "@/types/noticueva";
 import { Calendar, User, ChevronDown, ChevronUp, Share2, Check } from "lucide-react";
+import { FormattedContent } from "./formatted-content";
 
 interface NotiCuevaCardProps {
   post: NotiCuevaPost;
@@ -12,6 +13,10 @@ interface NotiCuevaCardProps {
 export function NotiCuevaCard({ post }: NotiCuevaCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Portada: foto del post o logo oficial de República Caraquista
+  const coverImage = post.imageUrl?.trim() || "/assets/logo.png";
+  const isDefaultLogo = coverImage === "/assets/logo.png" || coverImage.includes("logo.png");
 
   // Formatear fecha en español
   const formattedDate = new Date(post.createdAt).toLocaleDateString("es-VE", {
@@ -74,26 +79,43 @@ export function NotiCuevaCard({ post }: NotiCuevaCardProps) {
         </button>
       </div>
 
-      {/* Imagen opcional de portada */}
-      {post.imageUrl && (
-        <div className="relative w-full h-48 sm:h-56 rounded-xl overflow-hidden bg-[#070B19] border border-[#1E2B4D]">
-          <Image
-            src={post.imageUrl}
-            alt={post.title}
-            fill
-            className="object-cover hover:scale-105 transition-transform duration-300"
-            unoptimized
-          />
-        </div>
-      )}
+      {/* Portada: foto del post o logo oficial de República Caraquista */}
+      <div className="relative w-full rounded-xl overflow-hidden border border-[#1E2B4D] group">
+        {isDefaultLogo ? (
+          <div className="relative w-full h-40 sm:h-48 bg-gradient-to-br from-[#002D62] via-[#0D152B] to-[#070B19] flex items-center justify-center p-4">
+            <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center drop-shadow-[0_0_20px_rgba(253,184,39,0.25)] group-hover:scale-105 transition-transform duration-300">
+              <Image
+                src="/assets/logo.png"
+                alt="República Caraquista"
+                fill
+                className="object-contain"
+                unoptimized
+              />
+            </div>
+            <div className="absolute bottom-2.5 right-3 px-2 py-0.5 rounded-md bg-[#070B19]/80 border border-[#FDB827]/30 text-[10px] font-mono text-[#FDB827]">
+              República Caraquista
+            </div>
+          </div>
+        ) : (
+          <div className="relative w-full h-48 sm:h-56 bg-[#070B19]">
+            <Image
+              src={coverImage}
+              alt={post.title}
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
+              unoptimized
+            />
+          </div>
+        )}
+      </div>
 
       {/* Título y Contenido */}
       <div className="space-y-2.5 flex-1">
         <h2 className="text-base sm:text-lg font-bold text-slate-100 leading-snug tracking-tight">
           {post.title}
         </h2>
-        <div className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-line font-sans">
-          {displayContent}
+        <div className="font-sans">
+          <FormattedContent content={displayContent} />
         </div>
       </div>
 

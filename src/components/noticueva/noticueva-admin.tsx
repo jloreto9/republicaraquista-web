@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { NotiCuevaPost } from "@/types/noticueva";
+import { FormattedContent } from "./formatted-content";
 import {
   Lock,
   Send,
@@ -13,6 +15,14 @@ import {
   Newspaper,
   Image as ImageIcon,
   ExternalLink,
+  Bold,
+  Italic,
+  Underline,
+  Heading3,
+  List,
+  Quote,
+  Minus,
+  Eye,
 } from "lucide-react";
 
 export function NotiCuevaAdmin() {
@@ -26,6 +36,8 @@ export function NotiCuevaAdmin() {
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editorTab, setEditorTab] = useState<"write" | "preview">("write");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [posts, setPosts] = useState<NotiCuevaPost[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,6 +105,53 @@ export function NotiCuevaAdmin() {
     }
   };
 
+  /**
+   * Inserta o envuelve texto seleccionado con formato Markdown / HTML-lite
+   */
+  const insertFormat = (
+    prefix: string,
+    suffix: string = "",
+    placeholder: string = "texto"
+  ) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentVal = content;
+    const selectedText = currentVal.substring(start, end);
+
+    let newText = "";
+    let newCursorStart = start;
+    let newCursorEnd = end;
+
+    if (selectedText.length > 0) {
+      newText =
+        currentVal.substring(0, start) +
+        prefix +
+        selectedText +
+        suffix +
+        currentVal.substring(end);
+      newCursorStart = start + prefix.length;
+      newCursorEnd = newCursorStart + selectedText.length;
+    } else {
+      const insertVal = placeholder ? `${prefix}${placeholder}${suffix}` : prefix;
+      newText =
+        currentVal.substring(0, start) +
+        insertVal +
+        currentVal.substring(end);
+      newCursorStart = start + prefix.length;
+      newCursorEnd = placeholder ? newCursorStart + placeholder.length : newCursorStart;
+    }
+
+    setContent(newText);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(newCursorStart, newCursorEnd);
+    }, 20);
+  };
+
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) {
@@ -103,6 +162,7 @@ export function NotiCuevaAdmin() {
     try {
       setIsSubmitting(true);
       setFeedback(null);
+      const targetImage = imageUrl.trim() || "/assets/logo.png";
 
       if (editingPostId) {
         // Actualizar nota existente
@@ -115,7 +175,7 @@ export function NotiCuevaAdmin() {
           body: JSON.stringify({
             title: title.trim(),
             content: content.trim(),
-            imageUrl: imageUrl.trim() || null,
+            imageUrl: targetImage,
           }),
         });
         const json = await res.json();
@@ -137,7 +197,7 @@ export function NotiCuevaAdmin() {
           body: JSON.stringify({
             title: title.trim(),
             content: content.trim(),
-            imageUrl: imageUrl.trim() || null,
+            imageUrl: targetImage,
             author: "Gilberto Méndez",
           }),
         });
@@ -161,7 +221,8 @@ export function NotiCuevaAdmin() {
     setEditingPostId(p.id);
     setTitle(p.title);
     setContent(p.content);
-    setImageUrl(p.imageUrl || "");
+    setImageUrl(p.imageUrl === "/assets/logo.png" ? "" : (p.imageUrl || ""));
+    setEditorTab("write");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -192,6 +253,7 @@ export function NotiCuevaAdmin() {
     setContent("");
     setImageUrl("");
     setEditingPostId(null);
+    setEditorTab("write");
   };
 
   // ── Vista 1: Pantalla de Login para Gilberto Méndez ──
@@ -335,36 +397,230 @@ export function NotiCuevaAdmin() {
           </div>
 
           {/* Foto de Portada (Opcional) */}
-          <div>
-            <label className="block text-xs font-mono text-slate-300 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center space-x-1.5">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-mono text-slate-300 flex items-center justify-between">
+              <span className="flex items-center space-x-1.5 font-bold">
                 <ImageIcon className="w-3.5 h-3.5 text-[#FDB827]" />
                 <span>Foto de Portada (Opcional - Enlace URL):</span>
               </span>
-              <span className="text-[10px] text-slate-500 font-mono">Puedes dejarlo en blanco</span>
+              <span className="text-[10px] text-[#FDB827]/90 font-mono">
+                {imageUrl.trim() ? "Foto personalizada activa" : "Logo oficial Caraquista por defecto"}
+              </span>
             </label>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://ejemplo.com/foto-jugador.jpg"
-              className="w-full px-4 py-2 rounded-xl bg-[#070B19] border border-[#1E2B4D] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#FDB827]/70 text-xs font-mono"
-            />
+            <div className="relative">
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://ejemplo.com/foto-jugador.jpg (o déjalo en blanco)"
+                className="w-full pl-4 pr-28 py-2 rounded-xl bg-[#070B19] border border-[#1E2B4D] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#FDB827]/70 text-xs font-mono"
+              />
+              {!imageUrl.trim() && (
+                <div className="absolute right-2 top-1.5 px-2 py-0.5 rounded-md bg-[#131E3D] border border-[#FDB827]/30 text-[10px] text-[#FDB827] font-mono pointer-events-none">
+                  Logo Oficial
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-400">
+              💡 Si no colocas una foto, se publicará automáticamente con el logo oficial de República Caraquista.
+            </p>
           </div>
 
-          {/* Cuerpo de la Nota */}
-          <div>
-            <label className="block text-xs font-mono text-slate-300 mb-1.5 font-bold">
-              Contenido de la Nota: <span className="text-rose-400">*</span>
-            </label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={8}
-              placeholder="Escribe aquí tu nota para la fanaticada caraquista... Puedes usar saltos de línea y párrafos libremente."
-              className="w-full px-4 py-3 rounded-xl bg-[#070B19] border border-[#1E2B4D] text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#FDB827]/70 text-sm leading-relaxed"
-              required
-            />
+          {/* Cuerpo de la Nota con Toolbar y Vista Previa */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-mono text-slate-300 font-bold">
+                Contenido de la Nota: <span className="text-rose-400">*</span>
+              </label>
+
+              {/* Selector Escribir / Vista Previa */}
+              <div className="flex items-center p-0.5 rounded-lg bg-[#070B19] border border-[#1E2B4D]">
+                <button
+                  type="button"
+                  onClick={() => setEditorTab("write")}
+                  className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-mono transition-all ${
+                    editorTab === "write"
+                      ? "bg-[#131E3D] text-[#FDB827] font-bold shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Escribir</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditorTab("preview")}
+                  className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-mono transition-all ${
+                    editorTab === "preview"
+                      ? "bg-[#131E3D] text-[#FDB827] font-bold shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Eye className="w-3 h-3" />
+                  <span>Vista Previa</span>
+                </button>
+              </div>
+            </div>
+
+            {editorTab === "write" ? (
+              <div className="rounded-xl border border-[#1E2B4D] bg-[#070B19] overflow-hidden focus-within:border-[#FDB827]/70 transition-colors">
+                {/* Barra de Herramientas de Formato */}
+                <div className="flex flex-wrap items-center gap-1 p-2 bg-[#0D152B] border-b border-[#1E2B4D] text-slate-300">
+                  <button
+                    type="button"
+                    onClick={() => insertFormat("**", "**", "texto en negrita")}
+                    title="Negrita (**texto**)"
+                    className="p-1.5 rounded-lg hover:bg-[#1E2B4D] hover:text-[#FDB827] text-slate-300 transition-colors flex items-center gap-1 text-xs font-bold"
+                  >
+                    <Bold className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline font-mono text-[11px]">Negrita</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => insertFormat("*", "*", "texto en cursiva")}
+                    title="Cursiva (*texto*)"
+                    className="p-1.5 rounded-lg hover:bg-[#1E2B4D] hover:text-[#FDB827] text-slate-300 transition-colors flex items-center gap-1 text-xs italic"
+                  >
+                    <Italic className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline font-mono text-[11px]">Cursiva</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => insertFormat("<u>", "</u>", "texto subrayado")}
+                    title="Subrayado (<u>texto</u>)"
+                    className="p-1.5 rounded-lg hover:bg-[#1E2B4D] hover:text-[#FDB827] text-slate-300 transition-colors flex items-center gap-1 text-xs underline"
+                  >
+                    <Underline className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline font-mono text-[11px]">Subrayado</span>
+                  </button>
+
+                  <span className="h-4 w-px bg-[#1E2B4D] mx-1" />
+
+                  <button
+                    type="button"
+                    onClick={() => insertFormat("### ", "", "Subtítulo")}
+                    title="Subtítulo (### Título)"
+                    className="p-1.5 rounded-lg hover:bg-[#1E2B4D] hover:text-[#FDB827] text-slate-300 transition-colors flex items-center gap-1 text-xs"
+                  >
+                    <Heading3 className="w-3.5 h-3.5 text-[#FDB827]" />
+                    <span className="hidden sm:inline font-mono text-[11px]">Subtítulo</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => insertFormat("• ", "", "Novedad o elemento")}
+                    title="Viñeta (• Elemento)"
+                    className="p-1.5 rounded-lg hover:bg-[#1E2B4D] hover:text-[#FDB827] text-slate-300 transition-colors flex items-center gap-1 text-xs"
+                  >
+                    <List className="w-3.5 h-3.5 text-[#FDB827]" />
+                    <span className="hidden sm:inline font-mono text-[11px]">Viñetas</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => insertFormat('> "', '" — Autor', 'Declaración del dugout')}
+                    title='Cita (> "Declaración")'
+                    className="p-1.5 rounded-lg hover:bg-[#1E2B4D] hover:text-[#FDB827] text-slate-300 transition-colors flex items-center gap-1 text-xs"
+                  >
+                    <Quote className="w-3.5 h-3.5 text-[#FDB827]" />
+                    <span className="hidden sm:inline font-mono text-[11px]">Cita</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => insertFormat("\n---\n", "", "")}
+                    title="Línea separadora (---)"
+                    className="p-1.5 rounded-lg hover:bg-[#1E2B4D] hover:text-[#FDB827] text-slate-300 transition-colors flex items-center gap-1 text-xs"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline font-mono text-[11px]">Separador</span>
+                  </button>
+                </div>
+
+                <textarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  rows={9}
+                  placeholder="Escribe aquí tu nota para la fanaticada caraquista... Puedes seleccionar texto y pulsar los botones de arriba para aplicar Negrita, Cursiva, Subrayado, etc."
+                  className="w-full px-4 py-3 bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-sm leading-relaxed"
+                  required
+                />
+
+                <div className="px-3 py-1.5 bg-[#0D152B]/60 border-t border-[#1E2B4D]/60 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                  <span>
+                    💡 Tip: Sombrea una palabra o frase y pulsa el botón correspondiente para formatearla.
+                  </span>
+                  <span>{content.length} caracteres</span>
+                </div>
+              </div>
+            ) : (
+              /* Pestaña de Vista Previa en Vivo */
+              <div className="rounded-xl border border-[#1E2B4D] bg-[#070B19]/90 p-4 sm:p-5 space-y-4">
+                <div className="text-[11px] font-mono text-[#FDB827] uppercase tracking-wider pb-2 border-b border-[#1E2B4D]/70 flex items-center justify-between">
+                  <span>Vista Previa de Publicación</span>
+                  <span>Así se verá en la NotiCueva</span>
+                </div>
+
+                {/* Portada Preview */}
+                <div className="relative w-full rounded-xl overflow-hidden border border-[#1E2B4D]">
+                  {!imageUrl.trim() || imageUrl.trim() === "/assets/logo.png" ? (
+                    <div className="relative w-full h-36 sm:h-44 bg-gradient-to-br from-[#002D62] via-[#0D152B] to-[#070B19] flex items-center justify-center p-4">
+                      <div className="relative w-24 h-24 flex items-center justify-center drop-shadow-[0_0_15px_rgba(253,184,39,0.3)]">
+                        <Image
+                          src="/assets/logo.png"
+                          alt="República Caraquista"
+                          fill
+                          className="object-contain"
+                          unoptimized
+                        />
+                      </div>
+                      <div className="absolute bottom-2 right-3 px-2 py-0.5 rounded-md bg-[#070B19]/80 border border-[#FDB827]/30 text-[10px] font-mono text-[#FDB827]">
+                        Logo Oficial Caraquista
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative w-full h-44 sm:h-52 bg-[#070B19]">
+                      <Image
+                        src={imageUrl.trim()}
+                        alt="Portada"
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Título y Contenido Formateado */}
+                <div className="space-y-2">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-100 leading-snug">
+                    {title.trim() || "Título de la nota..."}
+                  </h2>
+                  <div className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
+                    <span className="text-[#FDB827]">Gilberto Méndez</span>
+                    <span>•</span>
+                    <span>
+                      {new Date().toLocaleDateString("es-VE", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <div className="pt-2 font-sans">
+                    <FormattedContent
+                      content={
+                        content ||
+                        "El contenido que redactes aparecerá aquí con todo su formato..."
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Botón de Publicación */}
