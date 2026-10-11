@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { BattingStats, PitchingStats } from "@/types/sports";
 import { StatsFilters } from "@/components/stats/stats-filters";
 import { BattingTable } from "@/components/stats/batting-table";
@@ -12,12 +12,16 @@ interface IndividualesViewProps {
   initialBattingStats: BattingStats[];
   initialPitchingStats: PitchingStats[];
   initialSeason?: number;
+  initialTeamGamesMap?: Record<number, number>;
+  initialMaxGames?: number;
 }
 
 export function IndividualesView({
   initialBattingStats,
   initialPitchingStats,
   initialSeason = 2025,
+  initialTeamGamesMap = {},
+  initialMaxGames = 56,
 }: IndividualesViewProps) {
   const [season, setSeason] = useState<number>(initialSeason);
   const [activeTab, setActiveTab] = useState<"batting" | "pitching" | "splits" | "fielding">(
@@ -25,6 +29,10 @@ export function IndividualesView({
   );
   const [selectedPhase, setSelectedPhase] = useState<string>("R");
   const [selectedTeam, setSelectedTeam] = useState<string | number>("all");
+  const [qualifyingOnly, setQualifyingOnly] = useState<boolean>(true); // Activado por defecto
+
+  const [teamGamesMap, setTeamGamesMap] = useState<Record<number, number>>(initialTeamGamesMap);
+  const [maxGames, setMaxGames] = useState<number>(initialMaxGames);
 
   const [battingStats, setBattingStats] = useState<BattingStats[]>(initialBattingStats);
   const [pitchingStats, setPitchingStats] = useState<PitchingStats[]>(initialPitchingStats);
@@ -46,19 +54,31 @@ export function IndividualesView({
         const teamParam = selectedTeam === "all" ? "all" : selectedTeam;
         if (activeTab === "batting") {
           const res = await fetch(
-            `/api/stats/batting?season=${season}&phase=${selectedPhase}&team_id=${teamParam}&limit=60`
+            `/api/stats/batting?season=${season}&phase=${selectedPhase}&team_id=${teamParam}&limit=250`
           );
           if (res.ok) {
             const json = await res.json();
-            if (isMounted) setBattingStats(json.data || json.stats || []);
+            if (isMounted) {
+              setBattingStats(json.data || json.stats || []);
+              if (json.teamGamesMap) setTeamGamesMap(json.teamGamesMap);
+              if (typeof json.maxGames === "number" && json.maxGames > 0) {
+                setMaxGames(json.maxGames);
+              }
+            }
           }
         } else if (activeTab === "pitching") {
           const res = await fetch(
-            `/api/stats/pitching?season=${season}&phase=${selectedPhase}&team_id=${teamParam}&limit=60`
+            `/api/stats/pitching?season=${season}&phase=${selectedPhase}&team_id=${teamParam}&limit=250`
           );
           if (res.ok) {
             const json = await res.json();
-            if (isMounted) setPitchingStats(json.data || json.stats || []);
+            if (isMounted) {
+              setPitchingStats(json.data || json.stats || []);
+              if (json.teamGamesMap) setTeamGamesMap(json.teamGamesMap);
+              if (typeof json.maxGames === "number" && json.maxGames > 0) {
+                setMaxGames(json.maxGames);
+              }
+            }
           }
         }
       } catch (err) {
@@ -78,7 +98,56 @@ export function IndividualesView({
     return () => {
       isMounted = false;
     };
-  }, [activeTab, selectedPhase, selectedTeam, pitchingStats.length]);
+  }, [activeTab, selectedPhase, selectedTeam, season, pitchingStats.length]);
+
+  // Juegos de referencia del equipo seleccionado o el máximo de la liga
+  const currentTeamGames = useMemo(() => {
+    if (selectedTeam !== "all") {
+      const g = teamGamesMap[Number(selectedTeam)];
+      if (typeof g === "number" && g > 0) return g;
+    }
+    return maxGames > 0 ? maxGames : 56;
+  }, [selectedTeam, teamGamesMap, maxGames]);
+
+  // Umbrales oficiales de calificación (3.1 AP/Juego para bateo, 1.0 IP/Juego para pitcheo)
+  const minPaThreshold = Math.round(currentTeamGames * 3.1);
+  const minIpThreshold = Number((currentTeamGames * 1.0).toFixed(1));
+
+  // Label para el botón toggle de StatsFilters
+  const thresholdBadgeLabel =
+    activeTab === "batting"
+      ? `≥ ${minPaThreshold} AP`
+      : activeTab === "pitching"
+      ? `≥ ${minIpThreshold.toFixed(1)} IP`
+      : undefined;
+
+  // Filtrado de bateadores
+  const displayedBattingStats = useMemo(() => {
+    if (!qualifyingOnly) return battingStats;
+    return battingStats.filter((b) => {
+      const teamGames =
+        selectedTeam !== "all"
+          ? currentTeamGames
+          : teamGamesMap[b.teamId] || maxGames || 56;
+      const reqPa = Math.round(teamGames * 3.1);
+      const playerPa =
+        b.plateAppearances ?? b.pa ?? ((b.atBats || 0) + (b.walks || 0));
+      return playerPa >= reqPa;
+    });
+  }, [battingStats, qualifyingOnly, selectedTeam, teamGamesMap, maxGames, currentTeamGames]);
+
+  // Filtrado de lanzadores
+  const displayedPitchingStats = useMemo(() => {
+    if (!qualifyingOnly) return pitchingStats;
+    return pitchingStats.filter((p) => {
+      const teamGames =
+        selectedTeam !== "all"
+          ? currentTeamGames
+          : teamGamesMap[p.teamId] || maxGames || 56;
+      const reqIp = teamGames * 1.0;
+      return (p.inningsPitched || 0) >= (reqIp - 0.05);
+    });
+  }, [pitchingStats, qualifyingOnly, selectedTeam, teamGamesMap, maxGames, currentTeamGames]);
 
   const handleSelectBatterForSplits = (playerId: number) => {
     setTargetSplitPlayer({ id: playerId, type: "batter" });
@@ -162,6 +231,10 @@ export function IndividualesView({
           onSelectPhase={setSelectedPhase}
           selectedTeam={selectedTeam}
           onSelectTeam={setSelectedTeam}
+          qualifyingOnly={qualifyingOnly}
+          onToggleQualifying={setQualifyingOnly}
+          activeTab={activeTab}
+          thresholdLabel={thresholdBadgeLabel}
         />
       )}
 
@@ -175,25 +248,75 @@ export function IndividualesView({
         </div>
       ) : activeTab === "batting" ? (
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
-            <span>Mostrando {battingStats.length} bateadores clasificados</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono text-slate-400 px-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span>
+                Mostrando {displayedBattingStats.length} de {battingStats.length} bateadores{" "}
+                {qualifyingOnly ? "(solo calificados)" : "(todos)"}
+              </span>
+              {qualifyingOnly && (
+                <span className="bg-[#1E2B4D] text-[#FDB827] text-[10px] px-2 py-0.5 rounded font-mono font-bold border border-[#FDB827]/30">
+                  Mínimo: {minPaThreshold} AP ({currentTeamGames} J × 3.1)
+                </span>
+              )}
+            </div>
             <span className="text-[#FDB827]">Orden por defecto: OPS descendente</span>
           </div>
-          <BattingTable
-            stats={battingStats}
-            onSelectPlayerForSplits={handleSelectBatterForSplits}
-          />
+          {displayedBattingStats.length === 0 ? (
+            <div className="p-8 text-center rounded-xl bg-[#0D152B] border border-[#1E2B4D] text-slate-400 text-xs space-y-3">
+              <p>
+                Ningún bateador alcanza el mínimo requerido de {minPaThreshold} AP ({currentTeamGames} juegos × 3.1) con los filtros actuales.
+              </p>
+              <button
+                type="button"
+                onClick={() => setQualifyingOnly(false)}
+                className="px-3 py-1.5 rounded-lg bg-[#1E2B4D] hover:bg-[#FDB827] text-[#FDB827] hover:text-[#070B19] text-xs font-semibold transition-all border border-[#FDB827]/30"
+              >
+                Ver todos los bateadores
+              </button>
+            </div>
+          ) : (
+            <BattingTable
+              stats={displayedBattingStats}
+              onSelectPlayerForSplits={handleSelectBatterForSplits}
+            />
+          )}
         </div>
       ) : activeTab === "pitching" ? (
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
-            <span>Mostrando {pitchingStats.length} lanzadores clasificados</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono text-slate-400 px-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span>
+                Mostrando {displayedPitchingStats.length} de {pitchingStats.length} lanzadores{" "}
+                {qualifyingOnly ? "(solo calificados)" : "(todos)"}
+              </span>
+              {qualifyingOnly && (
+                <span className="bg-[#1E2B4D] text-[#FDB827] text-[10px] px-2 py-0.5 rounded font-mono font-bold border border-[#FDB827]/30">
+                  Mínimo: {minIpThreshold.toFixed(1)} IP ({currentTeamGames} J × 1.0)
+                </span>
+              )}
+            </div>
             <span className="text-[#FDB827]">Orden por defecto: ERA ascendente</span>
           </div>
-          <PitchingTable
-            stats={pitchingStats}
-            onSelectPlayerForSplits={handleSelectPitcherForSplits}
-          />
+          {displayedPitchingStats.length === 0 ? (
+            <div className="p-8 text-center rounded-xl bg-[#0D152B] border border-[#1E2B4D] text-slate-400 text-xs space-y-3">
+              <p>
+                Ningún lanzador alcanza el mínimo requerido de {minIpThreshold.toFixed(1)} IP ({currentTeamGames} juegos × 1.0) con los filtros actuales.
+              </p>
+              <button
+                type="button"
+                onClick={() => setQualifyingOnly(false)}
+                className="px-3 py-1.5 rounded-lg bg-[#1E2B4D] hover:bg-[#FDB827] text-[#FDB827] hover:text-[#070B19] text-xs font-semibold transition-all border border-[#FDB827]/30"
+              >
+                Ver todo el cuerpo de lanzadores
+              </button>
+            </div>
+          ) : (
+            <PitchingTable
+              stats={displayedPitchingStats}
+              onSelectPlayerForSplits={handleSelectPitcherForSplits}
+            />
+          )}
         </div>
       ) : activeTab === "splits" ? (
         <PlayerSplitsView

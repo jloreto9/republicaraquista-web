@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBattingStats } from "@/lib/supabase";
+import { getBattingStats, getTeamGamesMap } from "@/lib/supabase";
 import { getActiveSeason } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -14,12 +14,15 @@ export async function GET(request: NextRequest) {
     const teamId = searchParams.get("team_id") || "all";
     const limit = searchParams.get("limit")
       ? parseInt(searchParams.get("limit")!, 10)
-      : 50;
+      : 250;
     const minAb = searchParams.get("min_ab")
       ? parseInt(searchParams.get("min_ab")!, 10)
-      : 10;
+      : 0;
 
-    const stats = await getBattingStats(season, phase, teamId, limit, minAb);
+    const [stats, { teamGamesMap, maxGames }] = await Promise.all([
+      getBattingStats(season, phase, teamId, limit, minAb),
+      getTeamGamesMap(season, phase),
+    ]);
 
     return NextResponse.json(
       {
@@ -28,6 +31,8 @@ export async function GET(request: NextRequest) {
         phase,
         team_id: teamId,
         count: stats.length,
+        maxGames,
+        teamGamesMap,
         data: stats,
       },
       {

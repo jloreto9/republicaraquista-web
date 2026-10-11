@@ -77,6 +77,8 @@ export interface BattingStats {
   teamLogo: string;
   games: number;
   atBats: number;
+  plateAppearances?: number;
+  pa?: number;
   runs: number;
   hits: number;
   doubles: number;
@@ -87,6 +89,9 @@ export interface BattingStats {
   strikeouts: number;
   stolenBases: number;
   caughtStealing: number;
+  hbp?: number;
+  sf?: number;
+  sh?: number;
   avg: number;
   obp: number;
   slg: number;

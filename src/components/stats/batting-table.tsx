@@ -26,8 +26,14 @@ export function BattingTable({ stats, onSelectPlayerForSplits }: BattingTablePro
   };
 
   const sortedStats = [...stats].sort((a, b) => {
-    const valA = a[sortField];
-    const valB = b[sortField];
+    let valA = a[sortField];
+    let valB = b[sortField];
+
+    if (sortField === "plateAppearances") {
+      valA = a.plateAppearances ?? a.pa ?? (a.atBats + a.walks);
+      valB = b.plateAppearances ?? b.pa ?? (b.atBats + b.walks);
+    }
+
     if (typeof valA === "number" && typeof valB === "number") {
       return sortAsc ? valA - valB : valB - valA;
     }
@@ -66,6 +72,13 @@ export function BattingTable({ stats, onSelectPlayerForSplits }: BattingTablePro
                 className="py-3 px-2.5 text-center cursor-pointer hover:text-slate-200"
               >
                 JJ
+              </th>
+              <th
+                onClick={() => handleSort("plateAppearances")}
+                className="py-3 px-2.5 text-center cursor-pointer hover:text-[#FDB827] font-semibold text-slate-200"
+                title="Apariciones al Plato (VB + BB + HBP + SF + SH)"
+              >
+                AP
               </th>
               <th
                 onClick={() => handleSort("atBats")}
@@ -232,6 +245,9 @@ export function BattingTable({ stats, onSelectPlayerForSplits }: BattingTablePro
                     </div>
                   </td>
                   <td className="py-2.5 px-2.5 text-center">{player.games}</td>
+                  <td className="py-2.5 px-2.5 text-center font-semibold text-slate-100">
+                    {player.plateAppearances ?? player.pa ?? (player.atBats + player.walks)}
+                  </td>
                   <td className="py-2.5 px-2.5 text-center">{player.atBats}</td>
                   <td className="py-2.5 px-2.5 text-center">{player.runs}</td>
                   <td className="py-2.5 px-2.5 text-center font-bold text-slate-100">

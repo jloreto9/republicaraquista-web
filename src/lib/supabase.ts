@@ -435,8 +435,8 @@ export async function getBattingStats(
   season = ACTIVE_SEASON,
   phase = "R",
   teamId: string | number = "all",
-  limit = 50,
-  minAb = 10
+  limit = 250,
+  minAb = 0
 ): Promise<BattingStats[]> {
   if (!supabase) {
     console.warn("Supabase no configurado; retornando bateo vacío.");
@@ -564,6 +564,7 @@ export async function getBattingStats(
     const iso = Number((slg - avg).toFixed(3));
     const babipDen = p.ab - p.so - p.hr + p.sf;
     const babip = babipDen > 0 ? Number(((p.h - p.hr) / babipDen).toFixed(3)) : 0.0;
+    const pa = p.ab + p.bb + p.hbp + p.sf + p.sh;
 
     return {
       playerId: p.playerId,
@@ -575,6 +576,8 @@ export async function getBattingStats(
       teamLogo: team.logoUrl,
       games: p.gamesCount,
       atBats: p.ab,
+      plateAppearances: pa,
+      pa,
       runs: p.r,
       hits: p.h,
       doubles: p.doubles,
@@ -585,6 +588,9 @@ export async function getBattingStats(
       strikeouts: p.so,
       stolenBases: p.sb,
       caughtStealing: p.cs,
+      hbp: p.hbp,
+      sf: p.sf,
+      sh: p.sh,
       avg,
       obp,
       slg,
@@ -607,8 +613,8 @@ export async function getPitchingStats(
   season = ACTIVE_SEASON,
   phase = "R",
   teamId: string | number = "all",
-  limit = 50,
-  minIp = 3.0
+  limit = 250,
+  minIp = 0.0
 ): Promise<PitchingStats[]> {
   if (!supabase) {
     console.warn("Supabase no configurado; retornando pitcheo vacío.");
@@ -746,3 +752,22 @@ export async function getPitchingStats(
   qualified.sort((a, b) => a.era - b.era || b.strikeouts - a.strikeouts);
   return limit ? qualified.slice(0, limit) : qualified;
 }
+
+/**
+ * Obtiene los juegos disputados por franquicia y el máximo de juegos en la fase.
+ */
+export async function getTeamGamesMap(
+  season = ACTIVE_SEASON,
+  phase = "R"
+): Promise<{ teamGamesMap: Record<number, number>; maxGames: number }> {
+  const phaseKey =
+    phase === "L" ? "round_robin" : phase === "F" ? "final" : phase === "all" ? "all" : "regular";
+  const standings = await getStandings(season, phaseKey);
+  const teamGamesMap: Record<number, number> = {};
+  standings.forEach((s) => {
+    teamGamesMap[s.teamId] = s.gamesPlayed;
+  });
+  const maxGames = Math.max(...standings.map((s) => s.gamesPlayed), 0);
+  return { teamGamesMap, maxGames };
+}
+

@@ -1,6 +1,6 @@
 import { Header } from "@/components/layout/header";
 import { IndividualesView } from "@/components/stats/individuales-view";
-import { getBattingStats, getPitchingStats } from "@/lib/supabase";
+import { getBattingStats, getPitchingStats, getTeamGamesMap } from "@/lib/supabase";
 import { getActiveSeason } from "@/lib/constants";
 
 export const revalidate = 300; // ISR cada 5 minutos
@@ -12,9 +12,10 @@ export const metadata = {
 
 export default async function IndividualesPage() {
   const activeSeason = await getActiveSeason();
-  const [initialBattingStats, initialPitchingStats] = await Promise.all([
-    getBattingStats(activeSeason, "R", "all", 60),
-    getPitchingStats(activeSeason, "R", "all", 60),
+  const [initialBattingStats, initialPitchingStats, { teamGamesMap, maxGames }] = await Promise.all([
+    getBattingStats(activeSeason, "R", "all", 250, 0),
+    getPitchingStats(activeSeason, "R", "all", 250, 0.0),
+    getTeamGamesMap(activeSeason, "R"),
   ]);
 
   return (
@@ -30,6 +31,8 @@ export default async function IndividualesPage() {
           initialBattingStats={initialBattingStats}
           initialPitchingStats={initialPitchingStats}
           initialSeason={activeSeason}
+          initialTeamGamesMap={teamGamesMap}
+          initialMaxGames={maxGames}
         />
       </main>
     </div>
