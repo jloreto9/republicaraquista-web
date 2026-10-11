@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase, supabaseAdmin } from "./supabase";
 import { NotiCuevaPost, CreatePostInput, UpdatePostInput } from "@/types/noticueva";
 import fs from "fs";
 import path from "path";
@@ -117,8 +117,9 @@ export async function createNotiCuevaPost(input: CreatePostInput): Promise<NotiC
     published: true,
   };
 
-  if (supabase) {
-    const { data, error } = await supabase
+  const db = supabaseAdmin || supabase;
+  if (db) {
+    const { data, error } = await db
       .from("noticueva_posts")
       .insert({
         title: newPost.title,
@@ -170,7 +171,8 @@ export async function updateNotiCuevaPost(
 ): Promise<NotiCuevaPost | null> {
   let updatedRecord: NotiCuevaPost | null = null;
 
-  if (supabase) {
+  const db = supabaseAdmin || supabase;
+  if (db) {
     const updateData: any = {
       updated_at: new Date().toISOString(),
     };
@@ -180,7 +182,7 @@ export async function updateNotiCuevaPost(
     if (input.imageUrl !== undefined) updateData.image_url = input.imageUrl?.trim() || "/assets/logo.png";
     if (input.published !== undefined) updateData.published = input.published;
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("noticueva_posts")
       .update(updateData)
       .eq("id", id)
@@ -230,8 +232,9 @@ export async function updateNotiCuevaPost(
  * Elimina una nota.
  */
 export async function deleteNotiCuevaPost(id: string): Promise<boolean> {
-  if (supabase) {
-    const { error } = await supabase.from("noticueva_posts").delete().eq("id", id);
+  const db = supabaseAdmin || supabase;
+  if (db) {
+    const { error } = await db.from("noticueva_posts").delete().eq("id", id);
     if (error) {
       console.error("Error al eliminar en Supabase:", error);
       throw new Error(`Error en base de datos Supabase: ${error.message}`);

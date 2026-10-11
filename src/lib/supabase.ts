@@ -85,6 +85,22 @@ export const supabase =
     ? createClient(supabaseUrl, supabaseAnonKey)
     : null;
 
+// Cliente de servidor con privilegios administrativos (service_role) para mutaciones seguras
+const supabaseServerKey = (
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  supabaseAnonKey
+).trim();
+
+export const supabaseAdmin =
+  supabaseUrl && supabaseServerKey
+    ? createClient(supabaseUrl, supabaseServerKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      })
+    : supabase;
+
 /**
  * Obtiene los standings calculados a partir de los partidos finalizados en Supabase.
  */
