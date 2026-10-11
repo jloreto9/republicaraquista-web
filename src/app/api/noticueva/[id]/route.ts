@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   updateNotiCuevaPost,
   deleteNotiCuevaPost,
@@ -32,6 +33,12 @@ export async function PUT(
       );
     }
 
+    try {
+      revalidatePath("/noticueva");
+      revalidatePath("/admin");
+      revalidatePath("/");
+    } catch {}
+
     return NextResponse.json({
       success: true,
       message: "Nota actualizada exitosamente.",
@@ -39,7 +46,10 @@ export async function PUT(
     });
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: "Error al actualizar nota." },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Error al actualizar nota.",
+      },
       { status: 500 }
     );
   }
@@ -63,13 +73,23 @@ export async function DELETE(
     }
 
     await deleteNotiCuevaPost(id);
+
+    try {
+      revalidatePath("/noticueva");
+      revalidatePath("/admin");
+      revalidatePath("/");
+    } catch {}
+
     return NextResponse.json({
       success: true,
       message: "Nota eliminada de la NotiCueva.",
     });
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: "Error al eliminar nota." },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Error al eliminar nota.",
+      },
       { status: 500 }
     );
   }

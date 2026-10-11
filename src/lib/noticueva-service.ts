@@ -24,7 +24,7 @@ function readLocalPosts(): NotiCuevaPost[] {
       }
     }
   } catch (err) {
-    console.warn("No se pudo leer noticueva_posts.json local:", err);
+    // Entornos de solo lectura como Vercel
   }
   return DEFAULT_INITIAL_POSTS;
 }
@@ -37,8 +37,8 @@ function writeLocalPosts(posts: NotiCuevaPost[]): void {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(filePath, JSON.stringify(posts, null, 2), "utf-8");
-  } catch (err) {
-    console.warn("No se pudo escribir noticueva_posts.json local:", err);
+  } catch {
+    // En Vercel EROFS se ignora silenciosamente como fallback secundario
   }
 }
 
@@ -64,7 +64,7 @@ export async function getNotiCuevaPosts(): Promise<NotiCuevaPost[]> {
         .eq("published", true)
         .order("created_at", { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data.map((row: any) => ({
           id: String(row.id),
           title: row.title,
@@ -76,6 +76,10 @@ export async function getNotiCuevaPosts(): Promise<NotiCuevaPost[]> {
           updatedAt: row.updated_at,
           published: Boolean(row.published),
         }));
+      }
+
+      if (error) {
+        console.warn("Supabase noticueva_posts error:", error.message);
       }
     } catch (sbErr) {
       console.warn("Supabase fallo al consultar noticueva_posts, usando local:", sbErr);
@@ -113,33 +117,45 @@ export async function createNotiCuevaPost(input: CreatePostInput): Promise<NotiC
   };
 
   if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from("noticueva_posts")
-        .insert({
-          title: newPost.title,
-          slug: newPost.slug,
-          content: newPost.content,
-          author: newPost.author,
-          image_url: newPost.imageUrl,
-          created_at: newPost.createdAt,
-          updated_at: newPost.updatedAt,
-          published: newPost.published,
-        })
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from("noticueva_posts")
+      .insert({
+        title: newPost.title,
+        slug: newPost.slug,
+        content: newPost.content,
+        author: newPost.author,
+        image_url: newPost.imageUrl,
+        created_at: newPost.createdAt,
+        updated_at: newPost.updatedAt,
+        published: newPost.published,
+      })
+      .select()
+      .single();
 
-      if (!error && data) {
-        newPost.id = String(data.id);
+    if (error) {
+      console.error("Error al insertar nota en Supabase:", error);
+      if (error.code === "PGRST205" || error.message.includes("Could not find the table")) {
+        throw new Error(
+          "La tabla 'noticueva_posts' no existe en Supabase. Debes ejecutar el script de migración SQL en Supabase para habilitar la publicación permanente."
+        );
       }
-    } catch (err) {
-      console.warn("Error al insertar en Supabase, guardando localmente:", err);
+      throw new Error(`Error en base de datos Supabase: ${error.message}`);
     }
+
+    if (data) {
+      newPost.id = String(data.id);
+    }
+  } else {
+    // Si no hay Supabase configurado, guardar localmente
+    const current = readLocalPosts();
+    writeLocalPosts([newPost, ...current]);
   }
 
-  // Respaldo en archivo local
-  const current = readLocalPosts();
-  writeLocalPosts([newPost, ...current]);
+  // Respaldo secundario local
+  try {
+    const current = readLocalPosts();
+    writeLocalPosts([newPost, ...current]);
+  } catch {}
 
   return newPost;
 }
@@ -151,36 +167,62 @@ export async function updateNotiCuevaPost(
   id: string,
   input: UpdatePostInput
 ): Promise<NotiCuevaPost | null> {
-  if (supabase) {
-    try {
-      const updateData: any = {
-        updated_at: new Date().toISOString(),
-      };
-      if (input.title !== undefined) updateData.title = input.title.trim();
-      if (input.content !== undefined) updateData.content = input.content.trim();
-      if (input.author !== undefined) updateData.author = input.author.trim();
-      if (input.imageUrl !== undefined) updateData.image_url = input.imageUrl?.trim() || "/assets/logo.png";
-      if (input.published !== undefined) updateData.published = input.published;
+  let updatedRecord: NotiCuevaPost | null = null;
 
-      await supabase.from("noticueva_posts").update(updateData).eq("id", id);
-    } catch (err) {
-      console.warn("Error al actualizar en Supabase:", err);
+  if (supabase) {
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+    if (input.title !== undefined) updateData.title = input.title.trim();
+    if (input.content !== undefined) updateData.content = input.content.trim();
+    if (input.author !== undefined) updateData.author = input.author.trim();
+    if (input.imageUrl !== undefined) updateData.image_url = input.imageUrl?.trim() || "/assets/logo.png";
+    if (input.published !== undefined) updateData.published = input.published;
+
+    const { data, error } = await supabase
+      .from("noticueva_posts")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error al actualizar en Supabase:", error);
+      throw new Error(`Error en base de datos Supabase: ${error.message}`);
+    }
+
+    if (data) {
+      updatedRecord = {
+        id: String(data.id),
+        title: data.title,
+        slug: data.slug,
+        content: data.content,
+        author: data.author || NOTICUEVA_AUTHOR,
+        imageUrl: data.image_url || "/assets/logo.png",
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        published: Boolean(data.published),
+      };
     }
   }
 
-  const posts = readLocalPosts();
-  const idx = posts.findIndex((p) => p.id === id);
-  if (idx !== -1) {
-    posts[idx] = {
-      ...posts[idx],
-      ...input,
-      imageUrl: input.imageUrl !== undefined ? (input.imageUrl?.trim() || "/assets/logo.png") : posts[idx].imageUrl,
-      updatedAt: new Date().toISOString(),
-    };
-    writeLocalPosts(posts);
-    return posts[idx];
-  }
-  return null;
+  // Actualizar también en respaldo local si existe
+  try {
+    const posts = readLocalPosts();
+    const idx = posts.findIndex((p) => p.id === id);
+    if (idx !== -1) {
+      posts[idx] = {
+        ...posts[idx],
+        ...input,
+        imageUrl: input.imageUrl !== undefined ? (input.imageUrl?.trim() || "/assets/logo.png") : posts[idx].imageUrl,
+        updatedAt: new Date().toISOString(),
+      };
+      writeLocalPosts(posts);
+      if (!updatedRecord) updatedRecord = posts[idx];
+    }
+  } catch {}
+
+  return updatedRecord;
 }
 
 /**
@@ -188,15 +230,18 @@ export async function updateNotiCuevaPost(
  */
 export async function deleteNotiCuevaPost(id: string): Promise<boolean> {
   if (supabase) {
-    try {
-      await supabase.from("noticueva_posts").delete().eq("id", id);
-    } catch (err) {
-      console.warn("Error al eliminar en Supabase:", err);
+    const { error } = await supabase.from("noticueva_posts").delete().eq("id", id);
+    if (error) {
+      console.error("Error al eliminar en Supabase:", error);
+      throw new Error(`Error en base de datos Supabase: ${error.message}`);
     }
   }
 
-  const posts = readLocalPosts();
-  const filtered = posts.filter((p) => p.id !== id);
-  writeLocalPosts(filtered);
+  try {
+    const posts = readLocalPosts();
+    const filtered = posts.filter((p) => p.id !== id);
+    writeLocalPosts(filtered);
+  } catch {}
+
   return true;
 }

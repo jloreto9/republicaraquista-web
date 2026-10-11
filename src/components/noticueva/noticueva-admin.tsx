@@ -24,7 +24,9 @@ import {
   Minus,
   Eye,
   Plus,
-  MessageSquare,
+  RefreshCw,
+  Copy,
+  Check,
 } from "lucide-react";
 
 export function NotiCuevaAdmin() {
@@ -51,6 +53,18 @@ export function NotiCuevaAdmin() {
   const [tweetUrl, setTweetUrl] = useState("");
   const [isAddingTweet, setIsAddingTweet] = useState(false);
 
+  // Diagnóstico de Base de Datos Supabase
+  const [dbStatus, setDbStatus] = useState<{
+    loading: boolean;
+    ready: boolean;
+    postsTableExists: boolean;
+    tweetsTableExists: boolean;
+    sqlMigration: string;
+    error?: string;
+  } | null>(null);
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [showSqlCode, setShowSqlCode] = useState(false);
+
   // Recordar sesión en sessionStorage
   useEffect(() => {
     const savedPass = sessionStorage.getItem("noticueva_admin_key");
@@ -59,6 +73,32 @@ export function NotiCuevaAdmin() {
       verifyLogin(savedPass);
     }
   }, []);
+
+  const checkDatabaseStatus = async () => {
+    try {
+      setDbStatus((prev) => (prev ? { ...prev, loading: true } : { loading: true, ready: false, postsTableExists: false, tweetsTableExists: false, sqlMigration: "" }));
+      const res = await fetch("/api/noticueva/status");
+      const data = await res.json();
+      setDbStatus({
+        loading: false,
+        ready: Boolean(data.ready),
+        postsTableExists: Boolean(data.postsTableExists),
+        tweetsTableExists: Boolean(data.tweetsTableExists),
+        sqlMigration: data.sqlMigration || "",
+        error: data.postsError || data.tweetsError || data.error,
+      });
+    } catch {
+      setDbStatus((prev) => (prev ? { ...prev, loading: false } : null));
+    }
+  };
+
+  const handleCopySql = () => {
+    const sql = dbStatus?.sqlMigration || "";
+    if (!sql) return;
+    navigator.clipboard.writeText(sql);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
+  };
 
   const verifyLogin = async (passToTest: string) => {
     try {
@@ -75,6 +115,7 @@ export function NotiCuevaAdmin() {
         sessionStorage.setItem("noticueva_admin_key", passToTest);
         loadPosts();
         loadTweets();
+        checkDatabaseStatus();
       } else {
         setIsAuthenticated(false);
         setAuthError(data.error || "Contraseña incorrecta.");
@@ -154,11 +195,12 @@ export function NotiCuevaAdmin() {
         setTweetText("");
         setTweetUrl("");
         loadTweets();
+        checkDatabaseStatus();
       } else {
         setFeedback({ type: "error", message: json.error || "No se pudo agregar el tuit." });
       }
-    } catch {
-      setFeedback({ type: "error", message: "Error al comunicarse con el servidor." });
+    } catch (err: any) {
+      setFeedback({ type: "error", message: err?.message || "Error al comunicarse con el servidor." });
     } finally {
       setIsAddingTweet(false);
     }
@@ -176,7 +218,8 @@ export function NotiCuevaAdmin() {
         setFeedback({ type: "success", message: "Tuit eliminado del feed." });
         loadTweets();
       } else {
-        setFeedback({ type: "error", message: "No se pudo eliminar el tuit." });
+        const json = await res.json().catch(() => ({}));
+        setFeedback({ type: "error", message: json.error || "No se pudo eliminar el tuit." });
       }
     } catch {
       setFeedback({ type: "error", message: "Error al eliminar tuit." });
@@ -284,12 +327,16 @@ export function NotiCuevaAdmin() {
           setFeedback({ type: "success", message: "¡Nota publicada exitosamente en la NotiCueva!" });
           resetForm();
           loadPosts();
+          checkDatabaseStatus();
         } else {
-          setFeedback({ type: "error", message: json.error || "No se pudo publicar la nota." });
+          setFeedback({
+            type: "error",
+            message: json.error || "No se pudo publicar la nota.",
+          });
         }
       }
-    } catch {
-      setFeedback({ type: "error", message: "Error al comunicarse con el servidor." });
+    } catch (err: any) {
+      setFeedback({ type: "error", message: err?.message || "Error al comunicarse con el servidor." });
     } finally {
       setIsSubmitting(false);
     }
@@ -319,7 +366,8 @@ export function NotiCuevaAdmin() {
         if (editingPostId === id) resetForm();
         loadPosts();
       } else {
-        setFeedback({ type: "error", message: "No se pudo eliminar la nota." });
+        const json = await res.json().catch(() => ({}));
+        setFeedback({ type: "error", message: json.error || "No se pudo eliminar la nota." });
       }
     } catch {
       setFeedback({ type: "error", message: "Error al eliminar nota." });
@@ -422,6 +470,84 @@ export function NotiCuevaAdmin() {
           </button>
         </div>
       </div>
+
+      {/* Alerta de Diagnóstico de Supabase */}
+      {dbStatus && !dbStatus.ready && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-950/60 via-[#0D152B] to-[#070B19] border border-amber-500/50 text-amber-200 shadow-xl space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-bold text-amber-300">
+                  Acción requerida: Inicializar Tablas en Supabase
+                </h3>
+                <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
+                  Las tablas <code>noticueva_posts</code> y/o <code>noticueva_tweets</code> aún no existen en tu proyecto de Supabase (<code>zkocgiozxtoifzujujqg</code>).
+                  Para que las notas de Gilberto Méndez y los tuits se guarden permanentemente, ejecuta el script SQL en el editor de Supabase.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={checkDatabaseStatus}
+              disabled={dbStatus.loading}
+              className="px-3 py-1.5 rounded-xl bg-amber-900/60 hover:bg-amber-800/80 border border-amber-600/60 text-xs font-mono text-amber-200 flex items-center space-x-1.5 shrink-0 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${dbStatus.loading ? "animate-spin" : ""}`} />
+              <span>{dbStatus.loading ? "Verificando..." : "Verificar"}</span>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              onClick={handleCopySql}
+              className="px-4 py-2 rounded-xl bg-[#FDB827] hover:bg-[#FDB827]/90 text-[#070B19] font-bold text-xs font-mono flex items-center space-x-1.5 shadow-md transition-transform active:scale-95"
+            >
+              {copiedSql ? (
+                <>
+                  <Check className="w-4 h-4 text-[#070B19]" />
+                  <span>¡Script SQL Copiado!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  <span>1-Click: Copiar Script SQL</span>
+                </>
+              )}
+            </button>
+
+            <a
+              href="https://supabase.com/dashboard/project/zkocgiozxtoifzujujqg/sql/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-xl bg-[#131E3D] hover:bg-[#1a2852] border border-[#1E2B4D] hover:border-[#FDB827]/50 text-slate-200 text-xs font-mono flex items-center space-x-1.5 transition-all"
+            >
+              <span>Abrir SQL Editor en Supabase</span>
+              <ExternalLink className="w-3.5 h-3.5 text-[#FDB827]" />
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setShowSqlCode(!showSqlCode)}
+              className="px-3 py-2 rounded-xl bg-transparent hover:bg-amber-900/30 text-amber-300 text-xs font-mono underline"
+            >
+              {showSqlCode ? "Ocultar código SQL" : "Ver código SQL"}
+            </button>
+          </div>
+
+          {showSqlCode && dbStatus.sqlMigration && (
+            <div className="mt-3 p-3 rounded-xl bg-[#070B19] border border-amber-700/40 text-[11px] font-mono text-slate-300 max-h-56 overflow-y-auto">
+              <pre>{dbStatus.sqlMigration}</pre>
+            </div>
+          )}
+        </div>
+      )}
+
+      {dbStatus && dbStatus.ready && (
+        <div className="px-3.5 py-2 rounded-xl bg-emerald-950/40 border border-emerald-700/50 text-emerald-300 text-xs font-mono flex items-center space-x-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>Base de datos Supabase sincronizada: tablas de la NotiCueva listas para almacenar contenido permanente.</span>
+        </div>
+      )}
 
       {/* Banner de Feedback */}
       {feedback && (

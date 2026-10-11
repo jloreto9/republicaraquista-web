@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   getEmbeddedTweets,
   addEmbeddedTweet,
@@ -58,6 +59,11 @@ export async function POST(request: NextRequest) {
         }),
     });
 
+    try {
+      revalidatePath("/noticueva");
+      revalidatePath("/admin");
+    } catch {}
+
     return NextResponse.json(
       {
         success: true,
@@ -99,13 +105,22 @@ export async function DELETE(request: NextRequest) {
     }
 
     await deleteEmbeddedTweet(id);
+
+    try {
+      revalidatePath("/noticueva");
+      revalidatePath("/admin");
+    } catch {}
+
     return NextResponse.json({
       success: true,
-      message: "Tuit embebido eliminado.",
+      message: "Tuit eliminado exitosamente.",
     });
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: "Error al eliminar tuit" },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Error al eliminar tuit",
+      },
       { status: 500 }
     );
   }

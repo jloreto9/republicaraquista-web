@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   getNotiCuevaPosts,
   createNotiCuevaPost,
@@ -56,6 +57,15 @@ export async function POST(request: NextRequest) {
       imageUrl,
     });
 
+    // Purgar caché ISR de Next.js en Vercel Edge para que la nota aparezca inmediatamente
+    try {
+      revalidatePath("/noticueva");
+      revalidatePath("/admin");
+      revalidatePath("/");
+    } catch (revErr) {
+      console.warn("revalidatePath error:", revErr);
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -65,6 +75,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    console.error("POST /api/noticueva error:", error);
     return NextResponse.json(
       {
         success: false,

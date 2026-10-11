@@ -1,18 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NotiCuevaPost } from "@/types/noticueva";
 import { NotiCuevaCard } from "./noticueva-card";
-import { Newspaper, Search } from "lucide-react";
+import { Newspaper, Search, RefreshCw } from "lucide-react";
 
 interface NotiCuevaFeedProps {
   initialPosts: NotiCuevaPost[];
 }
 
 export function NotiCuevaFeed({ initialPosts }: NotiCuevaFeedProps) {
+  const [posts, setPosts] = useState<NotiCuevaPost[]>(initialPosts);
   const [search, setSearch] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const filteredPosts = initialPosts.filter((post) => {
+  // Sincronizar si cambia initialPosts desde el servidor
+  useEffect(() => {
+    setPosts(initialPosts);
+  }, [initialPosts]);
+
+  // Refrescar al montar para garantizar datos al día incluso en navegaciones de cliente
+  const refreshPosts = async () => {
+    try {
+      setIsRefreshing(true);
+      const res = await fetch("/api/noticueva", { cache: "no-store" });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setPosts(json.data);
+      }
+    } catch (err) {
+      // silencioso
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshPosts();
+  }, []);
+
+  const filteredPosts = posts.filter((post) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -24,7 +51,7 @@ export function NotiCuevaFeed({ initialPosts }: NotiCuevaFeedProps) {
   return (
     <div className="space-y-4">
       {/* Buscador Rápido de Notas */}
-      {initialPosts.length > 3 && (
+      {posts.length > 3 && (
         <div className="relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input

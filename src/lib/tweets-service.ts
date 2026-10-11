@@ -14,15 +14,17 @@ export function readLocalTweets(): EmbeddedTweet[] {
   try {
     const filePath = getTweetsFilePath();
     if (!fs.existsSync(filePath)) {
-      writeLocalTweets(DEFAULT_EMBEDDED_TWEETS);
       return DEFAULT_EMBEDDED_TWEETS;
     }
     const data = fs.readFileSync(filePath, "utf-8");
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
   } catch (err) {
-    console.warn("Error leyendo embedded_tweets.json local:", err);
-    return DEFAULT_EMBEDDED_TWEETS;
+    // Entorno de solo lectura
   }
+  return DEFAULT_EMBEDDED_TWEETS;
 }
 
 export function writeLocalTweets(tweets: EmbeddedTweet[]): void {
@@ -33,8 +35,8 @@ export function writeLocalTweets(tweets: EmbeddedTweet[]): void {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(filePath, JSON.stringify(tweets, null, 2), "utf-8");
-  } catch (err) {
-    console.warn("Error escribiendo embedded_tweets.json local:", err);
+  } catch {
+    // Silencioso en Vercel EROFS
   }
 }
 
@@ -64,8 +66,12 @@ export async function getEmbeddedTweets(): Promise<EmbeddedTweet[]> {
           retweets: row.retweets,
         }));
       }
-    } catch {
-      // Fallback a almacenamiento local
+
+      if (error) {
+        console.warn("Supabase noticueva_tweets error:", error.message);
+      }
+    } catch (err) {
+      console.warn("Supabase fallo al consultar noticueva_tweets, usando local:", err);
     }
   }
 
@@ -81,43 +87,60 @@ export async function addEmbeddedTweet(
   };
 
   if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from("noticueva_tweets")
-        .insert({
-          url: newTweet.url,
-          author_name: newTweet.authorName,
-          handle: newTweet.handle,
-          text: newTweet.text,
-          date: newTweet.date,
-          likes: newTweet.likes || 0,
-          retweets: newTweet.retweets || 0,
-        })
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from("noticueva_tweets")
+      .insert({
+        url: newTweet.url,
+        author_name: newTweet.authorName,
+        handle: newTweet.handle,
+        text: newTweet.text,
+        date: newTweet.date,
+        likes: newTweet.likes || 0,
+        retweets: newTweet.retweets || 0,
+      })
+      .select()
+      .single();
 
-      if (!error && data) {
-        newTweet.id = String(data.id);
+    if (error) {
+      console.error("Error al guardar tuit en Supabase:", error);
+      if (error.code === "PGRST205" || error.message.includes("Could not find the table")) {
+        throw new Error(
+          "La tabla 'noticueva_tweets' no existe en Supabase. Debes ejecutar el script de migración SQL en Supabase para habilitar el guardado permanente."
+        );
       }
-    } catch (err) {
-      console.warn("Supabase fallo al guardar tuit, usando local:", err);
+      throw new Error(`Error en base de datos Supabase: ${error.message}`);
     }
+
+    if (data) {
+      newTweet.id = String(data.id);
+    }
+  } else {
+    const current = readLocalTweets();
+    writeLocalTweets([newTweet, ...current]);
   }
 
-  const current = readLocalTweets();
-  writeLocalTweets([newTweet, ...current]);
+  try {
+    const current = readLocalTweets();
+    writeLocalTweets([newTweet, ...current]);
+  } catch {}
+
   return newTweet;
 }
 
 export async function deleteEmbeddedTweet(id: string): Promise<boolean> {
   if (supabase) {
-    try {
-      await supabase.from("noticueva_tweets").delete().eq("id", id);
-    } catch {}
+    const { error } = await supabase.from("noticueva_tweets").delete().eq("id", id);
+    if (error) {
+      console.error("Error al eliminar tuit en Supabase:", error);
+      throw new Error(`Error en base de datos Supabase: ${error.message}`);
+    }
   }
 
-  const current = readLocalTweets();
-  const filtered = current.filter((t) => t.id !== id);
-  writeLocalTweets(filtered);
+  try {
+    const current = readLocalTweets();
+    const filtered = current.filter((t) => t.id !== id);
+    writeLocalTweets(filtered);
+  } catch {}
+
   return true;
 }
