@@ -20,6 +20,7 @@ import {
   Radio,
   Calendar,
   TrendingUp,
+  Newspaper,
   LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ const navigationItems: NavItem[] = [
   { name: "Centro de Mando", href: "/", icon: LayoutDashboard },
   { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
   { name: "Calendario Oficial", href: "/calendario", icon: Calendar },
+  { name: "NotiCueva", href: "/noticueva", icon: Newspaper, badge: "NUEVO" },
   // { name: "Líneas & Probabilidades", href: "/probabilidades", icon: TrendingUp }, // Temporalmente oculto
   { name: "Líderes Individuales", href: "/individuales", icon: Users },
   { name: "Pitching Summary", href: "/pitching", icon: Radio },
