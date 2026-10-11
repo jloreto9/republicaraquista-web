@@ -75,7 +75,7 @@ export default async function DashboardPage() {
         <DashboardTabs
           data={tabsData}
           seasonLabel={SEASON_LABELS[activeSeason] || `${activeSeason}-${(activeSeason + 1).toString().slice(-2)}`}
-          defaultTab="leones-stats"
+          defaultTab="last-game"
         />
 
         {/* Scoreboard Cara a Cara */}

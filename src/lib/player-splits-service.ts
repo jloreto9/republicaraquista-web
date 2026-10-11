@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { ACTIVE_SEASON, LVBP_TEAMS, LVBP_TEAM_IDS, getTeam } from "./constants";
+import { ACTIVE_SEASON, LVBP_TEAMS, LVBP_TEAM_IDS, getTeam, getPlayerHeadshotUrl } from "./constants";
 import {
   PlayerSplitRow,
   PitcherSplitRow,
@@ -512,7 +512,7 @@ export async function getPlayerSplitsProfile(
       return {
         playerId,
         playerName,
-        playerAvatar: `https://midfield.mlbstatic.com/v1/people/${playerId}/spots/120`,
+        playerAvatar: getPlayerHeadshotUrl(playerId),
         teamId,
         teamName: team.name,
         teamAbbr: team.abbreviation,
@@ -708,7 +708,7 @@ export async function getPlayerSplitsProfile(
       return {
         playerId,
         playerName,
-        playerAvatar: `https://midfield.mlbstatic.com/v1/people/${playerId}/spots/120`,
+        playerAvatar: getPlayerHeadshotUrl(playerId),
         teamId,
         teamName: team.name,
         teamAbbr: team.abbreviation,
@@ -788,7 +788,7 @@ export async function getAllAvailablePlayersForSplits(
           items.push({
             id: pid,
             name: b.name,
-            avatarUrl: `https://midfield.mlbstatic.com/v1/people/${pid}/spots/120`,
+            avatarUrl: getPlayerHeadshotUrl(pid),
             teamId: b.teamId,
             teamAbbr: team.abbreviation,
             teamLogo: team.logoUrl,
@@ -821,7 +821,7 @@ export async function getAllAvailablePlayersForSplits(
           items.push({
             id: pid,
             name: p.name,
-            avatarUrl: `https://midfield.mlbstatic.com/v1/people/${pid}/spots/120`,
+            avatarUrl: getPlayerHeadshotUrl(pid),
             teamId: p.teamId,
             teamAbbr: team.abbreviation,
             teamLogo: team.logoUrl,

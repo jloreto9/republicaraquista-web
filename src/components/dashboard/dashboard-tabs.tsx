@@ -17,7 +17,7 @@ interface DashboardTabsProps {
 export function DashboardTabs({
   data,
   seasonLabel = "25-26",
-  defaultTab = "leones-stats",
+  defaultTab = "last-game",
 }: DashboardTabsProps) {
   const [activeTab, setActiveTab] = useState<
     "last-game" | "trends" | "leaders" | "leones-stats"

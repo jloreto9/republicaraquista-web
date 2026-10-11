@@ -8,7 +8,7 @@ import {
   BroadcastChannelRecord,
   DashboardTabsData,
 } from "@/types/leones-stats";
-import { ACTIVE_SEASON, getTeam } from "./constants";
+import { ACTIVE_SEASON, getTeam, getPlayerHeadshotUrl } from "./constants";
 import { supabase, getBattingStats, getPitchingStats } from "./supabase";
 import calendarData from "@/data/calendar_2026_27.json";
 
@@ -73,19 +73,19 @@ const BASELINE_2025_TRENDS: TrendGameItem[] = [
 ];
 
 const BASELINE_2025_BATTERS: BatterLeaderItem[] = [
-  { playerId: 660821, playerName: "Leandro Cedeño", avatarUrl: "https://midfield.mlbstatic.com/v1/people/660821/spots/120", avg: ".333", hr: 8, rbi: 28, ops: "1.042", ab: 126, h: 42 },
-  { playerId: 683748, playerName: "Brainer Bonaci", avatarUrl: "https://midfield.mlbstatic.com/v1/people/683748/spots/120", avg: ".315", hr: 4, rbi: 22, ops: ".895", ab: 162, h: 51 },
-  { playerId: 672580, playerName: "Aldrem Corredor", avatarUrl: "https://midfield.mlbstatic.com/v1/people/672580/spots/120", avg: ".298", hr: 7, rbi: 34, ops: ".882", ab: 188, h: 56 },
-  { playerId: 660688, playerName: "Harold Castro", avatarUrl: "https://midfield.mlbstatic.com/v1/people/660688/spots/120", avg: ".305", hr: 5, rbi: 26, ops: ".820", ab: 164, h: 50 },
-  { playerId: 666971, playerName: "Víctor Bericoto", avatarUrl: "https://midfield.mlbstatic.com/v1/people/666971/spots/120", avg: ".285", hr: 4, rbi: 18, ops: ".812", ab: 112, h: 32 },
+  { playerId: 660681, playerName: "Leandro Cedeño", avatarUrl: getPlayerHeadshotUrl(660681), avg: ".333", hr: 8, rbi: 28, ops: "1.042", ab: 126, h: 42 },
+  { playerId: 682900, playerName: "Brainer Bonaci", avatarUrl: getPlayerHeadshotUrl(682900), avg: ".315", hr: 4, rbi: 22, ops: ".895", ab: 162, h: 51 },
+  { playerId: 625506, playerName: "Aldrem Corredor", avatarUrl: getPlayerHeadshotUrl(625506), avg: ".298", hr: 7, rbi: 34, ops: ".882", ab: 188, h: 56 },
+  { playerId: 660688, playerName: "Harold Castro", avatarUrl: getPlayerHeadshotUrl(660688), avg: ".305", hr: 5, rbi: 26, ops: ".820", ab: 164, h: 50 },
+  { playerId: 682674, playerName: "Víctor Bericoto", avatarUrl: getPlayerHeadshotUrl(682674), avg: ".285", hr: 4, rbi: 18, ops: ".812", ab: 112, h: 32 },
 ];
 
 const BASELINE_2025_PITCHERS: PitcherLeaderItem[] = [
-  { playerId: 650556, playerName: "Colin Rea", avatarUrl: "https://midfield.mlbstatic.com/v1/people/650556/spots/120", era: "2.85", whip: "1.12", ip: "38.0", so: 34, bb: 12 },
-  { playerId: 597113, playerName: "DJ Johnson", avatarUrl: "https://midfield.mlbstatic.com/v1/people/597113/spots/120", era: "3.12", whip: "1.18", ip: "17.1", so: 22, bb: 7 },
-  { playerId: 642545, playerName: "Sam Bordner", avatarUrl: "https://midfield.mlbstatic.com/v1/people/642545/spots/120", era: "3.45", whip: "1.25", ip: "21.0", so: 19, bb: 8 },
-  { playerId: 676664, playerName: "Norwith Gudiño", avatarUrl: "https://midfield.mlbstatic.com/v1/people/676664/spots/120", era: "3.82", whip: "1.30", ip: "24.0", so: 26, bb: 11 },
-  { playerId: 468504, playerName: "Jhoulys Chacín", avatarUrl: "https://midfield.mlbstatic.com/v1/people/468504/spots/120", era: "4.15", whip: "1.38", ip: "43.1", so: 31, bb: 16 },
+  { playerId: 600965, playerName: "Ricardo Rodríguez", avatarUrl: getPlayerHeadshotUrl(600965), era: "1.52", whip: "0.93", ip: "23.2", so: 22, bb: 10 },
+  { playerId: 660508, playerName: "Norwith Gudiño", avatarUrl: getPlayerHeadshotUrl(660508), era: "3.85", whip: "1.25", ip: "35.0", so: 37, bb: 20 },
+  { playerId: 600526, playerName: "José Torres", avatarUrl: getPlayerHeadshotUrl(600526), era: "3.62", whip: "1.15", ip: "49.2", so: 45, bb: 11 },
+  { playerId: 642545, playerName: "Sam Bordner", avatarUrl: getPlayerHeadshotUrl(642545), era: "3.45", whip: "1.25", ip: "21.0", so: 19, bb: 8 },
+  { playerId: 468504, playerName: "Jhoulys Chacín", avatarUrl: getPlayerHeadshotUrl(468504), era: "4.15", whip: "1.38", ip: "43.1", so: 31, bb: 16 },
 ];
 
 const BASELINE_2025_LAST_GAME: LastGameDetail = {
@@ -105,9 +105,9 @@ const BASELINE_2025_LAST_GAME: LastGameDetail = {
   isHomeLeones: true,
   leonesWon: false,
   mvp: {
-    playerId: 660821,
+    playerId: 660681,
     playerName: "Leandro Cedeño",
-    playerAvatar: "https://midfield.mlbstatic.com/v1/people/660821/spots/120",
+    playerAvatar: getPlayerHeadshotUrl(660681),
     wpaTotal: 0.320,
     wpaBat: 0.320,
     wpaPit: 0.000,

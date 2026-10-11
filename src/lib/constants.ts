@@ -2,6 +2,17 @@ import { Team } from "@/types/sports";
 
 export const MLB_SPOT_BASE = "https://midfield.mlbstatic.com/v1/team";
 
+/**
+ * Retorna la URL oficial del Headshot de MLB (Cloudinary CDN con fallback de silueta oficial genérica)
+ */
+export function getPlayerHeadshotUrl(playerId: number | string): string {
+  const cleanId = String(playerId).trim();
+  if (!cleanId || cleanId === "0") {
+    return "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/generic/headshot/67/current";
+  }
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/${cleanId}/headshot/67/current`;
+}
+
 export const LVBP_TEAMS: Record<number, Team> = {
   695: {
     id: 695,

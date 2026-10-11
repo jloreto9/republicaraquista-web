@@ -4,6 +4,7 @@ import {
   getTeam,
   calculatePythagorean,
   ACTIVE_SEASON,
+  getPlayerHeadshotUrl,
 } from "./constants";
 import { TeamStanding, GameSummary, SeasonKPIs, BattingStats, PitchingStats } from "@/types/sports";
 
@@ -567,7 +568,7 @@ export async function getBattingStats(
     return {
       playerId: p.playerId,
       playerName: p.playerName,
-      playerAvatar: `https://midfield.mlbstatic.com/v1/people/${p.playerId}/spots/120`,
+      playerAvatar: getPlayerHeadshotUrl(p.playerId),
       teamId: team.id,
       teamName: team.name,
       teamAbbr: team.abbreviation,
@@ -717,7 +718,7 @@ export async function getPitchingStats(
     return {
       playerId: p.playerId,
       playerName: p.playerName,
-      playerAvatar: `https://midfield.mlbstatic.com/v1/people/${p.playerId}/spots/120`,
+      playerAvatar: getPlayerHeadshotUrl(p.playerId),
       teamId: team.id,
       teamName: team.name,
       teamAbbr: team.abbreviation,
