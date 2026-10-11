@@ -96,9 +96,20 @@ export default async function NotiCuevaPage() {
                     </h4>
                     <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
                   </div>
-                  <p className="text-[11px] text-[#FDB827] font-mono">
-                    Cronista & Redactor Oficial
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="https://x.com/GilbertoMendez"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-[#FDB827] hover:underline font-mono inline-flex items-center gap-0.5"
+                    >
+                      @GilbertoMendez
+                    </a>
+                    <span className="text-slate-600 text-[10px]">•</span>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      Cronista Oficial
+                    </p>
+                  </div>
                 </div>
               </div>
 

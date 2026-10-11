@@ -138,8 +138,8 @@ El proyecto está configurado para integración continua en Vercel:
 
 ## ⚖️ Créditos y Licencia
 
-- **Diseño, Desarrollo y Modelos Sabermétricos:** [@republicaraquista](https://x.com/republicaraquista) • **Jorge Leonardo Loreto**
-- **Crónicas de NotiCueva:** Gilberto Méndez
+- **Diseño, Desarrollo y Modelos Sabermétricos:** **Jorge Leonardo Loreto** ([@JorgeLoreto](https://x.com/JorgeLoreto)) • [@RepubCaraquista](https://x.com/RepubCaraquista)
+- **Crónicas de NotiCueva:** **Gilberto Méndez** ([@GilbertoMendez](https://x.com/GilbertoMendez))
 - **Diseño de Tarjetas de Pitcheo:** Inspirado en Thomas Nestico (@TJStats)
 - **Datos Oficiales:** Consumidos desde MLB Stats API (`sportId=17`, `leagueId=135`)
 - **Licencia:** Propietaria • Todos los derechos reservados © República Caraquista
