@@ -2,11 +2,11 @@
 
 > **Plataforma Web y Progressive Web App (PWA) Sabermétrica de Alto Rendimiento para la Liga Venezolana de Béisbol Profesional (LVBP), con enfoque analítico en los Leones del Caracas.**
 
-[![Production URL](https://img.shields.io/badge/Production-republicaraquistapp.vercel.app-FDB827?style=for-the-badge&logo=vercel&logoColor=black)](https://republicaraquistapp.vercel.app/)
-[![Next.js](https://img.shields.io/badge/Next.js-16.3.6_(Turbopack)-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.2.8-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_(RLS)-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+[![Production](https://img.shields.io/badge/Production-Live_PWA-FDB827.svg?style=for-the-badge&logo=vercel&logoColor=black)](https://republicaraquistapp.vercel.app/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.3.6_Turbopack-000000.svg?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.2.8-20232A.svg?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_RLS-3ECF8E.svg?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 
 ---
 
