@@ -64,9 +64,6 @@ export default async function DashboardPage() {
             <h2 className="text-xs font-mono font-semibold text-slate-400 uppercase tracking-wider">
               Resumen de Temporada
             </h2>
-            <span className="text-[11px] text-[#FDB827] font-mono">
-              Fórmula Pitagórica (1.83)
-            </span>
           </div>
           <KPISummary kpis={kpis} />
         </section>
