@@ -228,7 +228,7 @@ export function ChannelIconStack({
           <div
             key={ch.id}
             title={`${ch.name} (${ch.typeLabel})`}
-            className="w-5 h-5 rounded-full bg-[#070B19] border border-[#1E2B4D] ring-1 ring-[#0D152B] p-0.5 flex items-center justify-center shadow-sm hover:scale-125 hover:z-30 hover:border-[#FDB827]/60 transition-all duration-150 cursor-pointer"
+            className="w-5 h-5 rounded-md bg-white border border-slate-200 ring-1 ring-white/20 p-0.5 flex items-center justify-center shadow-sm hover:scale-125 hover:z-30 hover:border-[#FDB827]/80 transition-all duration-150 cursor-pointer"
           >
             <ChannelLogoIcon channelId={ch.id} size={iconSize - 2} />
           </div>
@@ -259,7 +259,7 @@ export function ChannelBadgeCard({ channel }: ChannelBadgeCardProps) {
     <div
       className="flex items-center gap-3 p-2.5 rounded-xl border border-[#1E2B4D] bg-[#070B19]/90 hover:bg-[#131E3D] hover:border-[#FDB827]/40 transition-all shadow-md group"
     >
-      <div className="w-10 h-10 rounded-xl bg-[#0B132B] border border-[#1E2B4D] p-1.5 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 group-hover:border-[#FDB827]/50 transition-all">
+      <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1.5 flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 group-hover:border-[#FDB827]/80 transition-all">
         <ChannelLogoIcon channelId={channel.id} size={30} />
       </div>
       <div className="flex flex-col min-w-0">

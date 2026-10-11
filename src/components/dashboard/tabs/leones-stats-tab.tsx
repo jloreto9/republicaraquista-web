@@ -179,7 +179,7 @@ export function LeonesStatsTab({
               className="p-3 rounded-xl bg-[#070B19]/80 border border-[#1E2B4D] hover:border-[#FDB827]/40 transition-all flex flex-col justify-between"
             >
               <div className="flex items-center space-x-2 mb-2">
-                <div className="w-7 h-7 rounded-lg bg-[#0D152B] border border-[#1E2B4D] flex items-center justify-center p-1 shrink-0 overflow-hidden relative">
+                <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 shadow-sm flex items-center justify-center p-1 shrink-0 overflow-hidden relative">
                   <Image
                     src={ch.logoUrl}
                     alt={ch.channelName}
