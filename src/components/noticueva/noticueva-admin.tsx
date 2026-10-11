@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { NotiCuevaPost, EmbeddedTweet } from "@/types/noticueva";
+import { NotiCuevaPost } from "@/types/noticueva";
 import { FormattedContent } from "./formatted-content";
 import {
   Lock,
@@ -23,7 +23,6 @@ import {
   Quote,
   Minus,
   Eye,
-  Plus,
   RefreshCw,
   Copy,
   Check,
@@ -47,18 +46,11 @@ export function NotiCuevaAdmin() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  // Estados para Tuits Embebidos
-  const [tweets, setTweets] = useState<EmbeddedTweet[]>([]);
-  const [tweetText, setTweetText] = useState("");
-  const [tweetUrl, setTweetUrl] = useState("");
-  const [isAddingTweet, setIsAddingTweet] = useState(false);
-
   // Diagnóstico de Base de Datos Supabase
   const [dbStatus, setDbStatus] = useState<{
     loading: boolean;
     ready: boolean;
     postsTableExists: boolean;
-    tweetsTableExists: boolean;
     sqlMigration: string;
     error?: string;
   } | null>(null);
@@ -76,16 +68,15 @@ export function NotiCuevaAdmin() {
 
   const checkDatabaseStatus = async () => {
     try {
-      setDbStatus((prev) => (prev ? { ...prev, loading: true } : { loading: true, ready: false, postsTableExists: false, tweetsTableExists: false, sqlMigration: "" }));
+      setDbStatus((prev) => (prev ? { ...prev, loading: true } : { loading: true, ready: false, postsTableExists: false, sqlMigration: "" }));
       const res = await fetch("/api/noticueva/status");
       const data = await res.json();
       setDbStatus({
         loading: false,
         ready: Boolean(data.ready),
         postsTableExists: Boolean(data.postsTableExists),
-        tweetsTableExists: Boolean(data.tweetsTableExists),
         sqlMigration: data.sqlMigration || "",
-        error: data.postsError || data.tweetsError || data.error,
+        error: data.postsError || data.error,
       });
     } catch {
       setDbStatus((prev) => (prev ? { ...prev, loading: false } : null));
@@ -114,7 +105,6 @@ export function NotiCuevaAdmin() {
         setIsAuthenticated(true);
         sessionStorage.setItem("noticueva_admin_key", passToTest);
         loadPosts();
-        loadTweets();
         checkDatabaseStatus();
       } else {
         setIsAuthenticated(false);
@@ -152,77 +142,6 @@ export function NotiCuevaAdmin() {
       }
     } catch (err) {
       console.warn("Error al cargar posts:", err);
-    }
-  };
-
-  const loadTweets = async () => {
-    try {
-      const res = await fetch("/api/noticueva/tweets");
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        setTweets(json.data);
-      }
-    } catch (err) {
-      console.warn("Error al cargar tuits:", err);
-    }
-  };
-
-  const handleAddTweet = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tweetText.trim()) {
-      setFeedback({ type: "error", message: "El texto del tuit es obligatorio." });
-      return;
-    }
-
-    try {
-      setIsAddingTweet(true);
-      const res = await fetch("/api/noticueva/tweets", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-key": password,
-        },
-        body: JSON.stringify({
-          text: tweetText.trim(),
-          url: tweetUrl.trim() || "https://x.com/RepubCaraquista",
-          authorName: "RepubliCaraquista ®©",
-          handle: "@RepubCaraquista",
-        }),
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        setFeedback({ type: "success", message: "¡Tuit agregado exitosamente al feed!" });
-        setTweetText("");
-        setTweetUrl("");
-        loadTweets();
-        checkDatabaseStatus();
-      } else {
-        setFeedback({ type: "error", message: json.error || "No se pudo agregar el tuit." });
-      }
-    } catch (err: any) {
-      setFeedback({ type: "error", message: err?.message || "Error al comunicarse con el servidor." });
-    } finally {
-      setIsAddingTweet(false);
-    }
-  };
-
-  const handleDeleteTweet = async (id: string) => {
-    if (!confirm("¿Deseas eliminar este tuit del feed?")) return;
-
-    try {
-      const res = await fetch(`/api/noticueva/tweets?id=${id}&password=${encodeURIComponent(password)}`, {
-        method: "DELETE",
-        headers: { "x-admin-key": password },
-      });
-      if (res.ok) {
-        setFeedback({ type: "success", message: "Tuit eliminado del feed." });
-        loadTweets();
-      } else {
-        const json = await res.json().catch(() => ({}));
-        setFeedback({ type: "error", message: json.error || "No se pudo eliminar el tuit." });
-      }
-    } catch {
-      setFeedback({ type: "error", message: "Error al eliminar tuit." });
     }
   };
 
@@ -479,11 +398,11 @@ export function NotiCuevaAdmin() {
               <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
               <div>
                 <h3 className="text-sm font-bold text-amber-300">
-                  Acción requerida: Inicializar Tablas en Supabase
+                  Acción requerida: Inicializar Tabla en Supabase
                 </h3>
                 <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
-                  Las tablas <code>noticueva_posts</code> y/o <code>noticueva_tweets</code> aún no existen en tu proyecto de Supabase (<code>zkocgiozxtoifzujujqg</code>).
-                  Para que las notas de Gilberto Méndez y los tuits se guarden permanentemente, ejecuta el script SQL en el editor de Supabase.
+                  La tabla <code>noticueva_posts</code> aún no existe en tu proyecto de Supabase (<code>zkocgiozxtoifzujujqg</code>).
+                  Para que las notas de Gilberto Méndez se guarden permanentemente, ejecuta el script SQL en el editor de Supabase.
                 </p>
               </div>
             </div>
@@ -545,7 +464,7 @@ export function NotiCuevaAdmin() {
       {dbStatus && dbStatus.ready && (
         <div className="px-3.5 py-2 rounded-xl bg-emerald-950/40 border border-emerald-700/50 text-emerald-300 text-xs font-mono flex items-center space-x-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>Base de datos Supabase sincronizada: tablas de la NotiCueva listas para almacenar contenido permanente.</span>
+          <span>Base de datos Supabase sincronizada: tabla de la NotiCueva lista para almacenar notas editoriales permanentes.</span>
         </div>
       )}
 
@@ -868,146 +787,50 @@ export function NotiCuevaAdmin() {
           </p>
         </div>
 
-        <div className="divide-y divide-[#1E2B4D]/60">
-          {posts.map((p) => (
-            <div
-              key={p.id}
-              className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#131E3D]/30 px-2 rounded-xl transition-colors"
-            >
-              <div className="min-w-0 flex-1">
-                <h4 className="text-xs sm:text-sm font-bold text-slate-100 truncate">
-                  {p.title}
-                </h4>
-                <p className="text-[11px] text-slate-400 font-mono">
-                  {new Date(p.createdAt).toLocaleDateString("es-VE", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })} • {p.author}
-                </p>
-              </div>
+        {posts.length > 0 ? (
+          <div className="divide-y divide-[#1E2B4D]/60">
+            {posts.map((p) => (
+              <div
+                key={p.id}
+                className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#131E3D]/30 px-2 rounded-xl transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-100 truncate">
+                    {p.title}
+                  </h4>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    {new Date(p.createdAt).toLocaleDateString("es-VE", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })} • {p.author}
+                  </p>
+                </div>
 
-              <div className="flex items-center space-x-2 shrink-0">
-                <button
-                  onClick={() => handleEditClick(p)}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#131E3D] hover:bg-[#1a2852] border border-[#1E2B4D] text-slate-300 hover:text-[#FDB827] text-xs font-mono flex items-center space-x-1"
-                >
-                  <Edit3 className="w-3 h-3" />
-                  <span>Editar</span>
-                </button>
-                <button
-                  onClick={() => handleDeleteClick(p.id, p.title)}
-                  className="px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 text-xs font-mono flex items-center space-x-1"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Eliminar</span>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Gestor de Tuits Embebidos de @RepubCaraquista */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-[#0D152B]/90 border border-[#1E2B4D] shadow-lg space-y-5">
-        <div className="border-b border-[#1E2B4D] pb-3 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
-              <span className="text-slate-100 font-black">𝕏</span>
-              <span>Tuits Embebidos de @RepubCaraquista ({tweets.length})</span>
-            </h3>
-            <p className="text-xs text-slate-400">
-              Agrega publicaciones clave de X para que aparezcan de inmediato en el feed de la NotiCueva.
-            </p>
-          </div>
-        </div>
-
-        {/* Formulario para agregar tuit */}
-        <form onSubmit={handleAddTweet} className="space-y-3.5 p-4 rounded-xl bg-[#070B19]/60 border border-[#1E2B4D]">
-          <h4 className="text-xs font-bold text-[#FDB827] uppercase tracking-wider font-mono flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5" />
-            <span>Agregar Nuevo Tuit al Feed</span>
-          </h4>
-
-          <div>
-            <label className="block text-xs font-mono text-slate-300 mb-1 font-bold">
-              Texto del Tuit: <span className="text-rose-400">*</span>
-            </label>
-            <textarea
-              value={tweetText}
-              onChange={(e) => setTweetText(e.target.value)}
-              rows={3}
-              placeholder="Copia y pega el texto del tuit de @RepubCaraquista aquí..."
-              className="w-full px-3.5 py-2 rounded-xl bg-[#0D152B] border border-[#1E2B4D] text-slate-100 placeholder-slate-500 text-xs leading-relaxed focus:outline-none focus:border-[#FDB827]/70"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-mono text-slate-300 mb-1 flex items-center justify-between">
-              <span>Enlace del Tuit en 𝕏 (Opcional):</span>
-              <span className="text-[10px] text-slate-500 font-mono">Por defecto enlaza a @RepubCaraquista</span>
-            </label>
-            <input
-              type="url"
-              value={tweetUrl}
-              onChange={(e) => setTweetUrl(e.target.value)}
-              placeholder="https://x.com/RepubCaraquista/status/..."
-              className="w-full px-3.5 py-2 rounded-xl bg-[#0D152B] border border-[#1E2B4D] text-slate-200 placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-[#FDB827]/70"
-            />
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={isAddingTweet}
-              className="px-4 py-2 rounded-xl bg-[#131E3D] hover:bg-[#1E2B4D] border border-[#FDB827]/40 text-[#FDB827] font-bold text-xs font-mono transition-all flex items-center space-x-1.5 shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{isAddingTweet ? "Guardando..." : "Agregar Tuit al Feed"}</span>
-            </button>
-          </div>
-        </form>
-
-        {/* Lista de Tuits Embebidos actuales */}
-        <div className="divide-y divide-[#1E2B4D]/60 pt-1">
-          {tweets.map((t) => (
-            <div
-              key={t.id}
-              className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#131E3D]/30 px-2 rounded-xl transition-colors"
-            >
-              <div className="min-w-0 flex-1 space-y-1">
-                <p className="text-xs text-slate-200 line-clamp-2">
-                  {t.text}
-                </p>
-                <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
-                  <span className="text-[#FDB827]">{t.handle}</span>
-                  <span>•</span>
-                  <span>{t.date}</span>
+                <div className="flex items-center space-x-2 shrink-0">
+                  <button
+                    onClick={() => handleEditClick(p)}
+                    className="px-2.5 py-1.5 rounded-lg bg-[#131E3D] hover:bg-[#1a2852] border border-[#1E2B4D] text-slate-300 hover:text-[#FDB827] text-xs font-mono flex items-center space-x-1"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    <span>Editar</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClick(p.id, p.title)}
+                    className="px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 text-xs font-mono flex items-center space-x-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Eliminar</span>
+                  </button>
                 </div>
               </div>
-
-              <div className="flex items-center space-x-2 shrink-0">
-                <a
-                  href={t.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-2.5 py-1.5 rounded-lg bg-[#131E3D] hover:bg-[#1a2852] border border-[#1E2B4D] text-slate-300 hover:text-white text-xs font-mono flex items-center space-x-1"
-                >
-                  <span>Ver</span>
-                  <ExternalLink className="w-2.5 h-2.5" />
-                </a>
-                <button
-                  onClick={() => handleDeleteTweet(t.id)}
-                  className="px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 text-xs font-mono flex items-center space-x-1"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Eliminar</span>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-6 text-center text-xs text-slate-400 font-mono">
+            Aún no hay notas publicadas en la NotiCueva. Utiliza el formulario superior para redactar la primera.
+          </div>
+        )}
       </div>
     </div>
   );
