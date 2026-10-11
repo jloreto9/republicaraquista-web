@@ -30,8 +30,26 @@ export function Footer() {
             <span>Desarrollado y modelado por</span>
             <span className="font-bold text-[#FDB827]">Jorge Leonardo Loreto</span>
           </div>
-          <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-            @RepubCaraquista • Datos vía MLB Stats API
+          <div className="flex items-center justify-center sm:justify-end gap-1.5 text-[11px] text-slate-400 font-mono mt-0.5">
+            <a
+              href="https://x.com/JorgeLoreto"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#FDB827] hover:underline"
+            >
+              @JorgeLoreto
+            </a>
+            <span className="text-slate-600">•</span>
+            <a
+              href="https://x.com/RepubCaraquista"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[#FDB827] transition-colors"
+            >
+              @RepubCaraquista
+            </a>
+            <span className="text-slate-600">•</span>
+            <span>MLB Stats API</span>
           </div>
         </div>
       </div>

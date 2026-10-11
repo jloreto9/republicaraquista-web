@@ -177,9 +177,27 @@ export function MobileNav() {
               <span className="w-1.5 h-1.5 rounded-full bg-[#FDB827]"></span>
               Jorge Leonardo Loreto
             </span>
-            <span className="text-[10px] text-[#FDB827]/80 font-mono mt-0.5">
-              @republicaraquista • Sabermetría
-            </span>
+            <div className="flex items-center gap-1.5 mt-1 text-[10px] font-mono">
+              <a
+                href="https://x.com/JorgeLoreto"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#FDB827] hover:underline"
+                title="Cuenta personal de Jorge Leonardo Loreto en X"
+              >
+                @JorgeLoreto
+              </a>
+              <span className="text-slate-600">•</span>
+              <a
+                href="https://x.com/RepubCaraquista"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-[#FDB827] transition-colors"
+                title="Comunidad República Caraquista en X"
+              >
+                @RepubCaraquista
+              </a>
+            </div>
           </div>
         </div>
       </div>
