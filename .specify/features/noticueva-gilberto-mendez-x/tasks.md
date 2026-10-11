@@ -6,7 +6,7 @@
   - Generar archivo SQL `supabase/migrations/noticueva_posts.sql` con la definición de la tabla.
 
 - [X] **T2: Rutas de API Seguras (`/api/noticueva`)**
-  - Crear `src/app/api/noticueva/auth/route.ts` para verificar la contraseña `Leones21.`.
+  - Crear `src/app/api/noticueva/auth/route.ts` para verificar la contraseña del redactor.
   - Crear `src/app/api/noticueva/route.ts` (GET para listar posts, POST para crear).
   - Crear `src/app/api/noticueva/[id]/route.ts` (PUT para editar, DELETE para borrar).
 

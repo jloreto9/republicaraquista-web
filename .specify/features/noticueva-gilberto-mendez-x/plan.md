@@ -31,7 +31,7 @@ src/
         └── noticueva/
             ├── route.ts          # GET (público) y POST (con auth)
             ├── [id]/route.ts     # PUT y DELETE (con auth)
-            └── auth/route.ts     # Validación de contraseña Leones21.
+            └── auth/route.ts     # Validación de contraseña de redactor
 ```
 
 ---
@@ -67,6 +67,6 @@ ON public.noticueva_posts FOR ALL USING (true) WITH CHECK (true);
 
 ## 3. Seguridad del Panel de Redacción
 
-- Clave de redactor: `Leones21.`
+- Clave de redactor: Variable de entorno `NOTICUEVA_ADMIN_PASSWORD`
 - Verificación del lado del servidor en `/api/noticueva/auth` y en las mutaciones POST/PUT/DELETE mediante header `x-admin-key` o sesión de cookie.
 - Si la contraseña es correcta, almacena un token de sesión en `sessionStorage` para no forzar a Gilberto a escribir la clave cada vez que guarda o edita en la misma sesión.

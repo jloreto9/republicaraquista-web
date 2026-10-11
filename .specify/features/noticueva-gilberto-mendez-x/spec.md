@@ -6,7 +6,7 @@
 **Aplicación**: REPUBLICARAQUISTAPP (Next.js 16 / React 19 / Vercel)  
 **Redactor Oficial**: Gilberto Méndez  
 **Cuenta de Redes**: `@republicaraquista` en X (Twitter)  
-**Clave de Acceso Redactor**: `Leones21.`
+**Clave de Acceso Redactor**: Protegida vía variable de entorno `NOTICUEVA_ADMIN_PASSWORD`
 
 ---
 
@@ -31,7 +31,7 @@ Crear un espacio editorial y comunitario dentro de REPUBLICARAQUISTAPP compuesto
 
 ### RF3: Panel de Redacción para Gilberto Méndez (`/admin` o `/noticueva/redaccion`)
 - Diseñado para usuarios no informáticos:
-  - Pantalla de acceso protegida por la contraseña: `Leones21.`
+  - Pantalla de acceso protegida por contraseña segura de redactor
   - Formulario limpio:
     - **Título de la nota** (obligatorio)
     - **Cuerpo de la nota** (texto con saltos de línea automáticos, negritas y enlaces)
@@ -59,7 +59,7 @@ Crear un espacio editorial y comunitario dentro de REPUBLICARAQUISTAPP compuesto
 ---
 
 ## 3. Criterios de Aceptación
-1. Gilberto puede entrar a `/admin`, escribir `Leones21.` y publicar una nota en menos de 1 minuto desde su celular.
+1. Gilberto puede entrar a `/admin`, ingresar la contraseña autorizada y publicar una nota en menos de 1 minuto desde su celular.
 2. La nota aparece de inmediato en `/noticueva` bajo el título "NotiCueva por Gilberto Méndez".
 3. El feed de X muestra los tuits de `@republicaraquista` con estética Dark Navy de la plataforma.
 4. El enlace "NotiCueva" está integrado en el Sidebar desktop y MobileNav.
