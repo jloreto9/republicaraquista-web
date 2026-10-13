@@ -135,8 +135,8 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       .from("games")
       .select("*")
       .eq("season", season)
-      .in("status", ["Final", "Completed", "Completed Early"])
-      .eq("game_type", "R")
+      .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
+      .in("game_type", ["R", "regular"])
       .or("home_team_id.eq.695,away_team_id.eq.695");
 
     if (!rawGames || rawGames.length === 0) {
@@ -238,6 +238,98 @@ export async function getWeeklyRecords(season = ACTIVE_SEASON): Promise<WeeklyRe
  * Obtiene los detalles y el MVP del último encuentro jugado.
  */
 export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGameDetail | null> {
+  if (supabase) {
+    try {
+      const { data: rawGames } = await supabase
+        .from("games")
+        .select("*")
+        .eq("season", season)
+        .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
+        .in("game_type", ["R", "regular"])
+        .or("home_team_id.eq.695,away_team_id.eq.695")
+        .order("game_date", { ascending: false })
+        .limit(1);
+
+      if (rawGames && rawGames.length > 0) {
+        const g = rawGames[0];
+        const isHomeLeones = Number(g.home_team_id) === 695;
+        const homeTeam = getTeam(Number(g.home_team_id));
+        const awayTeam = getTeam(Number(g.away_team_id));
+        const homeScore = Number(g.home_score ?? 0);
+        const awayScore = Number(g.away_score ?? 0);
+        const leonesScore = isHomeLeones ? homeScore : awayScore;
+        const oppScore = isHomeLeones ? awayScore : homeScore;
+        const leonesWon = leonesScore > oppScore;
+
+        let gameDateFormatted = g.game_date || "";
+        if (g.game_date && g.game_date.length >= 10) {
+          const parts = g.game_date.slice(0, 10).split("-");
+          const months = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+          ];
+          const mIndex = parseInt(parts[1], 10) - 1;
+          gameDateFormatted = `${parseInt(parts[2], 10)} de ${months[mIndex]}, ${parts[0]}`;
+        }
+
+        let mvp = BASELINE_2025_LAST_GAME.mvp;
+        try {
+          const { data: pStats } = await supabase
+            .from("batting_stats")
+            .select("player_id, ab, h, hr, rbi, players(full_name)")
+            .eq("game_id", g.id)
+            .eq("team_id", 695)
+            .order("rbi", { ascending: false })
+            .limit(1);
+
+          if (pStats && pStats.length > 0) {
+            const best = pStats[0] as unknown as {
+              player_id: number;
+              ab: number;
+              h: number;
+              hr: number;
+              rbi: number;
+              players?: { full_name?: string };
+            };
+            const pName = best.players?.full_name || "Jugador Destacado";
+            mvp = {
+              playerId: Number(best.player_id),
+              playerName: pName,
+              playerAvatar: getPlayerHeadshotUrl(best.player_id),
+              wpaTotal: 0.25,
+              wpaBat: 0.25,
+              wpaPit: 0.0,
+              clutch: 0.15,
+              headline: `${best.h}-${best.ab}, ${best.hr > 0 ? `${best.hr} HR, ` : ""}${best.rbi} CI`,
+            };
+          }
+        } catch {
+          // Mantener MVP base
+        }
+
+        return {
+          id: Number(g.id),
+          gamePk: Number(g.game_pk ?? g.id),
+          gameDate: g.game_date || "",
+          gameDateFormatted,
+          venue: g.venue || (isHomeLeones ? "Estadio Monumental Simón Bolívar" : "Estadio Rival"),
+          homeTeamName: homeTeam.name,
+          homeTeamAbbr: homeTeam.abbreviation,
+          homeTeamLogo: homeTeam.logoUrl,
+          homeScore,
+          awayTeamName: awayTeam.name,
+          awayTeamAbbr: awayTeam.abbreviation,
+          awayTeamLogo: awayTeam.logoUrl,
+          awayScore,
+          isHomeLeones,
+          leonesWon,
+          mvp,
+        };
+      }
+    } catch (err) {
+      console.warn("Error consultando último juego de Leones:", err);
+    }
+  }
   return BASELINE_2025_LAST_GAME;
 }
 
@@ -245,6 +337,50 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
  * Obtiene los últimos 10 encuentros jugados por Leones.
  */
 export async function getRecentTrends(limit = 10, season = ACTIVE_SEASON): Promise<TrendGameItem[]> {
+  if (supabase) {
+    try {
+      const { data: rawGames } = await supabase
+        .from("games")
+        .select("*")
+        .eq("season", season)
+        .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
+        .in("game_type", ["R", "regular"])
+        .or("home_team_id.eq.695,away_team_id.eq.695")
+        .order("game_date", { ascending: false })
+        .limit(limit);
+
+      if (rawGames && rawGames.length > 0) {
+        return rawGames.map((g) => {
+          const isHome = Number(g.home_team_id) === 695;
+          const rivalId = isHome ? Number(g.away_team_id) : Number(g.home_team_id);
+          const rivalTeam = getTeam(rivalId);
+          const caracasScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
+          const rivalScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
+          const won = caracasScore > rivalScore;
+
+          let fecha = g.game_date?.slice(5) || "";
+          if (g.game_date && g.game_date.length >= 10) {
+            const parts = g.game_date.slice(0, 10).split("-");
+            fecha = `${parts[2]}/${parts[1]}`;
+          }
+
+          return {
+            id: Number(g.id),
+            fecha,
+            rivalId,
+            rivalName: rivalTeam.name,
+            rivalAbbr: rivalTeam.abbreviation,
+            rivalLogo: rivalTeam.logoUrl,
+            isHome,
+            score: `${caracasScore}-${rivalScore}`,
+            won,
+          };
+        });
+      }
+    } catch (err) {
+      console.warn("Error consultando tendencias de Leones:", err);
+    }
+  }
   return BASELINE_2025_TRENDS.slice(0, limit);
 }
 
@@ -256,8 +392,8 @@ export async function getCaracasTeamLeaders(season = ACTIVE_SEASON): Promise<{
   pitchers: PitcherLeaderItem[];
 }> {
   try {
-    const rawBatters = await getBattingStats(season, "R", 695, 10, 10);
-    const rawPitchers = await getPitchingStats(season, "R", 695, 10, 5);
+    const rawBatters = await getBattingStats(season, "R", 695, 10, 0);
+    const rawPitchers = await getPitchingStats(season, "R", 695, 10, 0.0);
 
     const batters: BatterLeaderItem[] =
       rawBatters && rawBatters.length > 0
@@ -377,7 +513,8 @@ export async function getBroadcastChannelRecords(season = 2026): Promise<Broadca
         .from("games")
         .select("game_date, home_score, away_score, home_team_id")
         .eq("season", season)
-        .in("status", ["Final", "Completed", "Completed Early"])
+        .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
+        .in("game_type", ["R", "regular"])
         .or("home_team_id.eq.695,away_team_id.eq.695");
 
       if (rawGames && rawGames.length > 0) {
