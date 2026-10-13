@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-export const FALLBACK_SEASON = 2025;
+export const FALLBACK_SEASON = 2026;
 export const UPCOMING_SEASON = 2026;
 
 interface CacheState {
@@ -14,7 +14,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 /**
  * Resuelve la temporada activa más reciente con partidos disputados o en vivo en Supabase.
  * En cuanto se insertan juegos de la temporada entrante (2026), conmuta automáticamente.
- * Si aún no hay juegos de la nueva temporada, retorna la última temporada activa con datos (2025).
+ * Si aún no hay juegos de la nueva temporada, retorna la temporada activa oficial (2026).
  */
 export async function getActiveSeason(): Promise<number> {
   const now = Date.now();
@@ -41,7 +41,7 @@ export async function getActiveSeason(): Promise<number> {
 
     const detectedSeason = Number(data[0].season);
     // Asegurar que sea al menos la temporada base verificada
-    const finalSeason = detectedSeason >= 2025 ? detectedSeason : FALLBACK_SEASON;
+    const finalSeason = detectedSeason >= 2026 ? detectedSeason : FALLBACK_SEASON;
 
     cachedActiveSeason = { season: finalSeason, expiresAt: now + CACHE_TTL_MS };
     return finalSeason;

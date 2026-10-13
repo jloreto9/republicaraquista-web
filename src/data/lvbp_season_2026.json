@@ -1,0 +1,252 @@
+{
+  "season": 2026,
+  "updated_at": "2026-10-13T11:18:48.001143+00:00",
+  "total_games": 226,
+  "finished_games": 1,
+  "total_batting_records": 21,
+  "total_pitching_records": 17,
+  "total_fielding_records": 39,
+  "total_bullpen_records": 5,
+  "total_lineup_records": 2,
+  "elo_ratings": {
+    "695": 1500,
+    "696": 1488.9960129349292,
+    "698": 1511.0039870650708,
+    "699": 1500,
+    "693": 1500,
+    "692": 1500,
+    "694": 1500,
+    "697": 1500
+  },
+  "elo_history": [
+    {
+      "game_id": 870098,
+      "season": 2026,
+      "game_date": "2026-10-12",
+      "phase": "regular",
+      "home_team_id": 696,
+      "away_team_id": 698,
+      "home_score": 6,
+      "away_score": 10,
+      "home_elo_before": 1500,
+      "away_elo_before": 1500,
+      "home_elo_after": 1489.0,
+      "away_elo_after": 1511.0
+    }
+  ],
+  "bullpen_records": [
+    {
+      "game_pk": 870098,
+      "game_id": 870098,
+      "season": 2026,
+      "game_date": "2026-10-12",
+      "team_id": 698,
+      "opposing_team": "Navegantes del Magallanes",
+      "pitcher_id": 700728,
+      "pitcher_name": "Luis Arejula",
+      "inning": 3,
+      "inherited_runners": 1,
+      "inherited_scored": 1
+    },
+    {
+      "game_pk": 870098,
+      "game_id": 870098,
+      "season": 2026,
+      "game_date": "2026-10-12",
+      "team_id": 698,
+      "opposing_team": "Navegantes del Magallanes",
+      "pitcher_id": 699215,
+      "pitcher_name": "Alberto Mota",
+      "inning": 4,
+      "inherited_runners": 1,
+      "inherited_scored": 0
+    },
+    {
+      "game_pk": 870098,
+      "game_id": 870098,
+      "season": 2026,
+      "game_date": "2026-10-12",
+      "team_id": 696,
+      "opposing_team": "Tiburones de La Guaira",
+      "pitcher_id": 697795,
+      "pitcher_name": "Ismael Agreda",
+      "inning": 7,
+      "inherited_runners": 2,
+      "inherited_scored": 2
+    },
+    {
+      "game_pk": 870098,
+      "game_id": 870098,
+      "season": 2026,
+      "game_date": "2026-10-12",
+      "team_id": 696,
+      "opposing_team": "Tiburones de La Guaira",
+      "pitcher_id": 660875,
+      "pitcher_name": "Jesús Reyes",
+      "inning": 8,
+      "inherited_runners": 1,
+      "inherited_scored": 0
+    },
+    {
+      "game_pk": 870098,
+      "game_id": 870098,
+      "season": 2026,
+      "game_date": "2026-10-12",
+      "team_id": 698,
+      "opposing_team": "Navegantes del Magallanes",
+      "pitcher_id": 664584,
+      "pitcher_name": "Jhon Romero",
+      "inning": 8,
+      "inherited_runners": 1,
+      "inherited_scored": 0
+    }
+  ],
+  "lineup_records": [
+    {
+      "game_pk": 870098,
+      "game_id": 870098,
+      "season": 2026,
+      "game_date": "2026-10-12",
+      "team_id": 696,
+      "opponent_id": 698,
+      "home_team": "Navegantes del Magallanes",
+      "away_team": "Tiburones de La Guaira",
+      "opposing_team": "Tiburones de La Guaira",
+      "is_home": true,
+      "leones_score": 6,
+      "opposing_score": 10,
+      "leones_won": false,
+      "score_str": "6-10",
+      "full_score_str": "MAG 6 - 10 LAG",
+      "starters": [
+        {
+          "order": 1,
+          "player_id": 591971,
+          "player_name": "Breyvic Valera",
+          "position": "3B"
+        },
+        {
+          "order": 2,
+          "player_id": 642731,
+          "player_name": "Thairo Estrada",
+          "position": "2B"
+        },
+        {
+          "order": 3,
+          "player_id": 672779,
+          "player_name": "Tucupita Marcano",
+          "position": "LF"
+        },
+        {
+          "order": 4,
+          "player_id": 600524,
+          "player_name": "Renato Núñez",
+          "position": "1B"
+        },
+        {
+          "order": 5,
+          "player_id": 596143,
+          "player_name": "Luis Sardinas",
+          "position": "DH"
+        },
+        {
+          "order": 6,
+          "player_id": 622580,
+          "player_name": "Angel Reyes",
+          "position": "RF"
+        },
+        {
+          "order": 7,
+          "player_id": 700164,
+          "player_name": "Bryant Betancourt",
+          "position": "C"
+        },
+        {
+          "order": 8,
+          "player_id": 694196,
+          "player_name": "Diego Velasquez",
+          "position": "SS"
+        },
+        {
+          "order": 9,
+          "player_id": 680815,
+          "player_name": "Damon Dues",
+          "position": "CF"
+        }
+      ]
+    },
+    {
+      "game_pk": 870098,
+      "game_id": 870098,
+      "season": 2026,
+      "game_date": "2026-10-12",
+      "team_id": 698,
+      "opponent_id": 696,
+      "home_team": "Navegantes del Magallanes",
+      "away_team": "Tiburones de La Guaira",
+      "opposing_team": "Navegantes del Magallanes",
+      "is_home": false,
+      "leones_score": 10,
+      "opposing_score": 6,
+      "leones_won": true,
+      "score_str": "10-6",
+      "full_score_str": "LAG 10 - 6 MAG",
+      "starters": [
+        {
+          "order": 1,
+          "player_id": 620439,
+          "player_name": "Franklin Barreto",
+          "position": "CF"
+        },
+        {
+          "order": 2,
+          "player_id": 444876,
+          "player_name": "Alcides Escobar",
+          "position": "3B"
+        },
+        {
+          "order": 3,
+          "player_id": 500208,
+          "player_name": "Yangervis Solarte",
+          "position": "2B"
+        },
+        {
+          "order": 4,
+          "player_id": 665914,
+          "player_name": "Daniel Montano",
+          "position": "DH"
+        },
+        {
+          "order": 5,
+          "player_id": 578570,
+          "player_name": "Juniel Querecuto",
+          "position": "SS"
+        },
+        {
+          "order": 6,
+          "player_id": 665922,
+          "player_name": "Símon Muzziotti",
+          "position": "RF"
+        },
+        {
+          "order": 7,
+          "player_id": 678489,
+          "player_name": "Jorge Barrosa",
+          "position": "LF"
+        },
+        {
+          "order": 8,
+          "player_id": 665561,
+          "player_name": "Rafael Marchán",
+          "position": "C"
+        },
+        {
+          "order": 9,
+          "player_id": 691922,
+          "player_name": "Javier Rivas",
+          "position": "3B"
+        }
+      ]
+    }
+  ]
+}
