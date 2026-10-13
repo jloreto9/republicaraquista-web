@@ -142,18 +142,21 @@ export async function getStandings(
   }
 
   const phaseTypeMap: Record<string, string[]> = {
-    regular: ["R"],
-    round_robin: ["L"],
-    final: ["F"],
-    all: ["R", "L", "D", "F"],
+    regular: ["R", "regular"],
+    R: ["R", "regular"],
+    round_robin: ["L", "round_robin"],
+    L: ["L", "round_robin"],
+    final: ["F", "final"],
+    F: ["F", "final"],
+    all: ["R", "regular", "L", "round_robin", "D", "F", "final"],
   };
-  const gameTypes = phaseTypeMap[phase] || ["R"];
+  const gameTypes = phaseTypeMap[phase] || [phase, "R"];
 
   const { data: rawGames, error } = await supabase
     .from("games")
     .select("*")
     .eq("season", season)
-    .in("status", ["Final", "Completed", "Completed Early"])
+    .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
     .in("game_type", gameTypes);
 
   if (error) {
@@ -334,7 +337,7 @@ export async function getRecentGames(
     .from("games")
     .select("*")
     .eq("season", season)
-    .in("status", ["Final", "Completed", "Completed Early"])
+    .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
     .order("game_date", { ascending: false })
     .limit(limit);
 
@@ -390,7 +393,7 @@ export async function getSeasonKPIs(season = ACTIVE_SEASON): Promise<SeasonKPIs>
       .from("games")
       .select("*")
       .eq("season", season)
-      .in("status", ["Final", "Completed", "Completed Early"])
+      .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
       .or("home_team_id.eq.695,away_team_id.eq.695");
 
     const caracasGames = (rawGames || []) as SupabaseGameRow[];
@@ -451,7 +454,15 @@ export async function getBattingStats(
     .eq("games.season", season);
 
   if (phase && phase !== "all") {
-    query = query.eq("games.game_type", phase);
+    const targetTypes =
+      phase === "R" || phase === "regular"
+        ? ["R", "regular"]
+        : phase === "L" || phase === "round_robin"
+        ? ["L", "round_robin"]
+        : phase === "F" || phase === "final"
+        ? ["F", "final"]
+        : [phase];
+    query = query.in("games.game_type", targetTypes);
   }
 
   if (teamId && teamId !== "all") {
@@ -629,7 +640,15 @@ export async function getPitchingStats(
     .eq("games.season", season);
 
   if (phase && phase !== "all") {
-    query = query.eq("games.game_type", phase);
+    const targetTypes =
+      phase === "R" || phase === "regular"
+        ? ["R", "regular"]
+        : phase === "L" || phase === "round_robin"
+        ? ["L", "round_robin"]
+        : phase === "F" || phase === "final"
+        ? ["F", "final"]
+        : [phase];
+    query = query.in("games.game_type", targetTypes);
   }
 
   if (teamId && teamId !== "all") {

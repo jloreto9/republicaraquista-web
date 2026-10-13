@@ -104,9 +104,9 @@ export function IndividualesView({
   const currentTeamGames = useMemo(() => {
     if (selectedTeam !== "all") {
       const g = teamGamesMap[Number(selectedTeam)];
-      if (typeof g === "number" && g > 0) return g;
+      if (typeof g === "number") return g;
     }
-    return maxGames > 0 ? maxGames : 56;
+    return maxGames;
   }, [selectedTeam, teamGamesMap, maxGames]);
 
   // Umbrales oficiales de calificación (3.1 AP/Juego para bateo, 1.0 IP/Juego para pitcheo)
@@ -125,11 +125,12 @@ export function IndividualesView({
   const displayedBattingStats = useMemo(() => {
     if (!qualifyingOnly) return battingStats;
     return battingStats.filter((b) => {
+      const tGames = teamGamesMap[b.teamId];
       const teamGames =
         selectedTeam !== "all"
           ? currentTeamGames
-          : teamGamesMap[b.teamId] || maxGames || 56;
-      const reqPa = Math.round(teamGames * 3.1);
+          : (typeof tGames === "number" ? tGames : maxGames);
+      const reqPa = Math.max(0, Math.round(teamGames * 3.1));
       const playerPa =
         b.plateAppearances ?? b.pa ?? ((b.atBats || 0) + (b.walks || 0));
       return playerPa >= reqPa;
@@ -140,12 +141,13 @@ export function IndividualesView({
   const displayedPitchingStats = useMemo(() => {
     if (!qualifyingOnly) return pitchingStats;
     return pitchingStats.filter((p) => {
+      const tGames = teamGamesMap[p.teamId];
       const teamGames =
         selectedTeam !== "all"
           ? currentTeamGames
-          : teamGamesMap[p.teamId] || maxGames || 56;
-      const reqIp = teamGames * 1.0;
-      return (p.inningsPitched || 0) >= (reqIp - 0.05);
+          : (typeof tGames === "number" ? tGames : maxGames);
+      const reqIp = Math.max(0, teamGames * 1.0);
+      return (p.inningsPitched || 0) >= (reqIp > 0 ? reqIp - 0.05 : 0);
     });
   }, [pitchingStats, qualifyingOnly, selectedTeam, teamGamesMap, maxGames, currentTeamGames]);
 
