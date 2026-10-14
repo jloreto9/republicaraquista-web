@@ -561,7 +561,8 @@ export async function getCaracasTeamLeaders(season = ACTIVE_SEASON): Promise<{
 }> {
   try {
     const rawBatters = await getBattingStats(season, "R", 695, 10, 0);
-    const rawPitchers = await getPitchingStats(season, "R", 695, 10, 0.0);
+    // Filtrar con mínimo 0.1 IP para excluir bateadores o lanzadores sin outs registrados
+    const rawPitchers = await getPitchingStats(season, "R", 695, 10, 0.1);
 
     const batters: BatterLeaderItem[] =
       rawBatters && rawBatters.length > 0
@@ -576,11 +577,16 @@ export async function getCaracasTeamLeaders(season = ACTIVE_SEASON): Promise<{
             ab: b.atBats,
             h: b.hits,
           }))
-        : BASELINE_2025_BATTERS;
+        : (season === 2025 ? BASELINE_2025_BATTERS : []);
+
+    // Filtrar estrictamente lanzadores con al menos 0.1 IP (1 out registrado)
+    const qualifiedPitchers = (rawPitchers || []).filter(
+      (p) => (p.inningsPitched || 0) >= 0.1
+    );
 
     const pitchers: PitcherLeaderItem[] =
-      rawPitchers && rawPitchers.length > 0
-        ? rawPitchers.slice(0, 5).map((p) => ({
+      qualifiedPitchers.length > 0
+        ? qualifiedPitchers.slice(0, 5).map((p) => ({
             playerId: p.playerId,
             playerName: p.playerName,
             avatarUrl: p.playerAvatar,
@@ -590,12 +596,15 @@ export async function getCaracasTeamLeaders(season = ACTIVE_SEASON): Promise<{
             so: p.strikeouts,
             bb: p.walks,
           }))
-        : BASELINE_2025_PITCHERS;
+        : (season === 2025 ? BASELINE_2025_PITCHERS : []);
 
     return { batters, pitchers };
   } catch (error) {
     console.warn("Fallo consulta de líderes, usando baseline:", error);
-    return { batters: BASELINE_2025_BATTERS, pitchers: BASELINE_2025_PITCHERS };
+    return {
+      batters: season === 2025 ? BASELINE_2025_BATTERS : [],
+      pitchers: season === 2025 ? BASELINE_2025_PITCHERS : [],
+    };
   }
 }
 

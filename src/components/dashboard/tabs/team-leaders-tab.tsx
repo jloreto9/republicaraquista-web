@@ -101,7 +101,7 @@ export function TeamLeadersTab({ batters, pitchers }: TeamLeadersTabProps) {
               </h3>
             </div>
             <span className="text-[10px] font-mono text-slate-400 bg-[#070B19] px-2 py-0.5 rounded border border-[#1E2B4D]">
-              Ordenados por ERA (mín. 5 IP)
+              Ordenados por ERA
             </span>
           </div>
 
@@ -118,34 +118,42 @@ export function TeamLeadersTab({ batters, pitchers }: TeamLeadersTabProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1E2B4D]/50 text-slate-200">
-                {pitchers.map((p, idx) => (
-                  <tr
-                    key={p.playerId || idx}
-                    className={`hover:bg-[#131E3D]/40 transition-colors ${
-                      idx === 0 ? "bg-[#FDB827]/10" : ""
-                    }`}
-                  >
-                    <td className="py-2 px-2 flex items-center space-x-2">
-                      <div className="w-7 h-7 rounded-full bg-[#070B19] border border-[#1E2B4D] overflow-hidden relative shrink-0">
-                        <Image
-                          src={p.avatarUrl}
-                          alt={p.playerName}
-                          width={28}
-                          height={28}
-                          className="object-cover"
-                        />
-                      </div>
-                      <span className="font-semibold text-slate-100 truncate max-w-[130px]">
-                        {p.playerName}
-                      </span>
+                {pitchers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-slate-500 text-xs font-sans">
+                      Sin lanzadores registrados con entradas lanzadas.
                     </td>
-                    <td className="py-2 px-2 text-center font-bold text-emerald-400">{p.era}</td>
-                    <td className="py-2 px-2 text-center text-slate-300">{p.whip}</td>
-                    <td className="py-2 px-2 text-center text-slate-300">{p.ip}</td>
-                    <td className="py-2 px-2 text-center font-bold text-[#FDB827]">{p.so}</td>
-                    <td className="py-2 px-2 text-right text-slate-400">{p.bb}</td>
                   </tr>
-                ))}
+                ) : (
+                  pitchers.map((p, idx) => (
+                    <tr
+                      key={p.playerId || idx}
+                      className={`hover:bg-[#131E3D]/40 transition-colors ${
+                        idx === 0 ? "bg-[#FDB827]/10" : ""
+                      }`}
+                    >
+                      <td className="py-2 px-2 flex items-center space-x-2">
+                        <div className="w-7 h-7 rounded-full bg-[#070B19] border border-[#1E2B4D] overflow-hidden relative shrink-0">
+                          <Image
+                            src={p.avatarUrl}
+                            alt={p.playerName}
+                            width={28}
+                            height={28}
+                            className="object-cover"
+                          />
+                        </div>
+                        <span className="font-semibold text-slate-100 truncate max-w-[130px]">
+                          {p.playerName}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2 text-center font-bold text-emerald-400">{p.era}</td>
+                      <td className="py-2 px-2 text-center text-slate-300">{p.whip}</td>
+                      <td className="py-2 px-2 text-center text-slate-300">{p.ip}</td>
+                      <td className="py-2 px-2 text-center font-bold text-[#FDB827]">{p.so}</td>
+                      <td className="py-2 px-2 text-right text-slate-400">{p.bb}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
