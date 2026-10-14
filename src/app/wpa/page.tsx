@@ -1,7 +1,11 @@
 import { Metadata } from "next";
 import { Header } from "@/components/layout/header";
 import { WpaView } from "@/components/wpa/wpa-view";
-import { processGameWpa, getSeasonWpaLeaders, LEONES_ALL_GAMES } from "@/lib/wpa-engine";
+import {
+  processGameWpa,
+  getSeasonWpaLeaders,
+  getLeonesGamesList,
+} from "@/lib/wpa-engine";
 import { getActiveSeason } from "@/lib/constants";
 
 export const revalidate = 300; // 5 minutos ISR
@@ -14,8 +18,10 @@ export const metadata: Metadata = {
 
 export default async function WpaPage() {
   const activeSeason = await getActiveSeason();
-  const initialGameData = await processGameWpa(LEONES_ALL_GAMES[0].id);
-  const seasonLeaders = getSeasonWpaLeaders();
+  const games = getLeonesGamesList(activeSeason);
+  const initialGameId = games[0]?.id || 870090;
+  const initialGameData = await processGameWpa(initialGameId);
+  const seasonLeaders = getSeasonWpaLeaders(activeSeason);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -29,7 +35,7 @@ export default async function WpaPage() {
         <WpaView
           initialGameData={initialGameData}
           seasonLeaders={seasonLeaders}
-          games={LEONES_ALL_GAMES}
+          games={games}
           season={activeSeason}
         />
       </main>

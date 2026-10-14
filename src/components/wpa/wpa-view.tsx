@@ -3,7 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { GameWpaData, SeasonWpaLeader, GameOption } from "@/types/wpa";
 import { WpaChart } from "./wpa-chart";
-import { LEONES_ALL_GAMES } from "@/lib/wpa-engine";
+import {
+  LEONES_2026_GAMES,
+  LEONES_ALL_GAMES,
+  getLeonesGamesList,
+  getSeasonWpaLeaders,
+} from "@/lib/wpa-engine";
+import { useSeason } from "@/context/season-context";
 import {
   Activity,
   Flame,
@@ -25,23 +31,57 @@ interface WpaViewProps {
 export function WpaView({
   initialGameData,
   seasonLeaders,
-  games = LEONES_ALL_GAMES,
-  season = 2025,
+  games,
+  season = 2026,
 }: WpaViewProps) {
-  const gamesList = games && games.length > 0 ? games : LEONES_ALL_GAMES;
+  const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
+  const [activeSeason, setActiveSeason] = useState<number>(globalSeason || season);
+  const [gamesList, setGamesList] = useState<GameOption[]>(
+    games && games.length > 0 ? games : getLeonesGamesList(activeSeason)
+  );
+  const [leaders, setLeaders] = useState<SeasonWpaLeader[]>(seasonLeaders);
   const [selectedGameId, setSelectedGameId] = useState<number>(
-    initialGameData?.gameId || gamesList[0]?.id || 829871
+    initialGameData?.gameId || gamesList[0]?.id || 870090
   );
   const [gameData, setGameData] = useState<GameWpaData | null>(initialGameData);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"chart" | "leaders" | "plays">("chart");
   const [leaderTab, setLeaderTab] = useState<"batter" | "pitcher">("batter");
 
-  useEffect(() => {
-    if (selectedGameId === initialGameData?.gameId) {
-      if (initialGameData && gameData?.gameId !== initialGameData.gameId) {
-        setGameData(initialGameData);
+  // Función para conmutar de temporada
+  const handleSeasonChange = async (newSeason: number) => {
+    setActiveSeason(newSeason);
+    setGlobalSeason(newSeason);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/wpa?leaders=true&season=${newSeason}`);
+      if (res.ok) {
+        const json = await res.json();
+        const newGames: GameOption[] = json.games || getLeonesGamesList(newSeason);
+        setGamesList(newGames);
+        setLeaders(json.leaders || getSeasonWpaLeaders(newSeason));
+        const firstGameId = newGames[0]?.id;
+        if (firstGameId) {
+          setSelectedGameId(firstGameId);
+        }
       }
+    } catch (err) {
+      console.error("Error updating season in WPA:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sincronizar si la temporada global cambia desde el Header u otra pestaña
+  useEffect(() => {
+    if (globalSeason && globalSeason !== activeSeason) {
+      handleSeasonChange(globalSeason);
+    }
+  }, [globalSeason]);
+
+  // Carga reactiva de jugadas del juego seleccionado
+  useEffect(() => {
+    if (selectedGameId === initialGameData?.gameId && gameData?.gameId === selectedGameId) {
       return;
     }
 
@@ -49,7 +89,7 @@ export function WpaView({
     async function loadGame() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/wpa?game_pk=${selectedGameId}`);
+        const res = await fetch(`/api/wpa?game_pk=${selectedGameId}&season=${activeSeason}`);
         if (res.ok && isMounted) {
           const data = await res.json();
           setGameData(data);
@@ -65,7 +105,7 @@ export function WpaView({
     return () => {
       isMounted = false;
     };
-  }, [selectedGameId, initialGameData]);
+  }, [selectedGameId, activeSeason]);
 
   const plays = gameData?.plays || [];
 
@@ -79,35 +119,64 @@ export function WpaView({
     .sort((a, b) => Math.abs(b.wpa) - Math.abs(a.wpa))
     .slice(0, 7);
 
-  const filteredLeaders = seasonLeaders.filter((l) => l.type === leaderTab);
+  const filteredLeaders = leaders.filter((l) => l.type === leaderTab);
 
   return (
     <div className="space-y-6">
       {/* Selector de Partido y Control */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-          <Activity className="w-4 h-4 text-[#FDB827]" />
-          <span>Análisis de Probabilidad por Partido ({gamesList.length} juegos de la temporada)</span>
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D] shadow-lg">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-100">
+              <Activity className="w-4 h-4 text-[#FDB827]" />
+              <span>Probabilidad de Victoria & Leverage Index</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/20 font-mono font-bold">
+              {activeSeason}-{String(activeSeason + 1).slice(-2)}
+            </span>
+            {loading && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono animate-pulse">
+                Cargando...
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400">
+            Curvas de Win Expectancy en vivo y registro jugada a jugada para Leones ({gamesList.length} {gamesList.length === 1 ? "juego" : "juegos"} disponibles).
+          </p>
         </div>
 
-        {/* Selector de Juego */}
-        <div className="flex items-center gap-3">
-          <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider shrink-0">
-            Partido:
-          </label>
-          <div className="relative max-w-full sm:max-w-md">
+        {/* Controles de Selección: Temporada y Partido */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Selector de Temporada */}
+          <div className="flex items-center gap-1.5 bg-[#070B19] px-2.5 py-1.5 rounded-lg border border-[#1E2B4D]">
+            <span className="text-[11px] text-slate-400 font-medium">Temporada:</span>
             <select
-              value={selectedGameId}
-              onChange={(e) => setSelectedGameId(Number(e.target.value))}
-              className="appearance-none w-full bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs font-medium rounded-lg px-3 py-2 pr-8 focus:outline-none focus:border-[#FDB827]/50"
+              value={activeSeason}
+              onChange={(e) => handleSeasonChange(Number(e.target.value))}
+              className="bg-transparent text-slate-200 text-xs font-bold font-mono focus:outline-none cursor-pointer"
             >
-              {gamesList.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.gameNumber ? `J#${g.gameNumber} • ` : ""}{g.date} — {g.opponent} ({g.score} {g.result})
-                </option>
-              ))}
+              <option value={2026} className="bg-[#070B19]">2026-27 (En Curso)</option>
+              <option value={2025} className="bg-[#070B19]">2025-26</option>
             </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {/* Selector de Juego */}
+          <div className="flex items-center gap-2 max-w-full sm:max-w-md">
+            <span className="text-xs text-slate-400 font-medium shrink-0">Partido:</span>
+            <div className="relative flex-1">
+              <select
+                value={selectedGameId}
+                onChange={(e) => setSelectedGameId(Number(e.target.value))}
+                className="appearance-none w-full bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs font-medium rounded-lg px-3 py-1.5 pr-8 focus:outline-none focus:border-[#FDB827]/50 cursor-pointer"
+              >
+                {gamesList.map((g) => (
+                  <option key={g.id} value={g.id} className="bg-[#070B19]">
+                    {g.gameNumber ? `J#${g.gameNumber} • ` : ""}{g.date} — {g.opponent} ({g.score} {g.result})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
         </div>
       </div>
@@ -322,7 +391,7 @@ export function WpaView({
             <div>
               <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                 <Award className="w-4 h-4 text-[#FDB827]" />
-                Líderes de Probabilidad de Victoria (WPA & Clutch) — Temporada {season}-{String(season + 1).slice(-2)}
+                Líderes de Probabilidad de Victoria (WPA & Clutch) — Temporada {activeSeason}-{String(activeSeason + 1).slice(-2)}
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 Clutch = WPA − (WPA/LI). Mide el desempeño en situaciones de alta presión comparado con situaciones neutrales.

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Award,
@@ -24,6 +24,7 @@ import {
   CollectiveFieldingTeam,
 } from "@/types/collective";
 import { cn } from "@/lib/utils";
+import { useSeason } from "@/context/season-context";
 
 interface ColectivasViewProps {
   initialData: CollectiveStatsResult;
@@ -40,10 +41,12 @@ const PHASES = [
 
 export function ColectivasView({
   initialData,
-  season = 2025,
+  season = 2026,
   initialPhase = "R",
 }: ColectivasViewProps) {
+  const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
   const [data, setData] = useState<CollectiveStatsResult>(initialData);
+  const [currentSeason, setCurrentSeason] = useState<number>(globalSeason || season);
   const [phase, setPhase] = useState<string>(initialPhase);
   const [activeTab, setActiveTab] = useState<"bateo" | "pitcheo" | "fildeo">("bateo");
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -53,42 +56,75 @@ export function ColectivasView({
   const [pitchingMetric, setPitchingMetric] = useState<keyof CollectivePitchingTeam>("era");
   const [fieldingMetric, setFieldingMetric] = useState<keyof CollectiveFieldingTeam>("fpct");
 
-  const handlePhaseChange = async (newPhase: string) => {
+  const fetchData = async (newSeason: number, newPhase: string) => {
+    setCurrentSeason(newSeason);
     setPhase(newPhase);
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/stats/collective?season=${season}&phase=${newPhase}`);
+      const res = await fetch(`/api/stats/collective?season=${newSeason}&phase=${newPhase}`);
       const json = await res.json();
       if (json.success && json.data) {
         setData(json.data);
       }
     } catch (e) {
-      console.error("Error cambiando fase colectiva:", e);
+      console.error("Error cambiando temporada/fase colectiva:", e);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (globalSeason && globalSeason !== currentSeason) {
+      fetchData(globalSeason, phase);
+    }
+  }, [globalSeason]);
+
+  const handlePhaseChange = (newPhase: string) => {
+    fetchData(currentSeason, newPhase);
   };
 
   return (
     <div className="space-y-6">
       {/* ── Barra de Control Superior: Fase y Tabs ── */}
       <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Selector de Fase */}
-        <div className="flex items-center space-x-2">
-          <Trophy className="w-4 h-4 text-[#FDB827]" />
-          <span className="text-xs font-bold text-slate-300">Fase del Torneo:</span>
-          <select
-            value={phase}
-            onChange={(e) => handlePhaseChange(e.target.value)}
-            disabled={isLoading}
-            className="bg-[#070B19] border border-[#1E2B4D] text-xs font-semibold text-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-[#FDB827] cursor-pointer"
-          >
-            {PHASES.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+        {/* Controles de Temporada y Fase */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Selector de Temporada */}
+          <div className="flex items-center space-x-1.5 bg-[#070B19] px-2.5 py-1.5 rounded-lg border border-[#1E2B4D]">
+            <span className="text-[11px] font-medium text-slate-400">Temporada:</span>
+            <select
+              value={currentSeason}
+              onChange={(e) => {
+                const s = Number(e.target.value);
+                setGlobalSeason(s);
+                fetchData(s, phase);
+              }}
+              disabled={isLoading}
+              className="bg-transparent text-xs font-bold font-mono text-[#FDB827] outline-none cursor-pointer"
+            >
+              <option value={2026} className="bg-[#070B19] text-slate-200">2026-27 (En Curso)</option>
+              <option value={2025} className="bg-[#070B19] text-slate-200">2025-26</option>
+            </select>
+          </div>
+
+          {/* Selector de Fase */}
+          <div className="flex items-center space-x-1.5 bg-[#070B19] px-2.5 py-1.5 rounded-lg border border-[#1E2B4D]">
+            <Trophy className="w-3.5 h-3.5 text-[#FDB827]" />
+            <span className="text-[11px] font-medium text-slate-400">Fase:</span>
+            <select
+              value={phase}
+              onChange={(e) => handlePhaseChange(e.target.value)}
+              disabled={isLoading}
+              className="bg-transparent text-xs font-semibold text-slate-200 outline-none cursor-pointer"
+            >
+              {PHASES.map((p) => (
+                <option key={p.value} value={p.value} className="bg-[#070B19]">
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {isLoading && (
             <span className="text-[11px] text-[#FDB827] font-mono animate-pulse">
               Actualizando...

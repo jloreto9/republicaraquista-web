@@ -31,7 +31,7 @@ const PHASES = [
 export function MatchupView({
   initialBatters,
   initialPitchers,
-  season = 2025,
+  season = 2026,
 }: MatchupViewProps) {
   const [compareType, setCompareType] = useState<"Bateadores" | "Lanzadores">("Bateadores");
   const [team1, setTeam1] = useState<string>("695"); // Leones por defecto

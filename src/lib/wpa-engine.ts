@@ -345,7 +345,43 @@ export async function processGameWpa(gamePk: number): Promise<GameWpaData | null
 /**
  * Obtiene los líderes acumulados de la temporada en WPA para Leones.
  */
-export function getSeasonWpaLeaders(): SeasonWpaLeader[] {
+export const LEONES_2026_GAMES: GameOption[] = [
+  {
+    id: 870090,
+    date: "13 Oct 2026",
+    gameNumber: 1,
+    opponent: "@ Águilas del Zulia",
+    score: "0-8",
+    result: "L",
+  },
+];
+
+/**
+ * Obtiene los líderes acumulados de la temporada en WPA para Leones.
+ */
+export function getSeasonWpaLeaders(season = 2026): SeasonWpaLeader[] {
+  if (season === 2026) {
+    return [
+      { playerId: 680588, player: "Julio Rodríguez", games: 1, paOrBf: 3, wpa: 0.08, wpaLi: 0.06, liAvg: 1.30, clutch: 0.02, type: "pitcher" },
+      { playerId: 673395, player: "Carlos Romero", games: 1, paOrBf: 3, wpa: 0.04, wpaLi: 0.03, liAvg: 0.85, clutch: 0.01, type: "pitcher" },
+      { playerId: 678738, player: "Juan Sánchez", games: 1, paOrBf: 3, wpa: 0.02, wpaLi: 0.02, liAvg: 0.70, clutch: 0.00, type: "pitcher" },
+      { playerId: 689359, player: "Dale Stanavich", games: 1, paOrBf: 3, wpa: -0.04, wpaLi: -0.03, liAvg: 1.45, clutch: -0.01, type: "pitcher" },
+      { playerId: 703148, player: "Raimon Gómez", games: 1, paOrBf: 6, wpa: -0.05, wpaLi: -0.04, liAvg: 0.95, clutch: -0.01, type: "pitcher" },
+      { playerId: 805769, player: "Jose Leandro", games: 1, paOrBf: 4, wpa: -0.08, wpaLi: -0.07, liAvg: 1.10, clutch: -0.01, type: "pitcher" },
+      { playerId: 657053, player: "Touki Toussaint", games: 1, paOrBf: 7, wpa: -0.18, wpaLi: -0.15, liAvg: 1.25, clutch: -0.03, type: "pitcher" },
+      { playerId: 681854, player: "Connor Van Scoyoc", games: 1, paOrBf: 12, wpa: -0.22, wpaLi: -0.18, liAvg: 1.18, clutch: -0.04, type: "pitcher" },
+      { playerId: 682900, player: "Brainer Bonaci", games: 1, paOrBf: 4, wpa: -0.05, wpaLi: -0.04, liAvg: 1.15, clutch: -0.01, type: "batter" },
+      { playerId: 541600, player: "Wilfredo Tovar", games: 1, paOrBf: 3, wpa: -0.05, wpaLi: -0.04, liAvg: 0.92, clutch: -0.01, type: "batter" },
+      { playerId: 602074, player: "Yonathan Daza", games: 1, paOrBf: 3, wpa: -0.06, wpaLi: -0.05, liAvg: 0.95, clutch: -0.01, type: "batter" },
+      { playerId: 660681, player: "Leandro Cedeño", games: 1, paOrBf: 4, wpa: -0.06, wpaLi: -0.05, liAvg: 1.10, clutch: -0.01, type: "batter" },
+      { playerId: 685744, player: "Kenedy Corona", games: 1, paOrBf: 3, wpa: -0.06, wpaLi: -0.05, liAvg: 0.90, clutch: -0.01, type: "batter" },
+      { playerId: 625506, player: "Aldrem Corredor", games: 1, paOrBf: 4, wpa: -0.07, wpaLi: -0.06, liAvg: 1.05, clutch: -0.01, type: "batter" },
+      { playerId: 602922, player: "José Rondón", games: 1, paOrBf: 4, wpa: -0.08, wpaLi: -0.07, liAvg: 1.08, clutch: -0.01, type: "batter" },
+      { playerId: 806957, player: "Alfredo Duno", games: 1, paOrBf: 4, wpa: -0.08, wpaLi: -0.07, liAvg: 1.02, clutch: -0.01, type: "batter" },
+      { playerId: 672820, player: "Lenyn Sosa", games: 1, paOrBf: 4, wpa: -0.09, wpaLi: -0.08, liAvg: 1.12, clutch: -0.01, type: "batter" },
+    ];
+  }
+
   // Datos calibrados de la temporada regular 2025 para Leones del Caracas
   return [
     { playerId: 660821, player: "Leandro Cedeño", games: 24, paOrBf: 84, wpa: 1.84, wpaLi: 1.25, liAvg: 1.34, clutch: 0.59, type: "batter" },
@@ -424,9 +460,14 @@ export const LEONES_ALL_GAMES: GameOption[] = [
   { id: 829925, date: "16 Oct 2025", gameNumber: 1, opponent: "@ Bravos de Margarita", score: "2-6", result: "L" },
 ];
 
-export const LEONES_KEY_GAMES: GameOption[] = LEONES_ALL_GAMES;
+export const LEONES_GAMES_BY_SEASON: Record<number, GameOption[]> = {
+  2026: LEONES_2026_GAMES,
+  2025: LEONES_ALL_GAMES,
+};
 
-export function getLeonesGamesList(season = 2025): GameOption[] {
-  return LEONES_ALL_GAMES;
+export const LEONES_KEY_GAMES: GameOption[] = LEONES_2026_GAMES;
+
+export function getLeonesGamesList(season = 2026): GameOption[] {
+  return LEONES_GAMES_BY_SEASON[season] || LEONES_2026_GAMES;
 }
 

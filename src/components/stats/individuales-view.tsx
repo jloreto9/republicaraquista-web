@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { BattingStats, PitchingStats } from "@/types/sports";
 import { StatsFilters } from "@/components/stats/stats-filters";
 import { BattingTable } from "@/components/stats/batting-table";
 import { PitchingTable } from "@/components/stats/pitching-table";
 import { PlayerSplitsView } from "@/components/stats/splits/player-splits-view";
 import { Flame, Target, Shield, Loader2, Sparkles, Zap } from "lucide-react";
+import { useSeason } from "@/context/season-context";
 
 interface IndividualesViewProps {
   initialBattingStats: BattingStats[];
@@ -19,11 +20,13 @@ interface IndividualesViewProps {
 export function IndividualesView({
   initialBattingStats,
   initialPitchingStats,
-  initialSeason = 2025,
+  initialSeason = 2026,
   initialTeamGamesMap = {},
   initialMaxGames = 56,
 }: IndividualesViewProps) {
-  const [season, setSeason] = useState<number>(initialSeason);
+  const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
+  const [season, setSeason] = useState<number>(globalSeason || initialSeason);
+  const isFirstMount = useRef(true);
   const [activeTab, setActiveTab] = useState<"batting" | "pitching" | "splits" | "fielding">(
     "batting"
   );
@@ -44,7 +47,14 @@ export function IndividualesView({
     type: "batter" | "pitcher";
   } | null>(null);
 
-  // Carga reactiva de estadísticas al cambiar filtros
+  // Sincronizar si la temporada global cambia desde el Header u otra vista
+  useEffect(() => {
+    if (globalSeason && globalSeason !== season) {
+      setSeason(globalSeason);
+    }
+  }, [globalSeason]);
+
+  // Carga reactiva de estadísticas al cambiar filtros o temporada
   useEffect(() => {
     let isMounted = true;
     async function fetchStats() {
@@ -88,17 +98,23 @@ export function IndividualesView({
       }
     }
 
-    if (
-      selectedPhase !== "R" ||
-      selectedTeam !== "all" ||
-      (activeTab === "pitching" && pitchingStats.length === 0)
-    ) {
-      fetchStats();
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      if (
+        selectedPhase !== "R" ||
+        selectedTeam !== "all" ||
+        (activeTab === "pitching" && pitchingStats.length === 0)
+      ) {
+        fetchStats();
+      }
+      return;
     }
+
+    fetchStats();
     return () => {
       isMounted = false;
     };
-  }, [activeTab, selectedPhase, selectedTeam, season, pitchingStats.length]);
+  }, [activeTab, selectedPhase, selectedTeam, season]);
 
   // Juegos de referencia del equipo seleccionado o el máximo de la liga
   const currentTeamGames = useMemo(() => {
@@ -219,10 +235,22 @@ export function IndividualesView({
           </button>
         </div>
 
-        {/* Badge Informativo */}
-        <div className="flex items-center justify-center sm:justify-start space-x-2 text-[10px] sm:text-[11px] font-mono text-slate-400 bg-[#070B19] px-3 py-1.5 rounded-lg border border-[#1E2B4D]">
+        {/* Selector de Temporada */}
+        <div className="flex items-center gap-1.5 bg-[#070B19] px-2.5 py-1.5 rounded-lg border border-[#1E2B4D]">
           <Sparkles className="w-3.5 h-3.5 text-[#FDB827]" />
-          <span>Líderes Oficiales • Temporada {season}-{String(season + 1).slice(-2)}</span>
+          <span className="text-[11px] text-slate-400 font-medium">Temporada:</span>
+          <select
+            value={season}
+            onChange={(e) => {
+              const s = Number(e.target.value);
+              setSeason(s);
+              setGlobalSeason(s);
+            }}
+            className="bg-transparent text-[#FDB827] text-xs font-bold font-mono focus:outline-none cursor-pointer"
+          >
+            <option value={2026} className="bg-[#070B19] text-slate-200">2026-27 (En Curso)</option>
+            <option value={2025} className="bg-[#070B19] text-slate-200">2025-26</option>
+          </select>
         </div>
       </div>
 

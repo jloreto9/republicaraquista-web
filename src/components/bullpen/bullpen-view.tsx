@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -20,6 +20,7 @@ import {
 } from "@/types/bullpen";
 import { cn } from "@/lib/utils";
 import { LVBP_TEAMS, LVBP_TEAM_IDS } from "@/lib/constants";
+import { useSeason } from "@/context/season-context";
 
 const POS_FULL_MAP: Record<string, string> = {
   "1B": "Primera Base",
@@ -39,8 +40,9 @@ interface BullpenViewProps {
 }
 
 export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
+  const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
   const [data, setData] = useState<BullpenAndLineupsData>(initialData);
-  const [currentSeason, setCurrentSeason] = useState<number>(season);
+  const [currentSeason, setCurrentSeason] = useState<number>(globalSeason || season);
   const [currentTeamId, setCurrentTeamId] = useState<number>(695);
   const [loading, setLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"bullpen" | "lineups">("bullpen");
@@ -66,6 +68,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
   ) => {
     setCurrentSeason(newSeason);
     setCurrentTeamId(newTeamId);
+    setGlobalSeason(newSeason);
     setLoading(true);
     try {
       const res = await fetch(
@@ -83,6 +86,13 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
       setLoading(false);
     }
   };
+
+  // Sincronizar si la temporada global cambia desde el Header u otra pestaña
+  useEffect(() => {
+    if (globalSeason && globalSeason !== currentSeason) {
+      handleSeasonOrTeamChange(globalSeason, currentTeamId);
+    }
+  }, [globalSeason]);
 
   const selectedPlayerImpact = useMemo(() => {
     const defaultPlayer = data.lineups.availablePlayers[0] || "";

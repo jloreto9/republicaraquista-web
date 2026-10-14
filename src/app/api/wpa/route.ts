@@ -1,24 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processGameWpa, getSeasonWpaLeaders, LEONES_ALL_GAMES } from "@/lib/wpa-engine";
+import {
+  processGameWpa,
+  getSeasonWpaLeaders,
+  getLeonesGamesList,
+} from "@/lib/wpa-engine";
 import { getActiveSeason } from "@/lib/season-service";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const seasonParam = searchParams.get("season");
+    const activeSeason = await getActiveSeason();
+    const season = seasonParam ? parseInt(seasonParam, 10) : activeSeason;
+
     const gamePkParam = searchParams.get("game_pk");
     const leadersParam = searchParams.get("leaders");
+    const gamesList = getLeonesGamesList(season);
 
     if (leadersParam === "true") {
-      const activeSeason = await getActiveSeason();
-      const leaders = getSeasonWpaLeaders();
+      const leaders = getSeasonWpaLeaders(season);
       return NextResponse.json({
-        season: activeSeason,
+        season,
         leaders,
-        games: LEONES_ALL_GAMES,
+        games: gamesList,
       });
     }
 
-    const gamePk = gamePkParam ? parseInt(gamePkParam, 10) : LEONES_ALL_GAMES[0].id;
+    const defaultGameId = gamesList[0]?.id || 870090;
+    const gamePk = gamePkParam ? parseInt(gamePkParam, 10) : defaultGameId;
     const wpaData = await processGameWpa(gamePk);
 
     if (!wpaData) {

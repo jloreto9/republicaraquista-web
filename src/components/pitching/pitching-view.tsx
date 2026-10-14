@@ -16,19 +16,21 @@ import { PitchingCardViewer } from "./pitching-card-viewer";
 import { PitchingGameLogsTable } from "./pitching-game-logs-table";
 import { downloadPitchingCard } from "@/lib/pitch-card-canvas";
 import { Loader2, AlertCircle, Sparkles, BarChart3 } from "lucide-react";
+import { useSeason } from "@/context/season-context";
 
 interface PitchingViewProps {
   initialSeason?: number;
 }
 
-export function PitchingView({ initialSeason = 2025 }: PitchingViewProps) {
+export function PitchingView({ initialSeason = 2026 }: PitchingViewProps) {
+  const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
   const [selectedPitcher, setSelectedPitcher] = useState<PitcherProfile>(
     CARACAS_FEATURED_PITCHERS[0]
   );
   const [branch, setBranch] = useState<"lvbp" | "mlb">("lvbp");
   const [timeMode, setTimeMode] = useState<TimeMode>("game");
   const [activeTab, setActiveTab] = useState<"card" | "telemetry">("card");
-  const [season, setSeason] = useState<number>(initialSeason);
+  const [season, setSeason] = useState<number>(globalSeason || initialSeason);
   const [phase, setPhase] = useState<string>("all");
 
   const [gameLogs, setGameLogs] = useState<PitcherGameLog[]>([]);
@@ -87,6 +89,13 @@ export function PitchingView({ initialSeason = 2025 }: PitchingViewProps) {
   useEffect(() => {
     fetchGameLogs();
   }, [fetchGameLogs]);
+
+  // Sincronizar si la temporada global cambia desde el Header u otra vista
+  useEffect(() => {
+    if (globalSeason && globalSeason !== season) {
+      setSeason(globalSeason);
+    }
+  }, [globalSeason]);
 
   // 2. Cargar detalle del partido o temporada cuando cambia selección o modo temporal
   useEffect(() => {
@@ -206,7 +215,10 @@ export function PitchingView({ initialSeason = 2025 }: PitchingViewProps) {
         timeMode={timeMode}
         onChangeTimeMode={(m) => setTimeMode(m)}
         season={season}
-        onChangeSeason={(s) => setSeason(s)}
+        onChangeSeason={(s) => {
+          setSeason(s);
+          setGlobalSeason(s);
+        }}
         phase={phase}
         onChangePhase={(p) => setPhase(p)}
         gameLogs={gameLogs}

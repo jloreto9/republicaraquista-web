@@ -17,7 +17,7 @@ interface SituacionalViewProps {
   season?: number;
 }
 
-export function SituacionalView({ initialData, season = 2025 }: SituacionalViewProps) {
+export function SituacionalView({ initialData, season = 2026 }: SituacionalViewProps) {
   const [activeTab, setActiveTab] = useState<"splits" | "lob" | "bvp">("splits");
   const [bvpSearch, setBvpSearch] = useState("");
 
