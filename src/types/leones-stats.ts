@@ -125,6 +125,26 @@ export interface BroadcastChannelRecord {
   pct: string;             // Ej: ".000"
 }
 
+export interface HeadToHeadRecord {
+  rivalId: number;
+  rivalName: string;
+  rivalAbbr: string;
+  rivalLogo: string;
+  scheduledGames: number;  // Generalmente 8 juegos en serie regular
+  gamesPlayed: number;
+  remainingGames: number;
+  wins: number;
+  losses: number;
+  record: string;          // Ej: "0G-1P" o "5G-3P"
+  pct: string;             // Ej: ".000" o ".625"
+  runsFor: number;
+  runsAgainst: number;
+  runDiff: string;         // Ej: "-8" o "+4"
+  homeRecord: string;      // Ej: "0-0"
+  awayRecord: string;      // Ej: "0-1"
+  statusText: string;      // Ej: "Águilas lidera 1-0" o "Empatada 0-0"
+}
+
 export interface DashboardTabsData {
   advancedStats: LeonesAdvancedStats;
   weeklyRecords: WeeklyRecord[];
@@ -135,4 +155,5 @@ export interface DashboardTabsData {
     pitchers: PitcherLeaderItem[];
   };
   channelRecords: BroadcastChannelRecord[];
+  h2hRecords: HeadToHeadRecord[];
 }

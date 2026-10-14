@@ -108,6 +108,7 @@ export function DashboardTabs({
             stats={data.advancedStats}
             weeklyRecords={data.weeklyRecords}
             channelRecords={data.channelRecords}
+            h2hRecords={data.h2hRecords}
             seasonLabel={seasonLabel}
           />
         )}

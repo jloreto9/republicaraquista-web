@@ -1,13 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { LeonesAdvancedStats, WeeklyRecord, BroadcastChannelRecord } from "@/types/leones-stats";
-import { Calendar, Tv, ShieldCheck } from "lucide-react";
+import {
+  LeonesAdvancedStats,
+  WeeklyRecord,
+  BroadcastChannelRecord,
+  HeadToHeadRecord,
+} from "@/types/leones-stats";
+import { Calendar, Tv, ShieldCheck, Swords } from "lucide-react";
 
 interface LeonesStatsTabProps {
   stats: LeonesAdvancedStats;
   weeklyRecords: WeeklyRecord[];
   channelRecords: BroadcastChannelRecord[];
+  h2hRecords?: HeadToHeadRecord[];
   seasonLabel?: string;
 }
 
@@ -15,6 +21,7 @@ export function LeonesStatsTab({
   stats,
   weeklyRecords,
   channelRecords,
+  h2hRecords = [],
   seasonLabel = "25-26",
 }: LeonesStatsTabProps) {
   return (
@@ -156,6 +163,141 @@ export function LeonesStatsTab({
           </div>
         </div>
       </div>
+
+      {/* ── SUB-PANEL: SERIES PARTICULARES (RÉCORD VS. LOS 7 RIVALES LVBP) ── */}
+      {h2hRecords && h2hRecords.length > 0 && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#0D152B]/85 border border-[#1E2B4D] shadow-lg space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#1E2B4D] pb-3">
+            <div className="flex items-center space-x-2">
+              <Swords className="w-4 h-4 text-[#FDB827]" />
+              <h4 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
+                Series Particulares (Récord vs. Rivales)
+              </h4>
+            </div>
+            <div className="flex items-center space-x-1.5 text-[11px] text-slate-400 font-mono bg-[#070B19] px-2.5 py-1 rounded-lg border border-[#1E2B4D]">
+              <span className="text-[#FDB827] font-semibold">Serie Regular:</span>
+              <span>8 juegos programados vs cada equipo</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-3.5">
+            {h2hRecords.map((rival) => {
+              const hasPlayed = rival.gamesPlayed > 0;
+              const isLeading = rival.wins > rival.losses;
+              const isTrailing = rival.losses > rival.wins;
+
+              return (
+                <div
+                  key={rival.rivalId}
+                  className="p-3.5 rounded-xl bg-[#070B19]/80 border border-[#1E2B4D] hover:border-[#FDB827]/40 transition-all flex flex-col justify-between space-y-3"
+                >
+                  {/* Cabecera del Rival */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 border border-[#1E2B4D] flex items-center justify-center p-1 shrink-0 overflow-hidden relative">
+                        <Image
+                          src={rival.rivalLogo}
+                          alt={rival.rivalName}
+                          width={26}
+                          height={26}
+                          className="object-contain"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-100 truncate flex items-center gap-1.5">
+                          <span>{rival.rivalName}</span>
+                          <span className="text-[10px] font-mono text-[#FDB827] bg-[#FDB827]/10 px-1 rounded">
+                            {rival.rivalAbbr}
+                          </span>
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-mono">
+                          {rival.gamesPlayed} / {rival.scheduledGames} JJ ({rival.remainingGames} restantes)
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Badge de Estado de la Serie */}
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full border shrink-0 ${
+                        !hasPlayed
+                          ? "bg-slate-800/40 text-slate-400 border-slate-700/50"
+                          : isLeading
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-bold"
+                          : isTrailing
+                          ? "bg-rose-500/10 text-rose-400 border-rose-500/30 font-bold"
+                          : "bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold"
+                      }`}
+                    >
+                      {!hasPlayed
+                        ? "Por jugar"
+                        : isLeading
+                        ? `+${rival.wins - rival.losses}`
+                        : isTrailing
+                        ? `-${rival.losses - rival.wins}`
+                        : "Empate"}
+                    </span>
+                  </div>
+
+                  {/* Récord & PCT Principal */}
+                  <div className="flex items-baseline justify-between border-t border-[#1E2B4D]/50 pt-2 font-mono">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-sm font-bold text-[#FDB827]">
+                        {rival.record}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {rival.pct} PCT
+                      </span>
+                    </div>
+                    <span
+                      className={`text-[11px] font-semibold ${
+                        rival.runDiff.startsWith("+")
+                          ? "text-emerald-400"
+                          : rival.runDiff.startsWith("-")
+                          ? "text-rose-400"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      DIF: {rival.runDiff}
+                    </span>
+                  </div>
+
+                  {/* Desglose de Carreras y Sedes */}
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-300 pt-1 border-t border-[#1E2B4D]/30">
+                    <div>
+                      <span className="text-slate-500 block">Carreras:</span>
+                      <span className="font-semibold text-slate-200">
+                        {rival.runsFor} CF - {rival.runsAgainst} CP
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Casa / Visita:</span>
+                      <span className="font-semibold text-slate-200">
+                        {rival.homeRecord} / {rival.awayRecord}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Estado narrativo inferior */}
+                  <div className="text-[10px] font-mono text-slate-400 bg-[#0A1022] px-2 py-1 rounded border border-[#1E2B4D]/60 flex items-center justify-between">
+                    <span className="truncate">{rival.statusText}</span>
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        !hasPlayed
+                          ? "bg-slate-500"
+                          : isLeading
+                          ? "bg-emerald-400"
+                          : isTrailing
+                          ? "bg-rose-400"
+                          : "bg-amber-400"
+                      }`}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── SUB-PANEL: RÉCORD POR CANAL DE TRANSMISIÓN (TV & STREAMING) ── */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[#0D152B]/80 border border-[#1E2B4D] shadow-lg space-y-4">

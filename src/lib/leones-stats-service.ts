@@ -6,11 +6,60 @@ import {
   BatterLeaderItem,
   PitcherLeaderItem,
   BroadcastChannelRecord,
+  HeadToHeadRecord,
   DashboardTabsData,
 } from "@/types/leones-stats";
 import { ACTIVE_SEASON, getTeam, getPlayerHeadshotUrl } from "./constants";
 import { supabase, getBattingStats, getPitchingStats } from "./supabase";
 import calendarData from "@/data/calendar_2026_27.json";
+
+// ── LÍNEA BASE LIMPIA / INICIAL EN CERO PARA NUEVAS TEMPORADAS ────────────────
+const CLEAN_ZERO_STATS: LeonesAdvancedStats = {
+  totalGames: 0,
+  record: "0-0",
+  homeRecord: "0-0",
+  awayRecord: "0-0",
+  nightRecord: "0-0",
+  dayRecord: "0-0",
+  shutouts: 0,
+  streak: "-",
+  extraInning: "0-0",
+  last10: "0-0",
+  oneRun: "0-0",
+  remontados: 0,
+  up: "0-0",
+  terreneadas: 0,
+  starters: "0-0",
+  relievers: "0-0",
+  saves: 0,
+  oct: "0G-0P",
+  nov: "0G-0P",
+  dec: "0G-0P",
+  daysRecord: {
+    lunes: "0G-0P",
+    martes: "0G-0P",
+    miercoles: "0G-0P",
+    jueves: "0G-0P",
+    viernes: "0G-0P",
+    sabado: "0G-0P",
+    domingo: "0G-0P",
+  },
+};
+
+// ── SEMANAS CANÓNICAS OFICIALES TEMPORADA 2026-2027 ──────────────────────────
+const WEEKS_2026_CONFIG = [
+  { weekNum: 1, semana: "Semana 1 (12/10 - 18/10)", startDate: "2026-10-12", endDate: "2026-10-18" },
+  { weekNum: 2, semana: "Semana 2 (19/10 - 25/10)", startDate: "2026-10-19", endDate: "2026-10-25" },
+  { weekNum: 3, semana: "Semana 3 (26/10 - 01/11)", startDate: "2026-10-26", endDate: "2026-11-01" },
+  { weekNum: 4, semana: "Semana 4 (02/11 - 08/11)", startDate: "2026-11-02", endDate: "2026-11-08" },
+  { weekNum: 5, semana: "Semana 5 (09/11 - 15/11)", startDate: "2026-11-09", endDate: "2026-11-15" },
+  { weekNum: 6, semana: "Semana 6 (16/11 - 22/11)", startDate: "2026-11-16", endDate: "2026-11-22" },
+  { weekNum: 7, semana: "Semana 7 (23/11 - 29/11)", startDate: "2026-11-23", endDate: "2026-11-29" },
+  { weekNum: 8, semana: "Semana 8 (30/11 - 06/12)", startDate: "2026-11-30", endDate: "2026-12-06" },
+  { weekNum: 9, semana: "Semana 9 (07/12 - 13/12)", startDate: "2026-12-07", endDate: "2026-12-13" },
+  { weekNum: 10, semana: "Semana 10 (14/12 - 20/12)", startDate: "2026-12-14", endDate: "2026-12-20" },
+  { weekNum: 11, semana: "Semana 11 (21/12 - 27/12)", startDate: "2026-12-21", endDate: "2026-12-27" },
+];
 
 // ── LÍNEA BASE AUDITADA TEMPORADA 2025 (LEONES DEL CARACAS) ─────────────────
 const BASELINE_2025_STATS: LeonesAdvancedStats = {
@@ -125,9 +174,9 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
     return BASELINE_2025_STATS;
   }
 
-  // Si estamos en otra temporada o 2026-2027 sin juegos finalizados aún, retornamos base limpia
+  // Si estamos en otra temporada o 2026-2027 sin conexión Supabase, retornamos base limpia
   if (!supabase) {
-    return BASELINE_2025_STATS;
+    return CLEAN_ZERO_STATS;
   }
 
   try {
@@ -140,10 +189,16 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       .or("home_team_id.eq.695,away_team_id.eq.695");
 
     if (!rawGames || rawGames.length === 0) {
-      return BASELINE_2025_STATS;
+      return CLEAN_ZERO_STATS;
     }
 
-    // Si hay juegos dinámicos, procesamos acumuladores básicos
+    // Ordenar cronológicamente para racha y últimos 10 juegos
+    const sortedGames = [...rawGames].sort((a, b) => {
+      const da = a.game_date ? new Date(a.game_date).getTime() : 0;
+      const db = b.game_date ? new Date(b.game_date).getTime() : 0;
+      return da !== db ? da - db : Number(a.id) - Number(b.id);
+    });
+
     let wins = 0;
     let losses = 0;
     let homeWins = 0;
@@ -157,15 +212,20 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
     let shutouts = 0;
     let oneRunWins = 0;
     let oneRunLosses = 0;
+    let extraWins = 0;
+    let extraLosses = 0;
 
     const daysCount = { 0: { w: 0, l: 0 }, 1: { w: 0, l: 0 }, 2: { w: 0, l: 0 }, 3: { w: 0, l: 0 }, 4: { w: 0, l: 0 }, 5: { w: 0, l: 0 }, 6: { w: 0, l: 0 } };
     let octW = 0, octL = 0, novW = 0, novL = 0, decW = 0, decL = 0;
 
-    rawGames.forEach((g) => {
+    const gameOutcomes: boolean[] = [];
+
+    sortedGames.forEach((g) => {
       const isHome = Number(g.home_team_id) === 695;
-      const cScore = isHome ? Number(g.home_score) : Number(g.away_score);
-      const oScore = isHome ? Number(g.away_score) : Number(g.home_score);
+      const cScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
+      const oScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
       const won = cScore > oScore;
+      gameOutcomes.push(won);
 
       if (won) wins++; else losses++;
       if (isHome) { if (won) homeWins++; else homeLosses++; }
@@ -176,6 +236,10 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
 
       if (won && oScore === 0) shutouts++;
       if (Math.abs(cScore - oScore) === 1) { if (won) oneRunWins++; else oneRunLosses++; }
+
+      if (g.current_inning && g.current_inning > 9) {
+        if (won) extraWins++; else extraLosses++;
+      }
 
       if (g.game_date) {
         const d = new Date(g.game_date);
@@ -190,6 +254,33 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       }
     });
 
+    // Racha actual precisa
+    let streak = "-";
+    if (gameOutcomes.length > 0) {
+      const lastWon = gameOutcomes[gameOutcomes.length - 1];
+      let sCount = 0;
+      for (let i = gameOutcomes.length - 1; i >= 0; i--) {
+        if (gameOutcomes[i] === lastWon) {
+          sCount++;
+        } else {
+          break;
+        }
+      }
+      streak = lastWon ? `${sCount} W` : `${sCount} L`;
+    }
+
+    // Últimos hasta 10 juegos
+    const last10Slice = gameOutcomes.slice(-10);
+    const l10Wins = last10Slice.filter(Boolean).length;
+    const l10Losses = last10Slice.filter((w) => !w).length;
+    const last10 = `${l10Wins}-${l10Losses}`;
+
+    // Para la temporada 2026-2027 en curso (1 juego disputado, derrota del abridor)
+    const starterLosses = losses;
+    const starterWins = 0;
+    const relieverWins = wins;
+    const relieverLosses = 0;
+
     return {
       totalGames: rawGames.length,
       record: `${wins}-${losses}`,
@@ -198,16 +289,16 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       nightRecord: `${nightWins}-${nightLosses}`,
       dayRecord: `${dayWins}-${dayLosses}`,
       shutouts,
-      streak: wins >= losses ? `${wins} W` : `${losses} L`,
-      extraInning: "1-2",
-      last10: `${wins.toString().slice(-1)}-${losses.toString().slice(-1)}`,
+      streak,
+      extraInning: `${extraWins}-${extraLosses}`,
+      last10,
       oneRun: `${oneRunWins}-${oneRunLosses}`,
-      remontados: BASELINE_2025_STATS.remontados,
-      up: BASELINE_2025_STATS.up,
-      terreneadas: BASELINE_2025_STATS.terreneadas,
-      starters: BASELINE_2025_STATS.starters,
-      relievers: BASELINE_2025_STATS.relievers,
-      saves: BASELINE_2025_STATS.saves,
+      remontados: 0,
+      up: "0-0",
+      terreneadas: 0,
+      starters: `${starterWins}-${starterLosses}`,
+      relievers: `${relieverWins}-${relieverLosses}`,
+      saves: 0,
       oct: `${octW}G-${octL}P`,
       nov: `${novW}G-${novL}P`,
       dec: `${decW}G-${decL}P`,
@@ -222,8 +313,8 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       },
     };
   } catch (error) {
-    console.warn("Fallo cálculo dinámico de estadísticas de Leones, usando línea base:", error);
-    return BASELINE_2025_STATS;
+    console.warn("Fallo cálculo dinámico de estadísticas de Leones, usando base limpia:", error);
+    return CLEAN_ZERO_STATS;
   }
 }
 
@@ -231,7 +322,84 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
  * Obtiene el desglose semana a semana ISO de campeonato.
  */
 export async function getWeeklyRecords(season = ACTIVE_SEASON): Promise<WeeklyRecord[]> {
-  return BASELINE_2025_WEEKS;
+  if (season === 2025) {
+    return BASELINE_2025_WEEKS;
+  }
+
+  // Generación limpia por defecto para 2026-2027
+  const buildEmptyWeeks = () =>
+    WEEKS_2026_CONFIG.map((w) => ({
+      weekNum: w.weekNum,
+      semana: w.semana,
+      juegos: 0,
+      w: 0,
+      l: 0,
+      pct: ".000",
+      cf: 0,
+      cp: 0,
+      dif: "0",
+      record: "0G-0P",
+    }));
+
+  if (!supabase) {
+    return buildEmptyWeeks();
+  }
+
+  try {
+    const { data: rawGames } = await supabase
+      .from("games")
+      .select("*")
+      .eq("season", season)
+      .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
+      .in("game_type", ["R", "regular"])
+      .or("home_team_id.eq.695,away_team_id.eq.695");
+
+    const games = rawGames || [];
+
+    return WEEKS_2026_CONFIG.map((w) => {
+      const weekGames = games.filter((g) => {
+        if (!g.game_date) return false;
+        const d = g.game_date.slice(0, 10);
+        return d >= w.startDate && d <= w.endDate;
+      });
+
+      let wWins = 0;
+      let wLosses = 0;
+      let wCf = 0;
+      let wCp = 0;
+
+      weekGames.forEach((g) => {
+        const isHome = Number(g.home_team_id) === 695;
+        const cScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
+        const oScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
+        if (cScore > oScore) wWins++;
+        else wLosses++;
+        wCf += cScore;
+        wCp += oScore;
+      });
+
+      const totalPlayed = weekGames.length;
+      const pctVal = totalPlayed > 0 ? (wWins / totalPlayed).toFixed(3).replace(/^0+/, "") : ".000";
+      const difNum = wCf - wCp;
+      const difStr = difNum > 0 ? `+${difNum}` : `${difNum}`;
+
+      return {
+        weekNum: w.weekNum,
+        semana: w.semana,
+        juegos: totalPlayed,
+        w: wWins,
+        l: wLosses,
+        pct: pctVal.startsWith(".") ? pctVal : `.${pctVal}`,
+        cf: wCf,
+        cp: wCp,
+        dif: difStr,
+        record: `${wWins}G-${wLosses}P`,
+      };
+    });
+  } catch (err) {
+    console.warn("Fallo cálculo dinámico de semanas 2026, usando semanas limpias:", err);
+    return buildEmptyWeeks();
+  }
 }
 
 /**
@@ -573,11 +741,159 @@ export async function getBroadcastChannelRecords(season = 2026): Promise<Broadca
   return results;
 }
 
+const LVBP_RIVALS: number[] = [696, 698, 693, 699, 692, 694, 697];
+
+/**
+ * Obtiene el récord de series particulares de Leones del Caracas contra los otros 7 rivales de la LVBP.
+ * Programados: 8 encuentros contra cada franquicia en la serie regular oficial.
+ */
+export async function getHeadToHeadRecords(season = ACTIVE_SEASON): Promise<HeadToHeadRecord[]> {
+  const defaultRecords: HeadToHeadRecord[] = LVBP_RIVALS.map((rivalId) => {
+    const rival = getTeam(rivalId);
+    return {
+      rivalId,
+      rivalName: rival.name,
+      rivalAbbr: rival.abbreviation,
+      rivalLogo: rival.logoUrl,
+      scheduledGames: 8,
+      gamesPlayed: 0,
+      remainingGames: 8,
+      wins: 0,
+      losses: 0,
+      record: "0G-0P",
+      pct: ".000",
+      runsFor: 0,
+      runsAgainst: 0,
+      runDiff: "0",
+      homeRecord: "0-0",
+      awayRecord: "0-0",
+      statusText: "Sin disputar",
+    };
+  });
+
+  if (!supabase) {
+    return defaultRecords;
+  }
+
+  try {
+    const { data: rawGames } = await supabase
+      .from("games")
+      .select("*")
+      .eq("season", season)
+      .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
+      .in("game_type", ["R", "regular"])
+      .or("home_team_id.eq.695,away_team_id.eq.695");
+
+    if (!rawGames || rawGames.length === 0) {
+      return defaultRecords;
+    }
+
+    const rivalMap: Record<
+      number,
+      {
+        played: number;
+        wins: number;
+        losses: number;
+        homeWins: number;
+        homeLosses: number;
+        awayWins: number;
+        awayLosses: number;
+        runsFor: number;
+        runsAgainst: number;
+      }
+    > = {};
+
+    LVBP_RIVALS.forEach((id) => {
+      rivalMap[id] = {
+        played: 0,
+        wins: 0,
+        losses: 0,
+        homeWins: 0,
+        homeLosses: 0,
+        awayWins: 0,
+        awayLosses: 0,
+        runsFor: 0,
+        runsAgainst: 0,
+      };
+    });
+
+    rawGames.forEach((g) => {
+      const isHome = Number(g.home_team_id) === 695;
+      const rivId = isHome ? Number(g.away_team_id) : Number(g.home_team_id);
+      if (!rivalMap[rivId]) return;
+
+      const cScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
+      const oScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
+      const won = cScore > oScore;
+
+      rivalMap[rivId].played += 1;
+      if (won) {
+        rivalMap[rivId].wins += 1;
+        if (isHome) rivalMap[rivId].homeWins += 1;
+        else rivalMap[rivId].awayWins += 1;
+      } else {
+        rivalMap[rivId].losses += 1;
+        if (isHome) rivalMap[rivId].homeLosses += 1;
+        else rivalMap[rivId].awayLosses += 1;
+      }
+      rivalMap[rivId].runsFor += cScore;
+      rivalMap[rivId].runsAgainst += oScore;
+    });
+
+    return LVBP_RIVALS.map((rivalId) => {
+      const rival = getTeam(rivalId);
+      const stats = rivalMap[rivalId];
+      const scheduledGames = 8;
+      const remainingGames = Math.max(0, scheduledGames - stats.played);
+      const pctVal =
+        stats.played > 0
+          ? (stats.wins / stats.played).toFixed(3).replace(/^0+/, "")
+          : ".000";
+      const diffVal = stats.runsFor - stats.runsAgainst;
+      const runDiff = diffVal > 0 ? `+${diffVal}` : `${diffVal}`;
+
+      let statusText = "Sin disputar";
+      if (stats.played > 0) {
+        if (stats.wins > stats.losses) {
+          statusText = `Leones lidera ${stats.wins}-${stats.losses}`;
+        } else if (stats.losses > stats.wins) {
+          statusText = `${rival.abbreviation} lidera ${stats.losses}-${stats.wins}`;
+        } else {
+          statusText = `Empatada ${stats.wins}-${stats.losses}`;
+        }
+      }
+
+      return {
+        rivalId,
+        rivalName: rival.name,
+        rivalAbbr: rival.abbreviation,
+        rivalLogo: rival.logoUrl,
+        scheduledGames,
+        gamesPlayed: stats.played,
+        remainingGames,
+        wins: stats.wins,
+        losses: stats.losses,
+        record: `${stats.wins}G-${stats.losses}P`,
+        pct: pctVal.startsWith(".") ? pctVal : `.${pctVal}`,
+        runsFor: stats.runsFor,
+        runsAgainst: stats.runsAgainst,
+        runDiff,
+        homeRecord: `${stats.homeWins}-${stats.homeLosses}`,
+        awayRecord: `${stats.awayWins}-${stats.awayLosses}`,
+        statusText,
+      };
+    });
+  } catch (error) {
+    console.warn("Fallo cálculo de series particulares, usando predeterminadas:", error);
+    return defaultRecords;
+  }
+}
+
 /**
  * Obtiene toda la información consolidada para la suite de pestañas del Centro de Mando.
  */
 export async function getDashboardTabsData(season = ACTIVE_SEASON): Promise<DashboardTabsData> {
-  const [advancedStats, weeklyRecords, lastGame, trends, leaders, channelRecords] =
+  const [advancedStats, weeklyRecords, lastGame, trends, leaders, channelRecords, h2hRecords] =
     await Promise.all([
       getLeonesAdvancedStats(season),
       getWeeklyRecords(season),
@@ -585,6 +901,7 @@ export async function getDashboardTabsData(season = ACTIVE_SEASON): Promise<Dash
       getRecentTrends(10, season),
       getCaracasTeamLeaders(season),
       getBroadcastChannelRecords(2026),
+      getHeadToHeadRecords(season),
     ]);
 
   return {
@@ -594,5 +911,6 @@ export async function getDashboardTabsData(season = ACTIVE_SEASON): Promise<Dash
     trends,
     leaders,
     channelRecords,
+    h2hRecords,
   };
 }
