@@ -369,7 +369,7 @@ export async function getPlayerSplitsProfile(
         .select(`
           player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh,
           players ( full_name ),
-          games ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
+          games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
         `)
         .eq("player_id", playerId)
         .eq("games.season", season);
@@ -506,7 +506,7 @@ export async function getPlayerSplitsProfile(
         buildSituationalBatterRows(totalRow, playerName);
 
       // LOB Tracker si existe en el ranking
-      const situData = getLeonesSituationalData();
+      const situData = getLeonesSituationalData(season);
       const lobEntry = situData.lobBatterRanking.find((b) => b.batterId === playerId || b.batterName.toLowerCase().includes(playerName.toLowerCase()));
 
       return {
@@ -550,7 +550,7 @@ export async function getPlayerSplitsProfile(
         .select(`
           player_id, team_id, ip_decimal, h, r, er, bb, so, hr,
           players ( full_name ),
-          games ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
+          games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
         `)
         .eq("player_id", playerId)
         .eq("games.season", season);
@@ -748,21 +748,26 @@ export async function getAllAvailablePlayersForSplits(
   if (!supabase) return [];
 
   try {
+    const minAb = season === 2026 ? 1 : 10;
+    const minIp = season === 2026 ? 0.1 : 5.0;
+
     const [batRes, pitRes] = await Promise.all([
       supabase
         .from("batting_stats")
-        .select("player_id, team_id, ab, h, hr, rbi, avg, ops, players(full_name)")
+        .select("player_id, team_id, ab, h, hr, rbi, avg, ops, players(full_name), games!inner(season)")
+        .eq("games.season", season)
         .limit(300),
       supabase
         .from("pitching_stats")
-        .select("player_id, team_id, ip_decimal, so, era, whip, players(full_name)")
+        .select("player_id, team_id, ip_decimal, so, era, whip, players(full_name), games!inner(season)")
+        .eq("games.season", season)
         .limit(200),
     ]);
 
     const items: PlayerSelectorItem[] = [];
     const seen = new Set<string>();
 
-    if (batRes.data) {
+    if (batRes.data && batRes.data.length > 0) {
       // Agrupar por jugador
       const batGroup: Record<number, { name: string; teamId: number; ab: number; h: number; hr: number; rbi: number }> = {};
       for (const row of batRes.data) {
@@ -779,7 +784,7 @@ export async function getAllAvailablePlayersForSplits(
 
       for (const [pidStr, b] of Object.entries(batGroup)) {
         const pid = parseInt(pidStr, 10);
-        if (b.ab < 10) continue; // Filtro mínimo de turnos
+        if (b.ab < minAb) continue; // Filtro mínimo adaptado a la temporada
         const key = `batter-${pid}`;
         if (!seen.has(key)) {
           seen.add(key);
@@ -799,7 +804,7 @@ export async function getAllAvailablePlayersForSplits(
       }
     }
 
-    if (pitRes.data) {
+    if (pitRes.data && pitRes.data.length > 0) {
       const pitGroup: Record<number, { name: string; teamId: number; ip: number; so: number; er: number }> = {};
       for (const row of pitRes.data) {
         const pid = row.player_id;
@@ -813,7 +818,7 @@ export async function getAllAvailablePlayersForSplits(
 
       for (const [pidStr, p] of Object.entries(pitGroup)) {
         const pid = parseInt(pidStr, 10);
-        if (p.ip < 5.0) continue; // Filtro mínimo de IP
+        if (p.ip < minIp) continue; // Filtro mínimo adaptado a la temporada
         const key = `pitcher-${pid}`;
         if (!seen.has(key)) {
           seen.add(key);
@@ -830,6 +835,29 @@ export async function getAllAvailablePlayersForSplits(
           });
         }
       }
+    }
+
+    // Fallback de jugadores 2026 de Leones si Supabase aún no tiene el corte procesado
+    if (items.length === 0 && season === 2026) {
+      const leones2026Batters: PlayerSelectorItem[] = [
+        { id: 682900, name: "Brainer Bonaci", avatarUrl: getPlayerHeadshotUrl(682900), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .333 AVG • 0 HR • 0 CI" },
+        { id: 602074, name: "Yonathan Daza", avatarUrl: getPlayerHeadshotUrl(602074), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .333 AVG • 0 HR • 0 CI" },
+        { id: 602922, name: "José Rondón", avatarUrl: getPlayerHeadshotUrl(602922), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
+        { id: 660821, name: "Leandro Cedeño", avatarUrl: getPlayerHeadshotUrl(660821), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
+        { id: 672580, name: "Aldrem Corredor", avatarUrl: getPlayerHeadshotUrl(672580), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
+        { id: 814407, name: "Alfredo Duno", avatarUrl: getPlayerHeadshotUrl(814407), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
+        { id: 672820, name: "Lenyn Sosa", avatarUrl: getPlayerHeadshotUrl(672820), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
+        { id: 541600, name: "Wilfredo Tovar", avatarUrl: getPlayerHeadshotUrl(541600), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
+        { id: 678876, name: "Kenedy Corona", avatarUrl: getPlayerHeadshotUrl(678876), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
+      ];
+      const leones2026Pitchers: PlayerSelectorItem[] = [
+        { id: 657053, name: "Touki Toussaint", avatarUrl: getPlayerHeadshotUrl(657053), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 2.0 IP • 2 K" },
+        { id: 687445, name: "Connor Van Scoyoc", avatarUrl: getPlayerHeadshotUrl(687445), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 2.0 IP • 3 K" },
+        { id: 702758, name: "Jose Leandro", avatarUrl: getPlayerHeadshotUrl(702758), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 1.0 IP • 1 K" },
+        { id: 683050, name: "Raimon Gomez", avatarUrl: getPlayerHeadshotUrl(683050), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 1.0 IP • 1 K" },
+        { id: 678848, name: "Juan Sanchez", avatarUrl: getPlayerHeadshotUrl(678848), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 1.0 IP • 1 K" },
+      ];
+      items.push(...leones2026Batters, ...leones2026Pitchers);
     }
 
     // Ordenar: primero Leones del Caracas (695), luego alfabéticamente

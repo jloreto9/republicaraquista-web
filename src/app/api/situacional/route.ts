@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       ? parseInt(searchParams.get("season")!, 10)
       : activeSeason;
 
-    const data = getLeonesSituationalData();
+    const data = getLeonesSituationalData(season);
     return NextResponse.json({
       season,
       teamId: 695,

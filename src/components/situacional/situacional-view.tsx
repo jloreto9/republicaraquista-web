@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SituationalData } from "@/types/situational";
 import {
   PieChart,
@@ -10,7 +10,9 @@ import {
   Search,
   Info,
   Shield,
+  Sparkles,
 } from "lucide-react";
+import { useSeason } from "@/context/season-context";
 
 interface SituacionalViewProps {
   initialData: SituationalData;
@@ -18,10 +20,37 @@ interface SituacionalViewProps {
 }
 
 export function SituacionalView({ initialData, season = 2026 }: SituacionalViewProps) {
+  const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
+  const [data, setData] = useState<SituationalData>(initialData);
+  const [currentSeason, setCurrentSeason] = useState<number>(globalSeason || season);
   const [activeTab, setActiveTab] = useState<"splits" | "lob" | "bvp">("splits");
   const [bvpSearch, setBvpSearch] = useState("");
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const { splits, lobSummary, lobBatterRanking, bvpRecords } = initialData;
+  const { splits, lobSummary, lobBatterRanking, bvpRecords } = data;
+
+  const handleSeasonChange = async (newSeason: number) => {
+    setCurrentSeason(newSeason);
+    setGlobalSeason(newSeason);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/situacional?season=${newSeason}`);
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+      }
+    } catch (err) {
+      console.error("Error al actualizar temporada en Splits Situacionales:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (globalSeason && globalSeason !== currentSeason) {
+      handleSeasonChange(globalSeason);
+    }
+  }, [globalSeason]);
 
   // Encontrar splits clave para KPIs
   const rispSplit = splits.find((s) => s.situacion.includes("RISP") && !s.situacion.includes("2 Outs"));
@@ -34,6 +63,47 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
 
   return (
     <div className="space-y-6">
+      {/* ── Switcher Superior de Temporada & Módulo ── */}
+      <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <PieChart className="w-4 h-4 text-[#FDB827]" />
+              <span>Splits Situacionales & LOB Tracker</span>
+            </h2>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/20 font-mono font-bold">
+              {currentSeason}-{String(currentSeason + 1).slice(-2)}
+            </span>
+            {loading && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono animate-pulse">
+                Actualizando...
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400">
+            {currentSeason === 2026
+              ? "Datos oficiales en curso • Temporada 2026-2027 (Juego 870090 vs Águilas del Zulia)"
+              : "Línea base histórica auditada • Temporada Regular 2024-2025"}
+          </p>
+        </div>
+
+        {/* Selector de Temporada */}
+        <div className="flex items-center gap-1.5 bg-[#070B19] px-3 py-1.5 rounded-lg border border-[#1E2B4D] self-start sm:self-auto">
+          <span className="text-[11px] text-slate-400 font-medium">Temporada:</span>
+          <select
+            value={currentSeason}
+            onChange={(e) => handleSeasonChange(Number(e.target.value))}
+            className="bg-transparent text-[#FDB827] text-xs font-bold font-mono focus:outline-none cursor-pointer"
+          >
+            <option value={2026} className="bg-[#070B19] text-slate-200">
+              2026-27 (En Curso)
+            </option>
+            <option value={2025} className="bg-[#070B19] text-slate-200">
+              2025-26
+            </option>
+          </select>
+        </div>
+      </div>
 
       {/* 4 KPIs Clave */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

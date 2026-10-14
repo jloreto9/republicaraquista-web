@@ -33,7 +33,7 @@ interface PlayerSplitsViewProps {
 export function PlayerSplitsView({
   initialPlayerId,
   initialType = "batter",
-  season = 2025,
+  season = 2026,
 }: PlayerSplitsViewProps) {
   const [playerType, setPlayerType] = useState<"batter" | "pitcher">(initialType);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(

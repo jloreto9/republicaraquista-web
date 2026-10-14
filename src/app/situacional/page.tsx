@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default async function SituacionalPage() {
   const activeSeason = await getActiveSeason();
-  const initialData = getLeonesSituationalData();
+  const initialData = getLeonesSituationalData(activeSeason);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">

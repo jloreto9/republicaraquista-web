@@ -48,12 +48,237 @@ export function calculateSlashLine(
   };
 }
 
-/**
- * Obtiene los splits situacionales y desglose LOB calibrados para la temporada de Leones del Caracas.
- */
-export function getLeonesSituationalData(): SituationalData {
-  // Splits situacionales agregados de la temporada
-  const splits: SituationalSplit[] = [
+// ── DATASET TEMPORADA 2026-2027 (EN CURSO) ──────────────────────────────
+export const LEONES_SITUATIONAL_2026: SituationalData = {
+  splits: [
+    {
+      situacion: "Total General",
+      badge: "Baseline",
+      ...calculateSlashLine(35, 27, 2, 1, 0, 0, 7, 6, 0, 1, 0),
+    },
+    {
+      situacion: "Bases Limpias",
+      badge: "Bases Vacías",
+      ...calculateSlashLine(16, 16, 1, 1, 0, 0, 0, 3, 0, 0, 0),
+    },
+    {
+      situacion: "Hombres en Base",
+      badge: "Tráfico",
+      ...calculateSlashLine(19, 11, 1, 0, 0, 0, 7, 3, 0, 1, 0),
+    },
+    {
+      situacion: "Posición Anotadora (RISP)",
+      badge: "Oportunidad",
+      ...calculateSlashLine(13, 9, 1, 0, 0, 0, 4, 3, 0, 0, 0),
+    },
+    {
+      situacion: "RISP con 2 Outs (Clutch)",
+      badge: "Alta Presión",
+      ...calculateSlashLine(11, 8, 1, 0, 0, 0, 3, 3, 0, 0, 0),
+    },
+    {
+      situacion: "Bases Llenas",
+      badge: "Grand Slam Threat",
+      ...calculateSlashLine(1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0),
+    },
+    {
+      situacion: "vs Lanzadores Derechos (RHP)",
+      badge: "Platoon RHP",
+      ...calculateSlashLine(35, 27, 2, 1, 0, 0, 7, 6, 0, 1, 0),
+    },
+    {
+      situacion: "vs Lanzadores Zurdos (LHP)",
+      badge: "Platoon LHP",
+      ...calculateSlashLine(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    },
+    {
+      situacion: "Entradas Tempranas (1-3)",
+      badge: "Apertura",
+      ...calculateSlashLine(13, 10, 1, 1, 0, 0, 2, 2, 0, 1, 0),
+    },
+    {
+      situacion: "Entradas Medias (4-6)",
+      badge: "Desarrollo",
+      ...calculateSlashLine(11, 10, 1, 0, 0, 0, 1, 3, 0, 0, 0),
+    },
+    {
+      situacion: "Entradas Tardías / Clutch (7-9+)",
+      badge: "Definición",
+      ...calculateSlashLine(11, 7, 0, 0, 0, 0, 4, 1, 0, 0, 0),
+    },
+  ],
+  lobSummary: {
+    totalPa: 35,
+    totalLobEnding: 10,
+    totalRispLobEnding: 7,
+    totalRispLobMid: 5,
+    totalRispLob: 12,
+  },
+  lobBatterRanking: [
+    {
+      batterId: 541600,
+      batterName: "Wilfredo Tovar",
+      pa: 3,
+      paRisp: 1,
+      rbi: 0,
+      avgRisp: ".000",
+      lobEnding: 3,
+      rispLobEnding: 3,
+      rispLobMid: 0,
+      totalRispLob: 3,
+    },
+    {
+      batterId: 660821,
+      batterName: "Leandro Cedeño",
+      pa: 4,
+      paRisp: 1,
+      rbi: 0,
+      avgRisp: ".000",
+      lobEnding: 2,
+      rispLobEnding: 1,
+      rispLobMid: 1,
+      totalRispLob: 2,
+    },
+    {
+      batterId: 602922,
+      batterName: "José Rondón",
+      pa: 4,
+      paRisp: 2,
+      rbi: 0,
+      avgRisp: ".000",
+      lobEnding: 2,
+      rispLobEnding: 1,
+      rispLobMid: 1,
+      totalRispLob: 2,
+    },
+    {
+      batterId: 808967,
+      batterName: "Marvin Alcántara",
+      pa: 1,
+      paRisp: 1,
+      rbi: 0,
+      avgRisp: ".000",
+      lobEnding: 2,
+      rispLobEnding: 1,
+      rispLobMid: 1,
+      totalRispLob: 2,
+    },
+    {
+      batterId: 678876,
+      batterName: "Kenedy Corona",
+      pa: 3,
+      paRisp: 0,
+      rbi: 0,
+      avgRisp: ".000",
+      lobEnding: 1,
+      rispLobEnding: 0,
+      rispLobMid: 0,
+      totalRispLob: 0,
+    },
+    {
+      batterId: 814407,
+      batterName: "Alfredo Duno",
+      pa: 4,
+      paRisp: 2,
+      rbi: 0,
+      avgRisp: ".000",
+      lobEnding: 0,
+      rispLobEnding: 1,
+      rispLobMid: 1,
+      totalRispLob: 2,
+    },
+    {
+      batterId: 672580,
+      batterName: "Aldrem Corredor",
+      pa: 4,
+      paRisp: 1,
+      rbi: 0,
+      avgRisp: ".000",
+      lobEnding: 0,
+      rispLobEnding: 0,
+      rispLobMid: 0,
+      totalRispLob: 0,
+    },
+    {
+      batterId: 682900,
+      batterName: "Brainer Bonaci",
+      pa: 4,
+      paRisp: 1,
+      rbi: 0,
+      avgRisp: ".000",
+      lobEnding: 0,
+      rispLobEnding: 0,
+      rispLobMid: 0,
+      totalRispLob: 0,
+    },
+    {
+      batterId: 672820,
+      batterName: "Lenyn Sosa",
+      pa: 4,
+      paRisp: 2,
+      rbi: 0,
+      avgRisp: ".000",
+      lobEnding: 0,
+      rispLobEnding: 0,
+      rispLobMid: 0,
+      totalRispLob: 0,
+    },
+    {
+      batterId: 602074,
+      batterName: "Yonathan Daza",
+      pa: 3,
+      paRisp: 2,
+      rbi: 0,
+      avgRisp: ".500",
+      lobEnding: 0,
+      rispLobEnding: 0,
+      rispLobMid: 0,
+      totalRispLob: 0,
+    },
+  ],
+  bvpRecords: [
+    {
+      pitcherId: 692369,
+      pitcherName: "José Dávila",
+      opposingTeam: "Águilas del Zulia",
+      ...calculateSlashLine(13, 10, 1, 1, 0, 0, 2, 2, 0, 1, 0),
+    },
+    {
+      pitcherId: 683518,
+      pitcherName: "Giussepe Velásquez",
+      opposingTeam: "Águilas del Zulia",
+      ...calculateSlashLine(8, 7, 1, 0, 0, 0, 1, 2, 0, 0, 0),
+    },
+    {
+      pitcherId: 669065,
+      pitcherName: "Michael Gómez",
+      opposingTeam: "Águilas del Zulia",
+      ...calculateSlashLine(3, 3, 0, 0, 0, 0, 0, 1, 0, 0, 0),
+    },
+    {
+      pitcherId: 663673,
+      pitcherName: "Will Kincanon",
+      opposingTeam: "Águilas del Zulia",
+      ...calculateSlashLine(3, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0),
+    },
+    {
+      pitcherId: 592229,
+      pitcherName: "Dylan Covey",
+      opposingTeam: "Águilas del Zulia",
+      ...calculateSlashLine(3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    },
+    {
+      pitcherId: 683515,
+      pitcherName: "José G. González",
+      opposingTeam: "Águilas del Zulia",
+      ...calculateSlashLine(5, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0),
+    },
+  ],
+};
+
+// ── DATASET HISTÓRICO TEMPORADA 2024-2025 ──────────────────────────────
+export const LEONES_SITUATIONAL_2025: SituationalData = {
+  splits: [
     {
       situacion: "Total General",
       badge: "Baseline",
@@ -66,7 +291,7 @@ export function getLeonesSituationalData(): SituationalData {
     },
     {
       situacion: "Hombres en Base",
-      badge: "Trafico",
+      badge: "Tráfico",
       ...calculateSlashLine(972, 773, 247, 48, 6, 24, 150, 167, 277, 22, 27),
     },
     {
@@ -109,19 +334,15 @@ export function getLeonesSituationalData(): SituationalData {
       badge: "Definición",
       ...calculateSlashLine(728, 617, 179, 34, 5, 17, 85, 137, 105, 11, 15),
     },
-  ];
-
-  // Métricas agregadas de Dejados en Base (LOB)
-  const lobSummary: LobSummary = {
+  ],
+  lobSummary: {
     totalPa: 2182,
     totalLobEnding: 412,
     totalRispLobEnding: 242,
     totalRispLobMid: 188,
     totalRispLob: 430,
-  };
-
-  // Ranking individual de Dejados en Base (LOB Tracker)
-  const lobBatterRanking: BatterLobRecord[] = [
+  },
+  lobBatterRanking: [
     {
       batterId: 672580,
       batterName: "Aldrem Corredor",
@@ -206,10 +427,8 @@ export function getLeonesSituationalData(): SituationalData {
       rispLobMid: 4,
       totalRispLob: 10,
     },
-  ];
-
-  // Enfrentamientos cara a cara BvP representativos
-  const bvpRecords: BvpRecord[] = [
+  ],
+  bvpRecords: [
     {
       pitcherId: 666687,
       pitcherName: "Max Castillo",
@@ -246,12 +465,16 @@ export function getLeonesSituationalData(): SituationalData {
       opposingTeam: "Águilas del Zulia",
       ...calculateSlashLine(12, 11, 3, 1, 0, 0, 1, 4, 1),
     },
-  ];
+  ],
+};
 
-  return {
-    splits,
-    lobSummary,
-    lobBatterRanking,
-    bvpRecords,
-  };
+/**
+ * Obtiene los splits situacionales y desglose LOB calibrados para la temporada solicitada de Leones del Caracas.
+ * Por defecto retorna la temporada activa oficial (2026).
+ */
+export function getLeonesSituationalData(season: number = 2026): SituationalData {
+  if (season === 2025) {
+    return LEONES_SITUATIONAL_2025;
+  }
+  return LEONES_SITUATIONAL_2026;
 }
