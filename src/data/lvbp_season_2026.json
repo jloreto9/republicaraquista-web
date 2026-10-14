@@ -1,21 +1,21 @@
 {
   "season": 2026,
-  "updated_at": "2026-10-13T11:18:48.001143+00:00",
+  "updated_at": "2026-10-14T23:02:49.782799+00:00",
   "total_games": 226,
-  "finished_games": 1,
-  "total_batting_records": 21,
-  "total_pitching_records": 17,
-  "total_fielding_records": 39,
-  "total_bullpen_records": 5,
-  "total_lineup_records": 2,
+  "finished_games": 4,
+  "total_batting_records": 85,
+  "total_pitching_records": 61,
+  "total_fielding_records": 151,
+  "total_bullpen_records": 11,
+  "total_lineup_records": 8,
   "elo_ratings": {
-    "695": 1500,
-    "696": 1488.9960129349292,
-    "698": 1511.0039870650708,
-    "699": 1500,
+    "695": 1491.0039870650708,
+    "696": 1480.6222659471046,
+    "698": 1519.3777340528954,
+    "699": 1511.0039870650708,
     "693": 1500,
-    "692": 1500,
-    "694": 1500,
+    "692": 1508.9960129349292,
+    "694": 1488.9960129349292,
     "697": 1500
   },
   "elo_history": [
@@ -32,6 +32,48 @@
       "away_elo_before": 1500,
       "home_elo_after": 1489.0,
       "away_elo_after": 1511.0
+    },
+    {
+      "game_id": 870090,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "phase": "regular",
+      "home_team_id": 692,
+      "away_team_id": 695,
+      "home_score": 8,
+      "away_score": 0,
+      "home_elo_before": 1500,
+      "away_elo_before": 1500,
+      "home_elo_after": 1509.0,
+      "away_elo_after": 1491.0
+    },
+    {
+      "game_id": 870091,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "phase": "regular",
+      "home_team_id": 694,
+      "away_team_id": 699,
+      "home_score": 4,
+      "away_score": 8,
+      "home_elo_before": 1500,
+      "away_elo_before": 1500,
+      "home_elo_after": 1489.0,
+      "away_elo_after": 1511.0
+    },
+    {
+      "game_id": 870092,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "phase": "regular",
+      "home_team_id": 698,
+      "away_team_id": 696,
+      "home_score": 10,
+      "away_score": 6,
+      "home_elo_before": 1511.0,
+      "away_elo_before": 1489.0,
+      "home_elo_after": 1519.4,
+      "away_elo_after": 1480.6
     }
   ],
   "bullpen_records": [
@@ -99,6 +141,84 @@
       "inning": 8,
       "inherited_runners": 1,
       "inherited_scored": 0
+    },
+    {
+      "game_pk": 870090,
+      "game_id": 870090,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 692,
+      "opposing_team": "Leones del Caracas",
+      "pitcher_id": 683510,
+      "pitcher_name": "Henry Gomez",
+      "inning": 3,
+      "inherited_runners": 1,
+      "inherited_scored": 0
+    },
+    {
+      "game_pk": 870090,
+      "game_id": 870090,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 695,
+      "opposing_team": "Águilas del Zulia",
+      "pitcher_id": 689359,
+      "pitcher_name": "Dale Stanavich",
+      "inning": 6,
+      "inherited_runners": 2,
+      "inherited_scored": 2
+    },
+    {
+      "game_pk": 870090,
+      "game_id": 870090,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 695,
+      "opposing_team": "Águilas del Zulia",
+      "pitcher_id": 680588,
+      "pitcher_name": "Julio Rodriguez",
+      "inning": 6,
+      "inherited_runners": 2,
+      "inherited_scored": 0
+    },
+    {
+      "game_pk": 870091,
+      "game_id": 870091,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 694,
+      "opposing_team": "Tigres de Aragua",
+      "pitcher_id": 837096,
+      "pitcher_name": "Leonel Mendoza",
+      "inning": 3,
+      "inherited_runners": 1,
+      "inherited_scored": 0
+    },
+    {
+      "game_pk": 870091,
+      "game_id": 870091,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 699,
+      "opposing_team": "Caribes de Anzoátegui",
+      "pitcher_id": 660435,
+      "pitcher_name": "Chester Pimentel",
+      "inning": 4,
+      "inherited_runners": 1,
+      "inherited_scored": 0
+    },
+    {
+      "game_pk": 870092,
+      "game_id": 870092,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 696,
+      "opposing_team": "Tiburones de La Guaira",
+      "pitcher_id": 644403,
+      "pitcher_name": "Luis Martinez",
+      "inning": 1,
+      "inherited_runners": 3,
+      "inherited_scored": 3
     }
   ],
   "lineup_records": [
@@ -245,6 +365,444 @@
           "player_id": 691922,
           "player_name": "Javier Rivas",
           "position": "3B"
+        }
+      ]
+    },
+    {
+      "game_pk": 870090,
+      "game_id": 870090,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 692,
+      "opponent_id": 695,
+      "home_team": "Águilas del Zulia",
+      "away_team": "Leones del Caracas",
+      "opposing_team": "Leones del Caracas",
+      "is_home": true,
+      "leones_score": 8,
+      "opposing_score": 0,
+      "leones_won": true,
+      "score_str": "8-0",
+      "full_score_str": "ZUL 8 - 0 CAR",
+      "starters": [
+        {
+          "order": 1,
+          "player_id": 800276,
+          "player_name": "Juan Villavicencio",
+          "position": "SS"
+        },
+        {
+          "order": 2,
+          "player_id": 800406,
+          "player_name": "Aron Estrada",
+          "position": "2B"
+        },
+        {
+          "order": 3,
+          "player_id": 836353,
+          "player_name": "Francisco Renteria",
+          "position": "RF"
+        },
+        {
+          "order": 4,
+          "player_id": 683079,
+          "player_name": "Omar Martinez",
+          "position": "C"
+        },
+        {
+          "order": 5,
+          "player_id": 698935,
+          "player_name": "Yasmil Bucce",
+          "position": "DH"
+        },
+        {
+          "order": 6,
+          "player_id": 676896,
+          "player_name": "Chris Roller",
+          "position": "CF"
+        },
+        {
+          "order": 7,
+          "player_id": 692478,
+          "player_name": "Victor Arias",
+          "position": "LF"
+        },
+        {
+          "order": 8,
+          "player_id": 692348,
+          "player_name": "Aeverson Arteaga",
+          "position": "3B"
+        },
+        {
+          "order": 9,
+          "player_id": 691191,
+          "player_name": "Jose Salas",
+          "position": "1B"
+        }
+      ]
+    },
+    {
+      "game_pk": 870090,
+      "game_id": 870090,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 695,
+      "opponent_id": 692,
+      "home_team": "Águilas del Zulia",
+      "away_team": "Leones del Caracas",
+      "opposing_team": "Águilas del Zulia",
+      "is_home": false,
+      "leones_score": 0,
+      "opposing_score": 8,
+      "leones_won": false,
+      "score_str": "0-8",
+      "full_score_str": "CAR 0 - 8 ZUL",
+      "starters": [
+        {
+          "order": 1,
+          "player_id": 682900,
+          "player_name": "Brainer Bonaci",
+          "position": "SS"
+        },
+        {
+          "order": 2,
+          "player_id": 602074,
+          "player_name": "Yonathan Daza",
+          "position": "RF"
+        },
+        {
+          "order": 3,
+          "player_id": 602922,
+          "player_name": "José Rondon",
+          "position": "LF"
+        },
+        {
+          "order": 4,
+          "player_id": 660681,
+          "player_name": "Leandro Cedeño",
+          "position": "DH"
+        },
+        {
+          "order": 5,
+          "player_id": 625506,
+          "player_name": "Aldrem Corredor",
+          "position": "1B"
+        },
+        {
+          "order": 6,
+          "player_id": 806957,
+          "player_name": "Alfredo Duno",
+          "position": "C"
+        },
+        {
+          "order": 7,
+          "player_id": 672820,
+          "player_name": "Lenyn Sosa",
+          "position": "3B"
+        },
+        {
+          "order": 8,
+          "player_id": 541600,
+          "player_name": "Wilfredo Tovar",
+          "position": "2B"
+        },
+        {
+          "order": 9,
+          "player_id": 685744,
+          "player_name": "Kenedy Corona",
+          "position": "CF"
+        }
+      ]
+    },
+    {
+      "game_pk": 870091,
+      "game_id": 870091,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 694,
+      "opponent_id": 699,
+      "home_team": "Caribes de Anzoátegui",
+      "away_team": "Tigres de Aragua",
+      "opposing_team": "Tigres de Aragua",
+      "is_home": true,
+      "leones_score": 4,
+      "opposing_score": 8,
+      "leones_won": false,
+      "score_str": "4-8",
+      "full_score_str": "ORI 4 - 8 ARA",
+      "starters": [
+        {
+          "order": 1,
+          "player_id": 685332,
+          "player_name": "Carlos Mendoza",
+          "position": "2B"
+        },
+        {
+          "order": 2,
+          "player_id": 541650,
+          "player_name": "Hernán Pérez",
+          "position": "RF"
+        },
+        {
+          "order": 3,
+          "player_id": 607439,
+          "player_name": "Herlis Rodriguez",
+          "position": "CF"
+        },
+        {
+          "order": 4,
+          "player_id": 515768,
+          "player_name": "Balbino Fuenmayor",
+          "position": "DH"
+        },
+        {
+          "order": 5,
+          "player_id": 679628,
+          "player_name": "Jacob Teter",
+          "position": "1B"
+        },
+        {
+          "order": 6,
+          "player_id": 694224,
+          "player_name": "Gabriel Gonzalez",
+          "position": "LF"
+        },
+        {
+          "order": 7,
+          "player_id": 665987,
+          "player_name": "Leonel Valera",
+          "position": "3B"
+        },
+        {
+          "order": 8,
+          "player_id": 491696,
+          "player_name": "Jesús Sucre",
+          "position": "C"
+        },
+        {
+          "order": 9,
+          "player_id": 527045,
+          "player_name": "Gabriel Noriega",
+          "position": "SS"
+        }
+      ]
+    },
+    {
+      "game_pk": 870091,
+      "game_id": 870091,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 699,
+      "opponent_id": 694,
+      "home_team": "Caribes de Anzoátegui",
+      "away_team": "Tigres de Aragua",
+      "opposing_team": "Caribes de Anzoátegui",
+      "is_home": false,
+      "leones_score": 8,
+      "opposing_score": 4,
+      "leones_won": true,
+      "score_str": "8-4",
+      "full_score_str": "ARA 8 - 4 ORI",
+      "starters": [
+        {
+          "order": 1,
+          "player_id": 661411,
+          "player_name": "Lorenzo Cedrola",
+          "position": "RF"
+        },
+        {
+          "order": 2,
+          "player_id": 677601,
+          "player_name": "Keyber Rodriguez",
+          "position": "SS"
+        },
+        {
+          "order": 3,
+          "player_id": 491676,
+          "player_name": "Gorkys Hernández",
+          "position": "CF"
+        },
+        {
+          "order": 4,
+          "player_id": 594021,
+          "player_name": "Alberth Martinez",
+          "position": "DH"
+        },
+        {
+          "order": 5,
+          "player_id": 630034,
+          "player_name": "David Rodríguez",
+          "position": "1B"
+        },
+        {
+          "order": 6,
+          "player_id": 600951,
+          "player_name": "Leobaldo Piña",
+          "position": "3B"
+        },
+        {
+          "order": 7,
+          "player_id": 650339,
+          "player_name": "Jermaine Palacios",
+          "position": "2B"
+        },
+        {
+          "order": 8,
+          "player_id": 650907,
+          "player_name": "René Pinto",
+          "position": "C"
+        },
+        {
+          "order": 9,
+          "player_id": 660659,
+          "player_name": "Leobaldo Cabrera",
+          "position": "LF"
+        }
+      ]
+    },
+    {
+      "game_pk": 870092,
+      "game_id": 870092,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 698,
+      "opponent_id": 696,
+      "home_team": "Tiburones de La Guaira",
+      "away_team": "Navegantes del Magallanes",
+      "opposing_team": "Navegantes del Magallanes",
+      "is_home": true,
+      "leones_score": 10,
+      "opposing_score": 6,
+      "leones_won": true,
+      "score_str": "10-6",
+      "full_score_str": "LAG 10 - 6 MAG",
+      "starters": [
+        {
+          "order": 1,
+          "player_id": 620439,
+          "player_name": "Franklin Barreto",
+          "position": "CF"
+        },
+        {
+          "order": 2,
+          "player_id": 678489,
+          "player_name": "Jorge Barrosa",
+          "position": "LF"
+        },
+        {
+          "order": 3,
+          "player_id": 500208,
+          "player_name": "Yangervis Solarte",
+          "position": "1B"
+        },
+        {
+          "order": 4,
+          "player_id": 665914,
+          "player_name": "Daniel Montano",
+          "position": "DH"
+        },
+        {
+          "order": 5,
+          "player_id": 444876,
+          "player_name": "Alcides Escobar",
+          "position": "2B"
+        },
+        {
+          "order": 6,
+          "player_id": 665922,
+          "player_name": "Símon Muzziotti",
+          "position": "RF"
+        },
+        {
+          "order": 7,
+          "player_id": 578570,
+          "player_name": "Juniel Querecuto",
+          "position": "SS"
+        },
+        {
+          "order": 8,
+          "player_id": 665861,
+          "player_name": "Sebastián Rivero",
+          "position": "C"
+        },
+        {
+          "order": 9,
+          "player_id": 691922,
+          "player_name": "Javier Rivas",
+          "position": "3B"
+        }
+      ]
+    },
+    {
+      "game_pk": 870092,
+      "game_id": 870092,
+      "season": 2026,
+      "game_date": "2026-10-13",
+      "team_id": 696,
+      "opponent_id": 698,
+      "home_team": "Tiburones de La Guaira",
+      "away_team": "Navegantes del Magallanes",
+      "opposing_team": "Tiburones de La Guaira",
+      "is_home": false,
+      "leones_score": 6,
+      "opposing_score": 10,
+      "leones_won": false,
+      "score_str": "6-10",
+      "full_score_str": "MAG 6 - 10 LAG",
+      "starters": [
+        {
+          "order": 1,
+          "player_id": 591971,
+          "player_name": "Breyvic Valera",
+          "position": "3B"
+        },
+        {
+          "order": 2,
+          "player_id": 642731,
+          "player_name": "Thairo Estrada",
+          "position": "2B"
+        },
+        {
+          "order": 3,
+          "player_id": 672779,
+          "player_name": "Tucupita Marcano",
+          "position": "LF"
+        },
+        {
+          "order": 4,
+          "player_id": 600524,
+          "player_name": "Renato Núñez",
+          "position": "1B"
+        },
+        {
+          "order": 5,
+          "player_id": 596143,
+          "player_name": "Luis Sardinas",
+          "position": "DH"
+        },
+        {
+          "order": 6,
+          "player_id": 622580,
+          "player_name": "Angel Reyes",
+          "position": "RF"
+        },
+        {
+          "order": 7,
+          "player_id": 700164,
+          "player_name": "Bryant Betancourt",
+          "position": "C"
+        },
+        {
+          "order": 8,
+          "player_id": 692562,
+          "player_name": "Alexis Hernandez",
+          "position": "CF"
+        },
+        {
+          "order": 9,
+          "player_id": 694196,
+          "player_name": "Diego Velasquez",
+          "position": "SS"
         }
       ]
     }

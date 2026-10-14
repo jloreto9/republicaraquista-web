@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import { getTeam, LVBP_TEAMS } from "./constants";
 import {
   RelieverInheritedStat,
@@ -11,6 +9,21 @@ import {
   PlayerLineupImpact,
   BullpenAndLineupsData,
 } from "@/types/bullpen";
+
+import season2022 from "@/data/lvbp_season_2022.json";
+import season2023 from "@/data/lvbp_season_2023.json";
+import season2024 from "@/data/lvbp_season_2024.json";
+import season2025 from "@/data/lvbp_season_2025.json";
+import season2026 from "@/data/lvbp_season_2026.json";
+
+// Repositorio de snapshots empaquetados para disponibilidad garantizada en Vercel Serverless
+const SNAPSHOTS: Record<number, Record<string, unknown>> = {
+  2022: season2022 as Record<string, unknown>,
+  2023: season2023 as Record<string, unknown>,
+  2024: season2024 as Record<string, unknown>,
+  2025: season2025 as Record<string, unknown>,
+  2026: season2026 as Record<string, unknown>,
+};
 
 const LEONES_TEAM_ID = 695;
 
@@ -84,20 +97,17 @@ export function getBullpenAndLineups(
   };
 
   try {
-    const filePath = path.join(process.cwd(), "src", "data", `lvbp_season_${season}.json`);
-    if (!fs.existsSync(filePath)) {
-      console.warn(`Archivo de snapshot no encontrado: ${filePath}`);
+    const data = SNAPSHOTS[season];
+    if (!data) {
+      console.warn(`Snapshot no disponible para temporada ${season}`);
       return emptyResult;
     }
 
-    const raw = fs.readFileSync(filePath, "utf8");
-    const data = JSON.parse(raw);
-
-    const bpRecords: RawBullpenRecord[] = (data.bullpen_records || []).filter(
+    const bpRecords: RawBullpenRecord[] = ((data.bullpen_records as RawBullpenRecord[]) || []).filter(
       (b: RawBullpenRecord) => Number(b.team_id) === teamId
     );
 
-    const luRecords: RawLineupRecord[] = (data.lineup_records || []).filter(
+    const luRecords: RawLineupRecord[] = ((data.lineup_records as RawLineupRecord[]) || []).filter(
       (l: RawLineupRecord) => Number(l.team_id) === teamId
     );
 

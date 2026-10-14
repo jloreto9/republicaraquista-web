@@ -19,6 +19,7 @@ import {
   GameLineup,
 } from "@/types/bullpen";
 import { cn } from "@/lib/utils";
+import { LVBP_TEAMS, LVBP_TEAM_IDS } from "@/lib/constants";
 
 const POS_FULL_MAP: Record<string, string> = {
   "1B": "Primera Base",
@@ -37,8 +38,11 @@ interface BullpenViewProps {
   season?: number;
 }
 
-export function BullpenView({ initialData, season = 2025 }: BullpenViewProps) {
-  const [data] = useState<BullpenAndLineupsData>(initialData);
+export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
+  const [data, setData] = useState<BullpenAndLineupsData>(initialData);
+  const [currentSeason, setCurrentSeason] = useState<number>(season);
+  const [currentTeamId, setCurrentTeamId] = useState<number>(695);
+  const [loading, setLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"bullpen" | "lineups">("bullpen");
   const [lineupSubtab, setLineupSubtab] = useState<
     "card" | "frequent" | "heatmap" | "player"
@@ -56,59 +60,142 @@ export function BullpenView({ initialData, season = 2025 }: BullpenViewProps) {
     data.lineups.availablePlayers[0] || ""
   );
 
+  const handleSeasonOrTeamChange = async (
+    newSeason: number,
+    newTeamId: number
+  ) => {
+    setCurrentSeason(newSeason);
+    setCurrentTeamId(newTeamId);
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/bullpen?season=${newSeason}&teamId=${newTeamId}`
+      );
+      const json = await res.json();
+      if (json.success && json.data) {
+        setData(json.data);
+        setSelectedGameIndex(0);
+        setSelectedPlayerName(json.data.lineups.availablePlayers[0] || "");
+      }
+    } catch (err) {
+      console.error("Error fetching bullpen data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const selectedPlayerImpact = useMemo(() => {
+    const defaultPlayer = data.lineups.availablePlayers[0] || "";
+    const player =
+      selectedPlayerName && data.lineups.playerImpacts[selectedPlayerName]
+        ? selectedPlayerName
+        : defaultPlayer;
+
     return (
-      data.lineups.playerImpacts[selectedPlayerName] || {
-        playerName: selectedPlayerName,
+      data.lineups.playerImpacts[player] || {
+        playerName: player || "Sin datos",
         games: 0,
         record: "0G - 0P",
         pct: ".000",
         breakdown: [],
       }
     );
-  }, [data.lineups.playerImpacts, selectedPlayerName]);
+  }, [data.lineups.playerImpacts, data.lineups.availablePlayers, selectedPlayerName]);
+
+  const activeTeam = LVBP_TEAMS[currentTeamId] || {
+    id: currentTeamId,
+    name: "Equipo",
+    abbreviation: "LVBP",
+    logoUrl: "/assets/logo.png",
+  };
 
   return (
     <div className="space-y-6">
-      {/* ── Switcher Principal del Módulo ── */}
-      <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
-            <span>🦁 Leones del Caracas — Bullpen & Lineup Analytics</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/20 font-mono">
-              {season}
+      {/* ── Switcher Principal del Módulo & Controles ── */}
+      <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-lg flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
+              <span>{activeTeam.name} — Bullpen & Lineup Analytics</span>
+            </h2>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/20 font-mono font-bold">
+              {currentSeason}-{String(currentSeason + 1).slice(-2)}
             </span>
-          </h2>
+            {loading && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono animate-pulse">
+                Actualizando...
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-400">
-            Contención de corredores heredados y optimización de alineaciones 1 al 9.
+            Contención de corredores heredados (IR/IRS) y optimización de alineaciones 1 al 9.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D] self-start sm:self-auto">
-          <button
-            onClick={() => setActiveTab("bullpen")}
-            className={cn(
-              "flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all",
-              activeTab === "bullpen"
-                ? "bg-[#FDB827] text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
-            )}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span>Relevistas (IR/IRS)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("lineups")}
-            className={cn(
-              "flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all",
-              activeTab === "lineups"
-                ? "bg-[#FDB827] text-slate-950 shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
-            )}
-          >
-            <ClipboardList className="w-3.5 h-3.5" />
-            <span>Tracker Lineups 1-9</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Selector de Temporada */}
+          <div className="flex items-center gap-1.5 bg-[#070B19] px-2.5 py-1.5 rounded-lg border border-[#1E2B4D]">
+            <span className="text-[11px] text-slate-400 font-medium">Temporada:</span>
+            <select
+              value={currentSeason}
+              onChange={(e) =>
+                handleSeasonOrTeamChange(Number(e.target.value), currentTeamId)
+              }
+              className="bg-transparent text-slate-200 text-xs font-bold font-mono focus:outline-none cursor-pointer"
+            >
+              <option value={2026} className="bg-[#070B19]">2026-27 (En Curso)</option>
+              <option value={2025} className="bg-[#070B19]">2025-26</option>
+              <option value={2024} className="bg-[#070B19]">2024-25</option>
+              <option value={2023} className="bg-[#070B19]">2023-24</option>
+              <option value={2022} className="bg-[#070B19]">2022-23</option>
+            </select>
+          </div>
+
+          {/* Selector de Franquicia */}
+          <div className="flex items-center gap-1.5 bg-[#070B19] px-2.5 py-1.5 rounded-lg border border-[#1E2B4D]">
+            <span className="text-[11px] text-slate-400 font-medium">Equipo:</span>
+            <select
+              value={currentTeamId}
+              onChange={(e) =>
+                handleSeasonOrTeamChange(currentSeason, Number(e.target.value))
+              }
+              className="bg-transparent text-slate-200 text-xs font-bold focus:outline-none cursor-pointer"
+            >
+              {LVBP_TEAM_IDS.map((tId) => (
+                <option key={tId} value={tId} className="bg-[#070B19]">
+                  {LVBP_TEAMS[tId]?.name || `Equipo ${tId}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Switcher de Pestañas Bullpen vs Lineups */}
+          <div className="flex items-center space-x-1 bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D]">
+            <button
+              onClick={() => setActiveTab("bullpen")}
+              className={cn(
+                "flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all",
+                activeTab === "bullpen"
+                  ? "bg-[#FDB827] text-slate-950 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>Relevistas (IR/IRS)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("lineups")}
+              className={cn(
+                "flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all",
+                activeTab === "lineups"
+                  ? "bg-[#FDB827] text-slate-950 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>Tracker Lineups 1-9</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -167,128 +254,139 @@ export function BullpenView({ initialData, season = 2025 }: BullpenViewProps) {
           </div>
 
           {/* Gráfico y Tabla de Relevistas */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-            {/* Gráfico IR vs IRS */}
-            <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-5 shadow-lg space-y-4">
-              <div className="flex items-center space-x-2 border-b border-[#1E2B4D] pb-3">
-                <BarChart2 className="w-4 h-4 text-[#FDB827]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                  Comparativa: Heredados (IR) vs Anotaron (IRS)
-                </h3>
+          {data.bullpen.relievers.length === 0 ? (
+            <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-8 text-center space-y-2">
+              <div className="text-sm font-bold text-slate-300">
+                Sin registros de relevistas con corredores heredados
               </div>
+              <p className="text-xs text-slate-400">
+                No se registraron situaciones de corredores en base al ingreso de relevistas para este equipo en la temporada seleccionada.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+              {/* Gráfico IR vs IRS */}
+              <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex items-center space-x-2 border-b border-[#1E2B4D] pb-3">
+                  <BarChart2 className="w-4 h-4 text-[#FDB827]" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                    Comparativa: Heredados (IR) vs Anotaron (IRS)
+                  </h3>
+                </div>
 
-              <div className="space-y-3 pt-1">
-                {data.bullpen.relievers.slice(0, 10).map((r) => {
-                  const maxIr = Math.max(...data.bullpen.relievers.map((x) => x.ir), 1);
-                  const irWidth = Math.max(10, (r.ir / maxIr) * 100);
-                  const irsWidth = r.ir > 0 ? (r.irs / r.ir) * irWidth : 0;
+                <div className="space-y-3 pt-1">
+                  {data.bullpen.relievers.slice(0, 10).map((r) => {
+                    const maxIr = Math.max(...data.bullpen.relievers.map((x) => x.ir), 1);
+                    const irWidth = Math.max(10, (r.ir / maxIr) * 100);
+                    const irsWidth = r.ir > 0 ? (r.irs / r.ir) * irWidth : 0;
 
-                  return (
-                    <div key={r.pitcherName} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-slate-200">{r.pitcherName}</span>
-                        <div className="flex items-center space-x-2 font-mono text-[11px]">
-                          <span className="text-[#38BDF8]">{r.ir} IR</span>
-                          <span>/</span>
-                          <span className="text-rose-400">{r.irs} IRS</span>
-                          <span className="text-[#FDB827] font-bold">({r.irsPct})</span>
+                    return (
+                      <div key={r.pitcherName} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-200">{r.pitcherName}</span>
+                          <div className="flex items-center space-x-2 font-mono text-[11px]">
+                            <span className="text-[#38BDF8]">{r.ir} IR</span>
+                            <span>/</span>
+                            <span className="text-rose-400">{r.irs} IRS</span>
+                            <span className="text-[#FDB827] font-bold">({r.irsPct})</span>
+                          </div>
+                        </div>
+
+                        <div className="relative w-full bg-[#070B19] h-3 rounded-full overflow-hidden border border-white/5">
+                          {/* Barra Total IR */}
+                          <div
+                            className="absolute top-0 left-0 h-full bg-[#38BDF8]/60 rounded-full"
+                            style={{ width: `${irWidth}%` }}
+                          />
+                          {/* Barra IRS (anotados) */}
+                          <div
+                            className="absolute top-0 left-0 h-full bg-rose-500 rounded-full"
+                            style={{ width: `${irsWidth}%` }}
+                          />
                         </div>
                       </div>
-
-                      <div className="relative w-full bg-[#070B19] h-3 rounded-full overflow-hidden border border-white/5">
-                        {/* Barra Total IR */}
-                        <div
-                          className="absolute top-0 left-0 h-full bg-[#38BDF8]/60 rounded-full"
-                          style={{ width: `${irWidth}%` }}
-                        />
-                        {/* Barra IRS (anotados) */}
-                        <div
-                          className="absolute top-0 left-0 h-full bg-rose-500 rounded-full"
-                          style={{ width: `${irsWidth}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex items-center justify-end space-x-4 pt-2 text-[10px] font-mono text-slate-400">
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#38BDF8]" />
-                  <span>Corredores Heredados (IR)</span>
+                    );
+                  })}
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                  <span>Anotaron (IRS)</span>
+
+                <div className="flex items-center justify-end space-x-4 pt-2 text-[10px] font-mono text-slate-400">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#38BDF8]" />
+                    <span>Corredores Heredados (IR)</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                    <span>Anotaron (IRS)</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Tabla por Relevista */}
-            <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-5 shadow-lg space-y-4">
-              <div className="flex items-center space-x-2 border-b border-[#1E2B4D] pb-3">
-                <Shield className="w-4 h-4 text-[#FDB827]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                  Efectividad por Lanzador Relevista
-                </h3>
-              </div>
+              {/* Tabla por Relevista */}
+              <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex items-center space-x-2 border-b border-[#1E2B4D] pb-3">
+                  <Shield className="w-4 h-4 text-[#FDB827]" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                    Efectividad por Lanzador Relevista
+                  </h3>
+                </div>
 
-              <div className="max-h-[380px] overflow-y-auto pr-1">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-[#0D152B] z-10 border-b border-[#1E2B4D] text-slate-400 text-[11px]">
-                    <tr>
-                      <th className="py-2 px-3">Lanzador Relevista</th>
-                      <th className="py-2 px-2 text-center">Juegos</th>
-                      <th className="py-2 px-2 text-center text-[#38BDF8] font-bold">Total IR</th>
-                      <th className="py-2 px-2 text-center text-rose-400 font-bold">Total IRS</th>
-                      <th className="py-2 px-3 text-right text-[#FDB827] font-bold">% IRS</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {data.bullpen.relievers.map((r) => (
-                      <tr key={r.pitcherName} className="hover:bg-white/[0.02]">
-                        <td className="py-2.5 px-3 font-semibold text-slate-100 truncate">
-                          <Link
-                            href="/pitching"
-                            title={`Ver Pitching Summary de ${r.pitcherName}`}
-                            className="hover:underline hover:text-[#FDB827] inline-flex items-center gap-1 group"
-                          >
-                            <span>{r.pitcherName}</span>
-                            <span className="text-[10px] text-slate-400 opacity-50 group-hover:opacity-100 group-hover:text-[#FDB827]">
-                              ↗
-                            </span>
-                          </Link>
-                        </td>
-                        <td className="py-2.5 px-2 text-center text-slate-400">
-                          {r.appearances}
-                        </td>
-                        <td className="py-2.5 px-2 text-center font-bold text-[#38BDF8]">
-                          {r.ir}
-                        </td>
-                        <td className="py-2.5 px-2 text-center font-bold text-rose-400">
-                          {r.irs}
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <span
-                            className={cn(
-                              "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                              r.irsPctNum <= 20
-                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                                : r.irsPctNum > 20 && r.irsPctNum <= 40
-                                ? "bg-amber-500/10 text-[#FDB827] border-amber-500/30"
-                                : "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                            )}
-                          >
-                            {r.irsPct}
-                          </span>
-                        </td>
+                <div className="max-h-[380px] overflow-y-auto pr-1">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 bg-[#0D152B] z-10 border-b border-[#1E2B4D] text-slate-400 text-[11px]">
+                      <tr>
+                        <th className="py-2 px-3">Lanzador Relevista</th>
+                        <th className="py-2 px-2 text-center">Juegos</th>
+                        <th className="py-2 px-2 text-center text-[#38BDF8] font-bold">Total IR</th>
+                        <th className="py-2 px-2 text-center text-rose-400 font-bold">Total IRS</th>
+                        <th className="py-2 px-3 text-right text-[#FDB827] font-bold">% IRS</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {data.bullpen.relievers.map((r) => (
+                        <tr key={r.pitcherName} className="hover:bg-white/[0.02]">
+                          <td className="py-2.5 px-3 font-semibold text-slate-100 truncate">
+                            <Link
+                              href="/pitching"
+                              title={`Ver Pitching Summary de ${r.pitcherName}`}
+                              className="hover:underline hover:text-[#FDB827] inline-flex items-center gap-1 group"
+                            >
+                              <span>{r.pitcherName}</span>
+                              <span className="text-[10px] text-slate-400 opacity-50 group-hover:opacity-100 group-hover:text-[#FDB827]">
+                                ↗
+                              </span>
+                            </Link>
+                          </td>
+                          <td className="py-2.5 px-2 text-center text-slate-400">
+                            {r.appearances}
+                          </td>
+                          <td className="py-2.5 px-2 text-center font-bold text-[#38BDF8]">
+                            {r.ir}
+                          </td>
+                          <td className="py-2.5 px-2 text-center font-bold text-rose-400">
+                            {r.irs}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <span
+                              className={cn(
+                                "text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                                r.irsPctNum <= 20
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  : r.irsPctNum > 20 && r.irsPctNum <= 40
+                                  ? "bg-amber-500/10 text-[#FDB827] border-amber-500/30"
+                                  : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                              )}
+                            >
+                              {r.irsPct}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Registro Detallado de Entradas con Corredores en Base */}
           <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-5 shadow-lg space-y-3">
@@ -301,46 +399,52 @@ export function BullpenView({ initialData, season = 2025 }: BullpenViewProps) {
               </span>
             </div>
 
-            <div className="overflow-x-auto max-h-[340px]">
-              <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 bg-[#0D152B] z-10 border-b border-[#1E2B4D] text-slate-400 text-[11px]">
-                  <tr>
-                    <th className="py-2 px-3">Fecha</th>
-                    <th className="py-2 px-3">Rival</th>
-                    <th className="py-2 px-2 text-center">Inning</th>
-                    <th className="py-2 px-3">Lanzador</th>
-                    <th className="py-2 px-2 text-center text-[#38BDF8] font-bold">Heredados (IR)</th>
-                    <th className="py-2 px-2 text-center text-rose-400 font-bold">Anotaron (IRS)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {data.bullpen.logs.map((log, idx) => (
-                    <tr key={`log-${idx}`} className="hover:bg-white/[0.02]">
-                      <td className="py-2 px-3 text-slate-400 font-mono text-[11px]">
-                        {log.gameDate}
-                      </td>
-                      <td className="py-2 px-3 font-semibold text-slate-200">
-                        {log.opp}
-                      </td>
-                      <td className="py-2 px-2 text-center">
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[#FDB827] text-[10px] font-bold">
-                          Inn {log.inning}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 font-medium text-slate-100">
-                        {log.pitcher}
-                      </td>
-                      <td className="py-2 px-2 text-center font-bold text-[#38BDF8]">
-                        {log.ir}
-                      </td>
-                      <td className="py-2 px-2 text-center font-bold text-rose-400">
-                        {log.irs}
-                      </td>
+            {data.bullpen.logs.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400">
+                No hay relevos con corredores heredados registrados en la bitácora para este equipo en la temporada seleccionada.
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-[340px]">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-[#0D152B] z-10 border-b border-[#1E2B4D] text-slate-400 text-[11px]">
+                    <tr>
+                      <th className="py-2 px-3">Fecha</th>
+                      <th className="py-2 px-3">Rival</th>
+                      <th className="py-2 px-2 text-center">Inning</th>
+                      <th className="py-2 px-3">Lanzador</th>
+                      <th className="py-2 px-2 text-center text-[#38BDF8] font-bold">Heredados (IR)</th>
+                      <th className="py-2 px-2 text-center text-rose-400 font-bold">Anotaron (IRS)</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {data.bullpen.logs.map((log, idx) => (
+                      <tr key={`log-${idx}`} className="hover:bg-white/[0.02]">
+                        <td className="py-2 px-3 text-slate-400 font-mono text-[11px]">
+                          {log.gameDate}
+                        </td>
+                        <td className="py-2 px-3 font-semibold text-slate-200">
+                          {log.opp}
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[#FDB827] text-[10px] font-bold">
+                            Inn {log.inning}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 font-medium text-slate-100">
+                          {log.pitcher}
+                        </td>
+                        <td className="py-2 px-2 text-center font-bold text-[#38BDF8]">
+                          {log.ir}
+                        </td>
+                        <td className="py-2 px-2 text-center font-bold text-rose-400">
+                          {log.irs}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -450,109 +554,126 @@ export function BullpenView({ initialData, season = 2025 }: BullpenViewProps) {
           {/* Subtab 1: Dugout Scorecard */}
           {lineupSubtab === "card" && (
             <div className="space-y-4">
-              {/* Selector de Partido */}
-              <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="w-4 h-4 text-[#FDB827]" />
-                  <span className="text-xs font-bold text-slate-200">
-                    Seleccionar Encuentro:
-                  </span>
+              {data.lineups.gameLineups.length === 0 ? (
+                <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-8 text-center space-y-2">
+                  <div className="text-sm font-bold text-slate-300">
+                    Sin tarjetas de juego disponibles
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    No se encontraron alineaciones titulares registradas para {activeTeam.name} en la temporada {currentSeason}-{String(currentSeason + 1).slice(-2)}.
+                  </p>
                 </div>
-                <select
-                  value={selectedGameIndex}
-                  onChange={(e) => setSelectedGameIndex(Number(e.target.value))}
-                  className="bg-[#070B19] border border-[#1E2B4D] text-xs text-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-[#FDB827] w-full sm:w-auto cursor-pointer"
-                >
-                  {data.lineups.gameLineups.map((g, idx) => (
-                    <option key={g.gamePk} value={idx}>
-                      {g.gameDate} vs {g.opp} ({g.scoreStr}) — {g.won ? "G" : "P"}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedGame && (
+              ) : (
                 <>
-                  {/* Banner de Partido */}
-                  <div className="bg-[#070B19] border border-[#1E2B4D] rounded-xl p-4 shadow-md flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="relative w-11 h-11 rounded-lg overflow-hidden border border-[#FDB827]/40 bg-[#0D152B] p-1 flex items-center justify-center shrink-0">
-                        <Image
-                          src="/assets/logo.png"
-                          alt="Leones del Caracas"
-                          width={40}
-                          height={40}
-                          className="object-contain"
-                        />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
-                          <span>🦁 Leones del Caracas</span>
-                          <span className="text-xs text-slate-400 font-normal">
-                            vs {selectedGame.opp}
-                          </span>
-                        </h4>
-                        <div className="text-xs text-slate-400 font-mono">
-                          📅 {selectedGame.gameDate} • Marcador: {selectedGame.scoreStr}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3">
-                      <span
-                        className={cn(
-                          "text-xs font-black px-3 py-1 rounded-md border",
-                          selectedGame.won
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                            : "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                        )}
-                      >
-                        {selectedGame.won ? "VICTORIA" : "DERROTA"}
+                  {/* Selector de Partido */}
+                  <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-[#FDB827]" />
+                      <span className="text-xs font-bold text-slate-200">
+                        Seleccionar Encuentro:
                       </span>
-                      {selectedGame.oppLogo && (
-                        <div className="relative w-8 h-8 shrink-0">
-                          <Image
-                            src={selectedGame.oppLogo}
-                            alt={selectedGame.opp}
-                            width={32}
-                            height={32}
-                            className="object-contain"
-                          />
-                        </div>
-                      )}
                     </div>
+                    <select
+                      value={selectedGameIndex}
+                      onChange={(e) => setSelectedGameIndex(Number(e.target.value))}
+                      className="bg-[#070B19] border border-[#1E2B4D] text-xs text-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-[#FDB827] w-full sm:w-auto cursor-pointer"
+                    >
+                      {data.lineups.gameLineups.map((g, idx) => (
+                        <option key={`${g.gamePk}-${idx}`} value={idx}>
+                          {g.gameDate} vs {g.opp} ({g.scoreStr}) — {g.won ? "G" : "P"}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  {/* Grilla 3x3 de Titulares (1 al 9) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {selectedGame.starters.map((st) => (
-                      <div
-                        key={`starter-${st.order}`}
-                        className="bg-[#0D152B] border border-white/5 rounded-lg p-3 flex items-center justify-between shadow-sm"
-                      >
+                  {selectedGame && (
+                    <>
+                      {/* Banner de Partido */}
+                      <div className="bg-[#070B19] border border-[#1E2B4D] rounded-xl p-4 shadow-md flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                          <div
-                            className="w-7 h-7 rounded-md flex items-center justify-center font-black text-xs text-white"
-                            style={{ backgroundColor: st.badgeColor }}
-                          >
-                            #{st.order}
+                          <div className="relative w-11 h-11 rounded-lg overflow-hidden border border-[#FDB827]/40 bg-[#0D152B] p-1 flex items-center justify-center shrink-0">
+                            <Image
+                              src={
+                                currentTeamId === 695
+                                  ? "/assets/logo.png"
+                                  : activeTeam.logoUrl || "/assets/logo.png"
+                              }
+                              alt={activeTeam.name}
+                              width={40}
+                              height={40}
+                              className="object-contain"
+                            />
                           </div>
                           <div>
-                            <div className="text-xs font-bold text-slate-100">
-                              {st.playerName}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              {POS_FULL_MAP[st.position] || st.position}
+                            <h4 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
+                              <span>{activeTeam.name}</span>
+                              <span className="text-xs text-slate-400 font-normal">
+                                vs {selectedGame.opp}
+                              </span>
+                            </h4>
+                            <div className="text-xs text-slate-400 font-mono">
+                              📅 {selectedGame.gameDate} • Marcador: {selectedGame.scoreStr}
                             </div>
                           </div>
                         </div>
 
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-[#FDB827] border border-white/10">
-                          {st.position}
-                        </span>
+                        <div className="flex items-center space-x-3">
+                          <span
+                            className={cn(
+                              "text-xs font-black px-3 py-1 rounded-md border",
+                              selectedGame.won
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                            )}
+                          >
+                            {selectedGame.won ? "VICTORIA" : "DERROTA"}
+                          </span>
+                          {selectedGame.oppLogo && (
+                            <div className="relative w-8 h-8 shrink-0">
+                              <Image
+                                src={selectedGame.oppLogo}
+                                alt={selectedGame.opp}
+                                width={32}
+                                height={32}
+                                className="object-contain"
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Grilla 3x3 de Titulares (1 al 9) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {selectedGame.starters.map((st) => (
+                          <div
+                            key={`starter-${st.order}`}
+                            className="bg-[#0D152B] border border-white/5 rounded-lg p-3 flex items-center justify-between shadow-sm"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div
+                                className="w-7 h-7 rounded-md flex items-center justify-center font-black text-xs text-white"
+                                style={{ backgroundColor: st.badgeColor }}
+                              >
+                                #{st.order}
+                              </div>
+                              <div>
+                                <div className="text-xs font-bold text-slate-100">
+                                  {st.playerName}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-mono">
+                                  {POS_FULL_MAP[st.position] || st.position}
+                                </div>
+                              </div>
+                            </div>
+
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 text-[#FDB827] border border-white/10">
+                              {st.position}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -565,62 +686,73 @@ export function BullpenView({ initialData, season = 2025 }: BullpenViewProps) {
                 Combinaciones de Orden al Bate Más Utilizadas
               </div>
 
-              <div className="space-y-4">
-                {data.lineups.topFrequentLineups.map((lu) => (
-                  <div
-                    key={`top-lu-${lu.rank}`}
-                    className="bg-[#0D152B] border border-[#FDB827]/20 rounded-xl p-4 shadow-md space-y-3"
-                  >
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
-                      <div className="flex items-center space-x-2">
-                        <span className="px-2 py-0.5 rounded bg-[#FDB827] text-slate-950 font-black text-xs">
-                          Top {lu.rank}
-                        </span>
-                        <span className="text-xs font-bold text-slate-200">
-                          {lu.games} Juegos Disputados
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                          {lu.record}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-[#FDB827]">
-                          {lu.pct} PCT
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                      {lu.starters.map((st) => (
-                        <div
-                          key={`lu-st-${st.order}`}
-                          className="bg-[#070B19] rounded-lg p-2 flex items-center space-x-2 border border-white/5 text-xs"
-                        >
-                          <span
-                            className="w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] text-white shrink-0"
-                            style={{ backgroundColor: st.badgeColor }}
-                          >
-                            {st.order}
+              {data.lineups.topFrequentLineups.length === 0 ? (
+                <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-8 text-center space-y-2">
+                  <div className="text-sm font-bold text-slate-300">
+                    Sin combinaciones frecuentes registradas
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    No se han registrado combinaciones repetidas de 9 titulares para {activeTeam.name} en esta temporada.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {data.lineups.topFrequentLineups.map((lu) => (
+                    <div
+                      key={`top-lu-${lu.rank}`}
+                      className="bg-[#0D152B] border border-[#FDB827]/20 rounded-xl p-4 shadow-md space-y-3"
+                    >
+                      <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-0.5 rounded bg-[#FDB827] text-slate-950 font-black text-xs">
+                            Top {lu.rank}
                           </span>
-                          <span className="font-semibold text-slate-100 truncate flex-1">
-                            {st.playerName}
-                          </span>
-                          <span className="text-[10px] text-[#FDB827] font-mono">
-                            {st.position}
+                          <span className="text-xs font-bold text-slate-200">
+                            {lu.games} {lu.games === 1 ? "Juego Disputado" : "Juegos Disputados"}
                           </span>
                         </div>
-                      ))}
-                    </div>
-
-                    {lu.gamesDetail && (
-                      <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex items-center space-x-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        <span className="truncate">{lu.gamesDetail}</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                            {lu.record}
+                          </span>
+                          <span className="text-xs font-mono font-bold text-[#FDB827]">
+                            {lu.pct} PCT
+                          </span>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                        {lu.starters.map((st) => (
+                          <div
+                            key={`lu-st-${st.order}`}
+                            className="bg-[#070B19] rounded-lg p-2 flex items-center space-x-2 border border-white/5 text-xs"
+                          >
+                            <span
+                              className="w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] text-white shrink-0"
+                              style={{ backgroundColor: st.badgeColor }}
+                            >
+                              {st.order}
+                            </span>
+                            <span className="font-semibold text-slate-100 truncate flex-1">
+                              {st.playerName}
+                            </span>
+                            <span className="text-[10px] text-[#FDB827] font-mono">
+                              {st.position}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {lu.gamesDetail && (
+                        <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex items-center space-x-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          <span className="truncate">{lu.gamesDetail}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -635,35 +767,45 @@ export function BullpenView({ initialData, season = 2025 }: BullpenViewProps) {
                   </h3>
                 </div>
                 <span className="text-[10px] text-slate-400 font-mono">
-                  Top 15 Titulares
+                  {data.lineups.heatmap.length} Titulares Registrados
                 </span>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-center text-xs">
-                  <thead>
-                    <tr className="border-b border-[#1E2B4D] text-slate-400 text-[11px]">
-                      <th className="py-2.5 px-3 text-left">Pelotero</th>
-                      <th className="py-2.5 px-2">1º</th>
-                      <th className="py-2.5 px-2">2º</th>
-                      <th className="py-2.5 px-2">3º</th>
-                      <th className="py-2.5 px-2 text-[#FDB827] font-bold">4º</th>
-                      <th className="py-2.5 px-2">5º</th>
-                      <th className="py-2.5 px-2">6º</th>
-                      <th className="py-2.5 px-2">7º</th>
-                      <th className="py-2.5 px-2">8º</th>
-                      <th className="py-2.5 px-2">9º</th>
-                      <th className="py-2.5 px-3 text-right font-bold text-slate-200">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {data.lineups.heatmap.map((row) => (
-                      <tr key={row.player} className="hover:bg-white/[0.02]">
-                        <td className="py-2.5 px-3 text-left font-semibold text-slate-100 truncate">
-                          {row.player}
-                        </td>
-                        {row.counts.map((cnt, slotIdx) => (
-                          <td key={`slot-${slotIdx}`} className="py-2.5 px-2 font-mono">
+              {data.lineups.heatmap.length === 0 ? (
+                <div className="p-8 text-center space-y-2">
+                  <div className="text-sm font-bold text-slate-300">
+                    Sin datos para matriz de calor
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    No hay registros de titulares para generar la matriz en esta temporada.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-center text-xs">
+                    <thead>
+                      <tr className="border-b border-[#1E2B4D] text-slate-400 text-[11px]">
+                        <th className="py-2.5 px-3 text-left">Pelotero</th>
+                        <th className="py-2.5 px-2">1º</th>
+                        <th className="py-2.5 px-2">2º</th>
+                        <th className="py-2.5 px-2">3º</th>
+                        <th className="py-2.5 px-2 text-[#FDB827] font-bold">4º</th>
+                        <th className="py-2.5 px-2">5º</th>
+                        <th className="py-2.5 px-2">6º</th>
+                        <th className="py-2.5 px-2">7º</th>
+                        <th className="py-2.5 px-2">8º</th>
+                        <th className="py-2.5 px-2">9º</th>
+                        <th className="py-2.5 px-3 text-right font-bold text-slate-200">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {data.lineups.heatmap.map((row) => (
+                        <tr key={row.player} className="hover:bg-white/[0.02]">
+                          <td className="py-2.5 px-3 text-left font-semibold text-slate-100 truncate">
+                            {row.player}
+                          </td>
+                          {row.counts.map((cnt, slotIdx) => (
+                            <td key={`slot-${slotIdx}`} className="py-2.5 px-2 font-mono">
                               {cnt > 0 ? (
                                 <span
                                   className={cn(
@@ -682,114 +824,128 @@ export function BullpenView({ initialData, season = 2025 }: BullpenViewProps) {
                               )}
                             </td>
                           ))}
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-[#FDB827]">
-                          {row.total}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Subtab 4: Impacto por Jugador */}
-          {lineupSubtab === "player" && (
-            <div className="space-y-4">
-              {/* Selector de Jugador */}
-              <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center space-x-2">
-                  <User className="w-4 h-4 text-[#FDB827]" />
-                  <span className="text-xs font-bold text-slate-200">
-                    Seleccionar Pelotero Titular:
-                  </span>
-                </div>
-                <select
-                  value={selectedPlayerName}
-                  onChange={(e) => setSelectedPlayerName(e.target.value)}
-                  className="bg-[#070B19] border border-[#1E2B4D] text-xs text-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-[#FDB827] w-full sm:w-auto cursor-pointer"
-                >
-                  {data.lineups.availablePlayers.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* KPIs de Impacto */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    JUEGOS COMO TITULAR
-                  </span>
-                  <div className="text-2xl font-black text-slate-100 font-mono">
-                    {selectedPlayerImpact.games} JJ
-                  </div>
-                </div>
-
-                <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    RÉCORD DEL EQUIPO
-                  </span>
-                  <div className="text-2xl font-black text-[#FDB827] font-mono">
-                    {selectedPlayerImpact.record}
-                  </div>
-                </div>
-
-                <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    % DE VICTORIAS
-                  </span>
-                  <div className="text-2xl font-black text-emerald-400 font-mono">
-                    {selectedPlayerImpact.pct}
-                  </div>
-                </div>
-              </div>
-
-              {/* Tabla de Desglose por Turno al Bate */}
-              <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-5 shadow-lg space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                  Rendimiento y Récord por Turno al Bate de {selectedPlayerImpact.playerName}
-                </h4>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-[#1E2B4D] text-slate-400 text-[11px]">
-                        <th className="py-2.5 px-3">Turno al Bate</th>
-                        <th className="py-2.5 px-3 text-center">Titularidades</th>
-                        <th className="py-2.5 px-3 text-center text-emerald-400 font-bold">Victorias</th>
-                        <th className="py-2.5 px-3 text-center text-rose-400 font-bold">Derrotas</th>
-                        <th className="py-2.5 px-3 text-right text-[#FDB827] font-bold">% Victorias</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {selectedPlayerImpact.breakdown.map((row) => (
-                        <tr key={row.slot} className="hover:bg-white/[0.02]">
-                          <td className="py-2.5 px-3 font-semibold text-slate-100">
-                            {row.slot}
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-mono text-slate-300">
-                            {row.starts}
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-400">
-                            {row.wins}
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-mono font-bold text-rose-400">
-                            {row.losses}
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <span className="px-2 py-0.5 rounded bg-amber-500/10 text-[#FDB827] font-mono font-bold border border-amber-500/20">
-                              {row.pct}
-                            </span>
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-[#FDB827]">
+                            {row.total}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
+              )}
+            </div>
+          )}
+
+          {/* Subtab 4: Impacto por Jugador */}
+          {lineupSubtab === "player" && (
+            <div className="space-y-4">
+              {data.lineups.availablePlayers.length === 0 ? (
+                <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-8 text-center space-y-2">
+                  <div className="text-sm font-bold text-slate-300">
+                    Sin jugadores titulares registrados
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    No hay alineaciones titulares registradas para {activeTeam.name} en esta temporada.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Selector de Jugador */}
+                  <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center space-x-2">
+                      <User className="w-4 h-4 text-[#FDB827]" />
+                      <span className="text-xs font-bold text-slate-200">
+                        Seleccionar Pelotero Titular:
+                      </span>
+                    </div>
+                    <select
+                      value={selectedPlayerName}
+                      onChange={(e) => setSelectedPlayerName(e.target.value)}
+                      className="bg-[#070B19] border border-[#1E2B4D] text-xs text-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-[#FDB827] w-full sm:w-auto cursor-pointer"
+                    >
+                      {data.lineups.availablePlayers.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* KPIs de Impacto */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        JUEGOS COMO TITULAR
+                      </span>
+                      <div className="text-2xl font-black text-slate-100 font-mono">
+                        {selectedPlayerImpact.games} JJ
+                      </div>
+                    </div>
+
+                    <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        RÉCORD DEL EQUIPO
+                      </span>
+                      <div className="text-2xl font-black text-[#FDB827] font-mono">
+                        {selectedPlayerImpact.record}
+                      </div>
+                    </div>
+
+                    <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        % DE VICTORIAS
+                      </span>
+                      <div className="text-2xl font-black text-emerald-400 font-mono">
+                        {selectedPlayerImpact.pct}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabla de Desglose por Turno al Bate */}
+                  <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-5 shadow-lg space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                      Rendimiento y Récord por Turno al Bate de {selectedPlayerImpact.playerName}
+                    </h4>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-[#1E2B4D] text-slate-400 text-[11px]">
+                            <th className="py-2.5 px-3">Turno al Bate</th>
+                            <th className="py-2.5 px-3 text-center">Titularidades</th>
+                            <th className="py-2.5 px-3 text-center text-emerald-400 font-bold">Victorias</th>
+                            <th className="py-2.5 px-3 text-center text-rose-400 font-bold">Derrotas</th>
+                            <th className="py-2.5 px-3 text-right text-[#FDB827] font-bold">% Victorias</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {selectedPlayerImpact.breakdown.map((row) => (
+                            <tr key={row.slot} className="hover:bg-white/[0.02]">
+                              <td className="py-2.5 px-3 font-semibold text-slate-100">
+                                {row.slot}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-mono text-slate-300">
+                                {row.starts}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-400">
+                                {row.wins}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-mono font-bold text-rose-400">
+                                {row.losses}
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <span className="px-2 py-0.5 rounded bg-amber-500/10 text-[#FDB827] font-mono font-bold border border-amber-500/20">
+                                  {row.pct}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
