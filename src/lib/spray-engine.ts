@@ -8,7 +8,15 @@ import {
   TRAJECTORY_COLORS,
   HARDNESS_COLORS,
 } from "@/types/spray";
-import sprayDataRaw from "@/data/lvbp_spray_2025.json";
+import sprayDataRaw2025 from "@/data/lvbp_spray_2025.json";
+import sprayDataRaw2026 from "@/data/lvbp_spray_2026.json";
+
+export function getSprayDataForSeason(season: number = 2026) {
+  if (season === 2025) {
+    return sprayDataRaw2025;
+  }
+  return sprayDataRaw2026;
+}
 
 export { EVENT_COLORS, TRAJECTORY_COLORS, HARDNESS_COLORS };
 
@@ -126,10 +134,11 @@ export function convertPitchCoordinates(
 }
 
 /**
- * Obtiene los batazos reales de la temporada 2025 para el jugador indicado o para toda la ofensiva (id: 0).
+ * Obtiene los batazos reales de la temporada indicada (2026 por defecto) para el jugador indicado o para toda la ofensiva (id: 0).
  */
-export function getPlayerBattedBalls(playerId: number): BattedBall[] {
-  const allBalls = (sprayDataRaw.battedBalls || []) as BattedBall[];
+export function getPlayerBattedBalls(playerId: number, season: number = 2026): BattedBall[] {
+  const sprayData = getSprayDataForSeason(season);
+  const allBalls = (sprayData.battedBalls || []) as BattedBall[];
   if (!playerId || playerId === 0) {
     return allBalls;
   }
@@ -194,13 +203,14 @@ export function computeSprayStats(balls: BattedBall[]): SprayStats {
 }
 
 /**
- * Obtiene lanzamientos reales y métricas de disciplina en zona de strike para el bateador.
+ * Obtiene lanzamientos reales y métricas de disciplina en zona de strike para el bateador en la temporada solicitada (2026 por defecto).
  */
-export function getPlayerStrikeZoneData(playerId: number): {
+export function getPlayerStrikeZoneData(playerId: number, season: number = 2026): {
   pitches: PitchEvent[];
   metrics: StrikeZoneMetrics;
 } {
-  const pitchesMap = sprayDataRaw.pitchesByBatter as Record<string, PitchEvent[]>;
+  const sprayData = getSprayDataForSeason(season);
+  const pitchesMap = (sprayData.pitchesByBatter || {}) as Record<string, PitchEvent[]>;
   let playerPitches: PitchEvent[] = [];
 
   if (!playerId || playerId === 0) {
@@ -282,6 +292,11 @@ export function getPlayerStrikeZoneData(playerId: number): {
   return { pitches: playerPitches.slice(0, 250), metrics };
 }
 
+export function getLeonesSprayPlayers(season: number = 2026): SprayPlayerOption[] {
+  const sprayData = getSprayDataForSeason(season);
+  return (sprayData.players as SprayPlayerOption[]) || [];
+}
+
 export const LEONES_SPRAY_PLAYERS: SprayPlayerOption[] =
-  (sprayDataRaw.players as SprayPlayerOption[]) || [];
+  (sprayDataRaw2026.players as SprayPlayerOption[]) || [];
 

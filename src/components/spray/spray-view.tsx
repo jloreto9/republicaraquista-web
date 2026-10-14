@@ -6,6 +6,7 @@ import { BaseballDiamond } from "./baseball-diamond";
 import { StrikeZoneHeatmap } from "./strike-zone-heatmap";
 import { LEONES_SPRAY_PLAYERS } from "@/lib/spray-engine";
 import { Target, ChevronDown, ShieldCheck, Flame, Compass, Activity } from "lucide-react";
+import { useSeason } from "@/context/season-context";
 
 interface SprayViewProps {
   initialPlayerId: number;
@@ -14,6 +15,7 @@ interface SprayViewProps {
   initialPitches: PitchEvent[];
   initialMetrics: StrikeZoneMetrics;
   players?: SprayPlayerOption[];
+  season?: number;
 }
 
 export function SprayView({
@@ -23,7 +25,10 @@ export function SprayView({
   initialPitches,
   initialMetrics,
   players = LEONES_SPRAY_PLAYERS,
+  season = 2026,
 }: SprayViewProps) {
+  const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
+  const [currentSeason, setCurrentSeason] = useState<number>(globalSeason || season);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number>(initialPlayerId);
   const [playerList, setPlayerList] = useState<SprayPlayerOption[]>(players);
   const [battedBalls, setBattedBalls] = useState<BattedBall[]>(initialBalls);
@@ -34,8 +39,76 @@ export function SprayView({
   const [activeTab, setActiveTab] = useState<"diamond" | "zone">("diamond");
   const [loading, setLoading] = useState(false);
 
+  // Conmutador de temporada con sincronización global
+  const handleSeasonChange = async (newSeason: number) => {
+    setCurrentSeason(newSeason);
+    setGlobalSeason(newSeason);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/spray?season=${newSeason}`);
+      if (res.ok) {
+        const data = await res.json();
+        const newPlayers: SprayPlayerOption[] = data.players || [];
+        setPlayerList(newPlayers);
+
+        // Mantener mismo bateador si existe en la nueva temporada, o seleccionar el primero
+        const exists = newPlayers.some((p) => p.id === selectedPlayerId);
+        const nextPlayerId = exists ? selectedPlayerId : (newPlayers[0]?.id || 0);
+        setSelectedPlayerId(nextPlayerId);
+
+        if (nextPlayerId) {
+          const pRes = await fetch(`/api/spray?player_id=${nextPlayerId}&season=${newSeason}`);
+          if (pRes.ok) {
+            const pData = await pRes.json();
+            setBattedBalls(pData.battedBalls || []);
+            setSprayStats(pData.sprayStats || {
+              totalBatted: 0,
+              totalHits: 0,
+              babip: ".000",
+              hardPct: "0.0%",
+              mediumPct: "0.0%",
+              softPct: "0.0%",
+              pullPct: "0.0%",
+              centerPct: "0.0%",
+              oppoPct: "0.0%",
+              gbPct: "0.0%",
+              ldPct: "0.0%",
+              fbPct: "0.0%",
+              puPct: "0.0%",
+            });
+            setPitches(pData.pitches || []);
+            setStrikeMetrics(pData.strikeZoneMetrics || {
+              totalPitches: 0,
+              zonePct: "0.0%",
+              oSwingPct: "0.0%",
+              zSwingPct: "0.0%",
+              zContactPct: "0.0%",
+              oContactPct: "0.0%",
+              whiffPct: "0.0%",
+              cswPct: "0.0%",
+              swStrPct: "0.0%",
+              zoneCounts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 },
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error al actualizar temporada en Spray Charts:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sincronizar si cambia temporada global
   useEffect(() => {
-    if (selectedPlayerId === initialPlayerId) {
+    if (globalSeason && globalSeason !== currentSeason) {
+      handleSeasonChange(globalSeason);
+    }
+  }, [globalSeason]);
+
+  // Carga reactiva de jugador cuando cambia de jugador o temporada
+  useEffect(() => {
+    if (selectedPlayerId === initialPlayerId && currentSeason === season) {
       if (initialBalls && battedBalls !== initialBalls) {
         setBattedBalls(initialBalls);
         setSprayStats(initialStats);
@@ -49,7 +122,7 @@ export function SprayView({
     async function loadPlayerData() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/spray?player_id=${selectedPlayerId}`);
+        const res = await fetch(`/api/spray?player_id=${selectedPlayerId}&season=${currentSeason}`);
         if (res.ok && isMounted) {
           const data = await res.json();
           setBattedBalls(data.battedBalls || []);
@@ -69,35 +142,68 @@ export function SprayView({
     return () => {
       isMounted = false;
     };
-  }, [selectedPlayerId, initialPlayerId, initialBalls, initialStats, initialPitches, initialMetrics]);
+  }, [selectedPlayerId, currentSeason]);
 
   return (
     <div className="space-y-6">
-      {/* Selector de Bateador y Control */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-          <Target className="w-4 h-4 text-[#FDB827]" />
-          <span>Filtro de Telemetría por Bateador ({playerList.length} disponibles)</span>
+      {/* ── Switcher Superior de Temporada & Selector de Bateador ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D] shadow-lg">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-100">
+              <Target className="w-4 h-4 text-[#FDB827]" />
+              <span>Spray Charts & Disciplina en Home</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/20 font-mono font-bold">
+              {currentSeason}-{String(currentSeason + 1).slice(-2)}
+            </span>
+            {loading && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono animate-pulse">
+                Cargando...
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-400">
+            {currentSeason === 2026
+              ? `Temporada 2026-27 en curso (${playerList.length} bateadores de Leones con telemetría)`
+              : `Línea base histórica auditada 2025-26 (${playerList.length} bateadores disponibles)`}
+          </p>
         </div>
 
-        {/* Selector de Bateador */}
-        <div className="flex items-center gap-3">
-          <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider shrink-0">
-            Bateador:
-          </label>
-          <div className="relative max-w-full sm:max-w-md">
+        {/* Controles: Temporada y Bateador */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Selector de Temporada */}
+          <div className="flex items-center gap-1.5 bg-[#070B19] px-2.5 py-1.5 rounded-lg border border-[#1E2B4D]">
+            <span className="text-[11px] text-slate-400 font-medium">Temporada:</span>
             <select
-              value={selectedPlayerId}
-              onChange={(e) => setSelectedPlayerId(Number(e.target.value))}
-              className="appearance-none w-full bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs font-medium rounded-lg px-3 py-2 pr-8 focus:outline-none focus:border-[#FDB827]/50"
+              value={currentSeason}
+              onChange={(e) => handleSeasonChange(Number(e.target.value))}
+              className="bg-transparent text-[#FDB827] text-xs font-bold font-mono focus:outline-none cursor-pointer"
             >
-              {playerList.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} {p.count ? `(${p.count} batazos)` : ""}
-                </option>
-              ))}
+              <option value={2026} className="bg-[#070B19] text-slate-200">2026-27 (En Curso)</option>
+              <option value={2025} className="bg-[#070B19] text-slate-200">2025-26</option>
             </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {/* Selector de Bateador */}
+          <div className="flex items-center gap-2 max-w-full sm:max-w-md">
+            <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider shrink-0">
+              Bateador:
+            </span>
+            <div className="relative flex-1">
+              <select
+                value={selectedPlayerId}
+                onChange={(e) => setSelectedPlayerId(Number(e.target.value))}
+                className="appearance-none w-full bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs font-medium rounded-lg px-3 py-1.5 pr-8 focus:outline-none focus:border-[#FDB827]/50 cursor-pointer"
+              >
+                {playerList.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} {p.count ? `(${p.count} batazos)` : ""}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
         </div>
       </div>

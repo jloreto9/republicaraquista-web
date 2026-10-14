@@ -5,7 +5,7 @@ import {
   getPlayerBattedBalls,
   computeSprayStats,
   getPlayerStrikeZoneData,
-  LEONES_SPRAY_PLAYERS,
+  getLeonesSprayPlayers,
 } from "@/lib/spray-engine";
 import { getActiveSeason } from "@/lib/constants";
 
@@ -19,10 +19,11 @@ export const metadata: Metadata = {
 
 export default async function SprayChartsPage() {
   const activeSeason = await getActiveSeason();
-  const initialPlayerId = LEONES_SPRAY_PLAYERS[0].id;
-  const initialBalls = getPlayerBattedBalls(initialPlayerId);
+  const players = getLeonesSprayPlayers(activeSeason);
+  const initialPlayerId = players[0]?.id || 682900;
+  const initialBalls = getPlayerBattedBalls(initialPlayerId, activeSeason);
   const initialStats = computeSprayStats(initialBalls);
-  const { pitches: initialPitches, metrics: initialMetrics } = getPlayerStrikeZoneData(initialPlayerId);
+  const { pitches: initialPitches, metrics: initialMetrics } = getPlayerStrikeZoneData(initialPlayerId, activeSeason);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -39,7 +40,8 @@ export default async function SprayChartsPage() {
           initialStats={initialStats}
           initialPitches={initialPitches}
           initialMetrics={initialMetrics}
-          players={LEONES_SPRAY_PLAYERS}
+          players={players}
+          season={activeSeason}
         />
       </main>
     </div>

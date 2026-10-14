@@ -3,23 +3,30 @@ import {
   getPlayerBattedBalls,
   computeSprayStats,
   getPlayerStrikeZoneData,
-  LEONES_SPRAY_PLAYERS,
+  getLeonesSprayPlayers,
 } from "@/lib/spray-engine";
+import { getActiveSeason } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const activeSeason = await getActiveSeason();
+    const season = searchParams.get("season")
+      ? parseInt(searchParams.get("season")!, 10)
+      : activeSeason;
     const playerId = parseInt(searchParams.get("player_id") ?? "0", 10);
 
-    const balls = getPlayerBattedBalls(playerId);
+    const balls = getPlayerBattedBalls(playerId, season);
     const stats = computeSprayStats(balls);
-    const { pitches, metrics } = getPlayerStrikeZoneData(playerId);
+    const { pitches, metrics } = getPlayerStrikeZoneData(playerId, season);
+    const players = getLeonesSprayPlayers(season);
 
-    const player = LEONES_SPRAY_PLAYERS.find((p) => p.id === playerId) || LEONES_SPRAY_PLAYERS[0];
+    const player = players.find((p) => p.id === playerId) || players[0];
 
     return NextResponse.json({
+      season,
       player,
-      players: LEONES_SPRAY_PLAYERS,
+      players,
       battedBalls: balls,
       sprayStats: stats,
       pitches,
