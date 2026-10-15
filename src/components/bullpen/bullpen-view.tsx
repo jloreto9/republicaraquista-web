@@ -94,6 +94,20 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
     }
   }, [globalSeason]);
 
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+      setSelectedGameIndex(0);
+      setSelectedPlayerName(initialData.lineups.availablePlayers[0] || "");
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    if (currentSeason >= 2026 && data.lineups.gameLineups.length <= 1) {
+      handleSeasonOrTeamChange(currentSeason, currentTeamId);
+    }
+  }, []);
+
   const selectedPlayerImpact = useMemo(() => {
     const defaultPlayer = data.lineups.availablePlayers[0] || "";
     const player =

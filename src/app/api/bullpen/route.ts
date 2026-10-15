@@ -3,7 +3,7 @@ import { getBullpenAndLineups } from "@/lib/bullpen";
 import { getDynamicBullpenAndLineups } from "@/lib/game-feed-service";
 import { getActiveSeason } from "@/lib/season-service";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);

@@ -7,12 +7,28 @@
 
 ## Summary
 
-Se eliminó por completo la dependencia de archivos JSON estáticos y constantes inmutables para la temporada 2026-2027 en las vistas `/wpa`, `/bullpen`, `/situacional`, `/spray-charts` y el MVP del último encuentro en `/`. Se implementó un pipeline unificado de ingesta y caché reactivo (`game-feed-service.ts`) que consulta en tiempo real los partidos oficiales jugados desde Supabase (`games`) e ingesta la telemetría viva de la MLB Stats API (`feed/live`) para construir métricas sabermétricas en memoria con latencia submilisegundo y fallback transparente a históricos.
+Se eliminó por completo la dependencia de archivos JSON estáticos y constantes inmutables para la temporada 2026-2027 en las vistas `/wpa`, `/bullpen`, `/situacional`, `/spray-charts` y el MVP del último encuentro en `/`. Se implementó un pipeline unificado de ingesta y caché reactivo (`game-feed-service.ts`) y se convirtieron todas las páginas del servidor (`page.tsx`) a `export const dynamic = "force-dynamic"`, eliminando el congelamiento de HTML prerenderizado (ISR 5 min en Vercel Edge) y añadiendo rehidratación reactiva inmediata en los componentes cliente.
 
 ## Changes
 
 | File | Change | Notes |
 |------|--------|-------|
+| `src/app/wpa/page.tsx` | modified | Conmutado a `force-dynamic`; consume `fetchLeonesGamesList` y `fetchSeasonWpaLeaders` asíncronos seleccionando el juego más reciente. |
+| `src/app/situacional/page.tsx` | modified | Conmutado a `force-dynamic`; consume `getDynamicSituationalData`. |
+| `src/app/bullpen/page.tsx` | modified | Conmutado a `force-dynamic`; consume `getDynamicBullpenAndLineups`. |
+| `src/app/spray-charts/page.tsx` | modified | Conmutado a `force-dynamic`; consume `getDynamicSprayData`. |
+| `src/app/page.tsx` | modified | Conmutado a `force-dynamic` para refrescar KPIs y MVP en tiempo real. |
+| `src/app/standings/page.tsx` | modified | Conmutado a `force-dynamic`. |
+| `src/app/individuales/page.tsx` | modified | Conmutado a `force-dynamic`. |
+| `src/app/colectivas/page.tsx` | modified | Conmutado a `force-dynamic`. |
+| `src/app/matchup/page.tsx` | modified | Conmutado a `force-dynamic`. |
+| `src/app/probabilidades/page.tsx` | modified | Conmutado a `force-dynamic`. |
+| `src/app/calendario/page.tsx` | modified | Conmutado a `force-dynamic`. |
+| `src/app/pitching/page.tsx` | modified | Conmutado a `force-dynamic`. |
+| `src/components/wpa/wpa-view.tsx` | modified | Rehidratación reactiva al montar si la lista de juegos tiene un solo juego. |
+| `src/components/situacional/situacional-view.tsx` | modified | Rehidratación reactiva al montar si `totalPa <= 35`. |
+| `src/components/bullpen/bullpen-view.tsx` | modified | Rehidratación reactiva al montar si `gameLineups <= 1`. |
+| `src/components/spray/spray-view.tsx` | modified | Rehidratación reactiva al montar si `battedBalls <= 21`. |
 | `src/lib/game-feed-service.ts` | added | Servicio unificado de ingesta dinámica y memoria caché (`feedCache`) para partidos, bullpen IR/IRS, alineaciones 1-9, splits situacionales LOB, telemetría de spray/pitcheos y WPA. |
 | `src/lib/bullpen.ts` | modified | Firma de `getBullpenAndLineups` ampliada con `overrideData` para procesar datasets dinámicos sin romper compatibilidad con snapshots 2022-2025. |
 | `src/app/api/bullpen/route.ts` | modified | Conectado a `getDynamicBullpenAndLineups(season)` para temporadas activas (2026+) con fallback al snapshot. |

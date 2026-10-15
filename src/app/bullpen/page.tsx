@@ -1,8 +1,11 @@
 import { Metadata } from "next";
 import { Header } from "@/components/layout/header";
 import { getBullpenAndLineups } from "@/lib/bullpen";
+import { getDynamicBullpenAndLineups } from "@/lib/game-feed-service";
 import { BullpenView } from "@/components/bullpen/bullpen-view";
 import { getActiveSeason } from "@/lib/constants";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Bullpen & Tracker de Alineaciones — República Caraquista",
@@ -10,11 +13,12 @@ export const metadata: Metadata = {
     "Efectividad en herencia de corredores (IR/IRS) del cuerpo de relevistas y optimización del orden al bate 1-9 de Leones del Caracas.",
 };
 
-export const revalidate = 300;
-
 export default async function BullpenPage() {
   const activeSeason = await getActiveSeason();
-  const data = getBullpenAndLineups(activeSeason, 695);
+  const data =
+    activeSeason >= 2026
+      ? await getDynamicBullpenAndLineups(activeSeason)
+      : getBullpenAndLineups(activeSeason, 695);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">

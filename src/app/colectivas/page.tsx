@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     "Comparativa completa de ofensiva, pitcheo y fildeo entre las 8 franquicias de la LVBP con tablas de líderes y gráficos comparativos.",
 };
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export default async function ColectivasPage() {
   const activeSeason = await getActiveSeason();

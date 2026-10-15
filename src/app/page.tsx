@@ -9,7 +9,7 @@ import { getDashboardTabsData } from "@/lib/leones-stats-service";
 import { getActiveSeason, SEASON_LABELS } from "@/lib/constants";
 import { ArrowRight, Trophy, Calendar } from "lucide-react";
 
-export const revalidate = 300; // ISR cada 5 minutos en Edge de Vercel
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const activeSeason = await getActiveSeason();
@@ -46,7 +46,7 @@ export default async function DashboardPage() {
                 ¡Temporada 2026-2027 en Marcha!
               </h3>
               <p className="text-[11px] text-slate-400">
-                Debut de Leones hoy 13 de Octubre en Maracaibo vs. Águilas del Zulia.
+                Seguimiento en vivo, métricas sabermétricas y boxscores oficiales de Leones del Caracas.
               </p>
             </div>
           </div>

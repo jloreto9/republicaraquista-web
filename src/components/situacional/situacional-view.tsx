@@ -52,6 +52,18 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
     }
   }, [globalSeason]);
 
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    if (currentSeason >= 2026 && (data.lobSummary?.totalPa <= 35 || data.splits?.length <= 1)) {
+      handleSeasonChange(currentSeason);
+    }
+  }, []);
+
   // Encontrar splits clave para KPIs
   const rispSplit = splits.find((s) => s.situacion.includes("RISP") && !s.situacion.includes("2 Outs"));
   const clutchSplit = splits.find((s) => s.situacion.includes("Clutch") || s.situacion.includes("2 Outs"));

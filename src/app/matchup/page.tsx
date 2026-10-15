@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     "Comparador sabermétrico Head-to-Head entre dos jugadores de la LVBP con radar polar multidimensional y veredicto automatizado.",
 };
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export default async function MatchupPage() {
   const activeSeason = await getActiveSeason();

@@ -2,9 +2,10 @@ import { Metadata } from "next";
 import { Header } from "@/components/layout/header";
 import { SituacionalView } from "@/components/situacional/situacional-view";
 import { getLeonesSituationalData } from "@/lib/situational-engine";
+import { getDynamicSituationalData } from "@/lib/game-feed-service";
 import { getActiveSeason } from "@/lib/constants";
 
-export const revalidate = 300; // 5 minutos ISR
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Splits Situacionales & LOB Tracker | República Caraquista",
@@ -14,7 +15,10 @@ export const metadata: Metadata = {
 
 export default async function SituacionalPage() {
   const activeSeason = await getActiveSeason();
-  const initialData = getLeonesSituationalData(activeSeason);
+  const initialData =
+    activeSeason >= 2026
+      ? await getDynamicSituationalData(activeSeason)
+      : getLeonesSituationalData(activeSeason);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">

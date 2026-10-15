@@ -4,7 +4,7 @@ import { getStandings } from "@/lib/supabase";
 import { runMonteCarloSimulation } from "@/lib/monte-carlo";
 import { getActiveSeason } from "@/lib/constants";
 
-export const revalidate = 300; // ISR en Vercel
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Posiciones & ELO | REPUBLICARAQUISTAPP",

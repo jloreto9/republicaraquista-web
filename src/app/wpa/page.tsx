@@ -3,12 +3,12 @@ import { Header } from "@/components/layout/header";
 import { WpaView } from "@/components/wpa/wpa-view";
 import {
   processGameWpa,
-  getSeasonWpaLeaders,
-  getLeonesGamesList,
+  fetchSeasonWpaLeaders,
+  fetchLeonesGamesList,
 } from "@/lib/wpa-engine";
 import { getActiveSeason } from "@/lib/constants";
 
-export const revalidate = 300; // 5 minutos ISR
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Win Expectancy & WPA | República Caraquista",
@@ -18,10 +18,10 @@ export const metadata: Metadata = {
 
 export default async function WpaPage() {
   const activeSeason = await getActiveSeason();
-  const games = getLeonesGamesList(activeSeason);
-  const initialGameId = games[0]?.id || 870090;
+  const games = await fetchLeonesGamesList(activeSeason);
+  const initialGameId = games[0]?.id || 870093;
   const initialGameData = await processGameWpa(initialGameId);
-  const seasonLeaders = getSeasonWpaLeaders(activeSeason);
+  const seasonLeaders = await fetchSeasonWpaLeaders(activeSeason);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">

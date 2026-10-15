@@ -106,6 +106,26 @@ export function SprayView({
     }
   }, [globalSeason]);
 
+  // Sincronizar props cuando cambian
+  useEffect(() => {
+    if (initialBalls && initialBalls.length > 0) {
+      setBattedBalls(initialBalls);
+      setSprayStats(initialStats);
+      setPitches(initialPitches);
+      setStrikeMetrics(initialMetrics);
+      if (players && players.length > 0) {
+        setPlayerList(players);
+      }
+    }
+  }, [initialBalls, initialStats, initialPitches, initialMetrics, players]);
+
+  // Refrescar automáticamente en cliente si está en temporada activa con data estática antigua
+  useEffect(() => {
+    if (currentSeason >= 2026 && (battedBalls.length <= 21 || playerList.length <= 1)) {
+      handleSeasonChange(currentSeason);
+    }
+  }, []);
+
   // Carga reactiva de jugador cuando cambia de jugador o temporada
   useEffect(() => {
     if (selectedPlayerId === initialPlayerId && currentSeason === season) {

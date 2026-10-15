@@ -7,9 +7,10 @@ import {
   getPlayerStrikeZoneData,
   getLeonesSprayPlayers,
 } from "@/lib/spray-engine";
+import { getDynamicSprayData } from "@/lib/game-feed-service";
 import { getActiveSeason } from "@/lib/constants";
 
-export const revalidate = 300; // 5 minutos ISR
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Spray Charts & Strike Zone | República Caraquista",
@@ -19,6 +20,33 @@ export const metadata: Metadata = {
 
 export default async function SprayChartsPage() {
   const activeSeason = await getActiveSeason();
+
+  if (activeSeason >= 2026) {
+    const dynamicData = await getDynamicSprayData(activeSeason, 0);
+    const initialPlayerId = dynamicData.players[0]?.id || 0;
+    return (
+      <div className="flex-1 flex flex-col min-h-screen">
+        <Header
+          title="Spray Charts & Strike Zone"
+          subtitle="Geometría Espacial en Diamante • Modelo BIS de Dureza • Zona 3x3"
+          season={activeSeason}
+        />
+
+        <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
+          <SprayView
+            initialPlayerId={initialPlayerId}
+            initialBalls={dynamicData.battedBalls}
+            initialStats={dynamicData.sprayStats}
+            initialPitches={dynamicData.pitches}
+            initialMetrics={dynamicData.strikeZoneMetrics}
+            players={dynamicData.players}
+            season={activeSeason}
+          />
+        </main>
+      </div>
+    );
+  }
+
   const players = getLeonesSprayPlayers(activeSeason);
   const initialPlayerId = players[0]?.id || 682900;
   const initialBalls = getPlayerBattedBalls(initialPlayerId, activeSeason);

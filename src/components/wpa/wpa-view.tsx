@@ -79,6 +79,29 @@ export function WpaView({
     }
   }, [globalSeason]);
 
+  // Sincronizar props cuando cambian
+  useEffect(() => {
+    if (games && games.length > 0) {
+      setGamesList(games);
+      if (!selectedGameId || !games.some((g) => g.id === selectedGameId)) {
+        setSelectedGameId(games[0].id);
+      }
+    }
+  }, [games]);
+
+  useEffect(() => {
+    if (initialGameData) {
+      setGameData(initialGameData);
+    }
+  }, [initialGameData]);
+
+  // Si en el cliente solo hay 1 juego o menos en temporada activa, refrescar desde la API
+  useEffect(() => {
+    if (activeSeason >= 2026 && gamesList.length <= 1) {
+      handleSeasonChange(activeSeason);
+    }
+  }, []);
+
   // Carga reactiva de jugadas del juego seleccionado
   useEffect(() => {
     if (selectedGameId === initialGameData?.gameId && gameData?.gameId === selectedGameId) {

@@ -9,7 +9,7 @@ import {
 import fallbackData from "@/data/calendar_2026_27.json";
 import { CalendarApiResponse, CalendarGameEvent } from "@/types/calendar";
 
-export const revalidate = 300; // ISR cada 5 minutos en Vercel Edge para actualización de resultados
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Calendario Oficial LVBP | Leones del Caracas | REPUBLICARAQUISTAPP",

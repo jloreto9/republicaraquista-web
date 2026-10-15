@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     "Proyecciones multi-factor de partidos LVBP, Cuotas Justas (Fair Odds), comparador de casas de apuestas (JuegaEnLínea, Betcris, SellaTuParley, Apuestas Royal), detección de cuotas desfasadas (+EV) y Criterio de Kelly.",
 };
 
-export const revalidate = 300; // ISR cada 5 minutos
+export const dynamic = "force-dynamic";
 
 export default async function ProbabilidadesPage() {
   const activeSeason = await getActiveSeason();

@@ -3,7 +3,7 @@ import { IndividualesView } from "@/components/stats/individuales-view";
 import { getBattingStats, getPitchingStats, getTeamGamesMap } from "@/lib/supabase";
 import { getActiveSeason } from "@/lib/constants";
 
-export const revalidate = 300; // ISR cada 5 minutos
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Líderes Individuales | República Caraquista",

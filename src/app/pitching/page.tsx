@@ -9,6 +9,8 @@ export const metadata: Metadata = {
     "Buscador universal de lanzadores, telemetría Hawk-Eye (MLB) y analítica Play-by-Play adaptada para Leones del Caracas con exportación de tarjetas HD.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function PitchingPage() {
   const activeSeason = await getActiveSeason();
 
