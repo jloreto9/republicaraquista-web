@@ -471,3 +471,29 @@ export function getLeonesGamesList(season = 2026): GameOption[] {
   return LEONES_GAMES_BY_SEASON[season] || LEONES_2026_GAMES;
 }
 
+export async function fetchLeonesGamesList(season = 2026): Promise<GameOption[]> {
+  try {
+    const { getLeonesPlayedGames } = await import("./game-feed-service");
+    const games = await getLeonesPlayedGames(season);
+    if (games && games.length > 0) {
+      return games;
+    }
+  } catch (err) {
+    console.warn("Fallo fetchLeonesGamesList:", err);
+  }
+  return getLeonesGamesList(season);
+}
+
+export async function fetchSeasonWpaLeaders(season = 2026): Promise<SeasonWpaLeader[]> {
+  try {
+    const { getDynamicSeasonWpaLeaders } = await import("./game-feed-service");
+    const leaders = await getDynamicSeasonWpaLeaders(season);
+    if (leaders && leaders.length > 0) {
+      return leaders;
+    }
+  } catch (err) {
+    console.warn("Fallo fetchSeasonWpaLeaders:", err);
+  }
+  return getSeasonWpaLeaders(season);
+}
+

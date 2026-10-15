@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLeonesSituationalData } from "@/lib/situational-engine";
+import { getDynamicSituationalData } from "@/lib/game-feed-service";
 import { getActiveSeason } from "@/lib/season-service";
 
 export async function GET(request: NextRequest) {
@@ -10,7 +11,11 @@ export async function GET(request: NextRequest) {
       ? parseInt(searchParams.get("season")!, 10)
       : activeSeason;
 
-    const data = getLeonesSituationalData(season);
+    const data =
+      season >= activeSeason
+        ? await getDynamicSituationalData(season)
+        : getLeonesSituationalData(season);
+
     return NextResponse.json({
       season,
       teamId: 695,

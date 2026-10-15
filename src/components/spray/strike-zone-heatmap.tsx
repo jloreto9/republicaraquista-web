@@ -169,7 +169,7 @@ export function StrikeZoneHeatmap({ pitches, metrics }: StrikeZoneHeatmapProps) 
               pitches.map((p, idx) => {
                 const px = toSvgX(p.xFt);
                 const py = toSvgY(p.zFt);
-                const col = callColors[p.callGroup] || "#94a3b8";
+                const col = (p.callGroup && callColors[p.callGroup]) || "#94a3b8";
 
                 return (
                   <circle

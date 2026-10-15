@@ -65,7 +65,8 @@ interface RawLineupRecord {
 
 export function getBullpenAndLineups(
   season = 2025,
-  teamId = LEONES_TEAM_ID
+  teamId = LEONES_TEAM_ID,
+  overrideData?: { bullpen_records?: RawBullpenRecord[]; lineup_records?: RawLineupRecord[] }
 ): BullpenAndLineupsData {
   const emptyResult: BullpenAndLineupsData = {
     bullpen: {
@@ -97,7 +98,12 @@ export function getBullpenAndLineups(
   };
 
   try {
-    const data = SNAPSHOTS[season];
+    const data =
+      overrideData &&
+      ((overrideData.bullpen_records && overrideData.bullpen_records.length > 0) ||
+        (overrideData.lineup_records && overrideData.lineup_records.length > 0))
+        ? overrideData
+        : SNAPSHOTS[season];
     if (!data) {
       console.warn(`Snapshot no disponible para temporada ${season}`);
       return emptyResult;

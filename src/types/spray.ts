@@ -41,9 +41,9 @@ export interface SprayStats {
 }
 
 export interface PitchEvent {
-  pitchNumber: number;
-  callDesc: string;
-  callGroup: "Whiff" | "Called Strike" | "Foul" | "In Play" | "Ball" | "Other";
+  pitchNumber?: number;
+  callDesc?: string;
+  callGroup?: "Whiff" | "Called Strike" | "Foul" | "In Play" | "Ball" | "Other";
   xFt: number;
   zFt: number;
   zone: number;
@@ -51,9 +51,17 @@ export interface PitchEvent {
   isWhiff: boolean;
   isContact: boolean;
   isCalledStrike: boolean;
-  isBall: boolean;
-  isStrike: boolean;
+  isBall?: boolean;
+  isStrike?: boolean;
   inZone: boolean;
+  gamePk?: number;
+  pitcherId?: number;
+  pitcherName?: string;
+  pitchType?: string;
+  pitchName?: string;
+  speedMph?: number;
+  xRaw?: number;
+  yRaw?: number;
 }
 
 export interface StrikeZoneMetrics {
@@ -73,6 +81,8 @@ export interface SprayPlayerOption {
   id: number;
   name: string;
   count?: number;
+  battedBallsCount?: number;
+  hitsCount?: number;
 }
 
 export const EVENT_COLORS: Record<string, string> = {

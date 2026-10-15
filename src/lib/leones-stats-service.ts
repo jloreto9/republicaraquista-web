@@ -443,12 +443,67 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
 
         let mvp = season === 2025 ? BASELINE_2025_LAST_GAME.mvp : null;
         try {
-          // Obtener los líderes oficiales de WPA para que el MVP coincida exactamente con la pestaña WPA
-          const wpaLeaders = getSeasonWpaLeaders(season);
-          const topLeader =
-            wpaLeaders && wpaLeaders.length > 0
-              ? [...wpaLeaders].sort((a, b) => b.wpa - a.wpa)[0]
-              : null;
+          // Obtener el jugador de mayor impacto de victoria (WPA) en este juego específico
+          const { processGameWpa, fetchSeasonWpaLeaders } = await import("./wpa-engine");
+          let topLeader: {
+            playerId: number;
+            player: string;
+            type: "batter" | "pitcher";
+            wpa: number;
+            clutch: number;
+          } | null = null;
+
+          const gameWpa = await processGameWpa(g.id);
+          if (gameWpa && gameWpa.plays && gameWpa.plays.length > 0) {
+            const playerWpa: Record<
+              number,
+              { id: number; name: string; type: "batter" | "pitcher"; wpa: number; clutch: number }
+            > = {};
+
+            for (const p of gameWpa.plays) {
+              const isBatter = p.leonesBatting;
+              const pId = isBatter ? p.batterId : p.pitcherId;
+              const pName = isBatter ? p.batter : p.pitcher;
+              if (!pId) continue;
+              if (!playerWpa[pId]) {
+                playerWpa[pId] = {
+                  id: pId,
+                  name: pName,
+                  type: isBatter ? "batter" : "pitcher",
+                  wpa: 0,
+                  clutch: 0,
+                };
+              }
+              playerWpa[pId].wpa += p.wpa;
+              playerWpa[pId].clutch += p.wpa - p.wpaLi;
+            }
+
+            const sorted = Object.values(playerWpa).sort((a, b) => b.wpa - a.wpa);
+            if (sorted.length > 0) {
+              const top = sorted[0];
+              topLeader = {
+                playerId: top.id,
+                player: top.name,
+                type: top.type,
+                wpa: Number(top.wpa.toFixed(3)),
+                clutch: Number(top.clutch.toFixed(3)),
+              };
+            }
+          }
+
+          if (!topLeader) {
+            const wpaLeaders = await fetchSeasonWpaLeaders(season);
+            if (wpaLeaders && wpaLeaders.length > 0) {
+              const top = [...wpaLeaders].sort((a, b) => b.wpa - a.wpa)[0];
+              topLeader = {
+                playerId: top.playerId,
+                player: top.player,
+                type: top.type,
+                wpa: top.wpa,
+                clutch: top.clutch,
+              };
+            }
+          }
 
           if (topLeader) {
             let headline = "";

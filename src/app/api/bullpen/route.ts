@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBullpenAndLineups } from "@/lib/bullpen";
+import { getDynamicBullpenAndLineups } from "@/lib/game-feed-service";
 import { getActiveSeason } from "@/lib/season-service";
 
 export const revalidate = 300;
@@ -13,7 +14,11 @@ export async function GET(request: NextRequest) {
   const teamId = parseInt(searchParams.get("teamId") || "695", 10);
 
   try {
-    const data = getBullpenAndLineups(season, teamId);
+    const data =
+      season >= activeSeason
+        ? await getDynamicBullpenAndLineups(season)
+        : getBullpenAndLineups(season, teamId);
+
     return NextResponse.json({
       success: true,
       season,

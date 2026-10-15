@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   processGameWpa,
-  getSeasonWpaLeaders,
-  getLeonesGamesList,
+  fetchSeasonWpaLeaders,
+  fetchLeonesGamesList,
 } from "@/lib/wpa-engine";
 import { getActiveSeason } from "@/lib/season-service";
 
@@ -15,10 +15,10 @@ export async function GET(request: NextRequest) {
 
     const gamePkParam = searchParams.get("game_pk");
     const leadersParam = searchParams.get("leaders");
-    const gamesList = getLeonesGamesList(season);
+    const gamesList = await fetchLeonesGamesList(season);
 
     if (leadersParam === "true") {
-      const leaders = getSeasonWpaLeaders(season);
+      const leaders = await fetchSeasonWpaLeaders(season);
       return NextResponse.json({
         season,
         leaders,
