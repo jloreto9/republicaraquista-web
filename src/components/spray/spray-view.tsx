@@ -4,10 +4,9 @@ import React, { useState, useEffect } from "react";
 import { BattedBall, SprayStats, PitchEvent, StrikeZoneMetrics, SprayPlayerOption } from "@/types/spray";
 import { BaseballDiamond } from "./baseball-diamond";
 import { StrikeZoneHeatmap } from "./strike-zone-heatmap";
-import { WouldItDongCard } from "./would-it-dong-card";
-import { DeepBallsDrawer } from "./deep-balls-drawer";
+import { StadiumSimulatorView } from "./stadium-simulator-view";
 import { LEONES_SPRAY_PLAYERS } from "@/lib/spray-engine";
-import { Target, ChevronDown, ShieldCheck, Flame, Compass, Activity, Building2, Sparkles } from "lucide-react";
+import { Target, ChevronDown, ShieldCheck, Flame, Compass, Activity, Building2 } from "lucide-react";
 import { useSeason } from "@/context/season-context";
 
 interface SprayViewProps {
@@ -38,13 +37,8 @@ export function SprayView({
   const [pitches, setPitches] = useState<PitchEvent[]>(initialPitches);
   const [strikeMetrics, setStrikeMetrics] = useState<StrikeZoneMetrics>(initialMetrics);
   const [colorMode, setColorMode] = useState<"event" | "trajectory" | "hardness">("event");
-  const [activeTab, setActiveTab] = useState<"diamond" | "zone">("diamond");
+  const [activeTab, setActiveTab] = useState<"diamond" | "dong" | "zone">("diamond");
   const [loading, setLoading] = useState(false);
-
-  // Estados del Emulador de Estadios y Simulador "HR en X/8"
-  const [selectedStadiumId, setSelectedStadiumId] = useState<string>("monumental");
-  const [selectedBall, setSelectedBall] = useState<BattedBall | null>(null);
-  const [showDeepDrawer, setShowDeepDrawer] = useState<boolean>(false);
 
   // Conmutador de temporada con sincronización global
   const handleSeasonChange = async (newSeason: number) => {
@@ -71,14 +65,12 @@ export function SprayView({
             setSprayStats(pData.sprayStats || initialStats);
             setPitches(pData.pitches || []);
             setStrikeMetrics(pData.strikeZoneMetrics || initialMetrics);
-            setSelectedBall(null);
           }
         } else {
           setBattedBalls(data.battedBalls || []);
           setSprayStats(data.sprayStats || initialStats);
           setPitches(data.pitches || []);
           setStrikeMetrics(data.strikeZoneMetrics || initialMetrics);
-          setSelectedBall(null);
         }
       }
     } catch (err) {
@@ -137,7 +129,6 @@ export function SprayView({
           setPitches(data.pitches || []);
           setStrikeMetrics(data.strikeZoneMetrics || initialMetrics);
           if (data.players) setPlayerList(data.players);
-          setSelectedBall(null);
         }
       } catch (err) {
         console.error("Error loading spray data:", err);
@@ -152,7 +143,7 @@ export function SprayView({
     };
   }, [selectedPlayerId, currentSeason]);
 
-  // Cantidad de batazos profundos que califican para simulación
+  // Conteo de batazos profundos que califican para el simulador
   const deepBallsCount = battedBalls.filter(
     (b) => (b.distanceFt && b.distanceFt >= 300) || b.event === "Home Run"
   ).length;
@@ -277,21 +268,37 @@ export function SprayView({
         </div>
       </div>
 
-      {/* Tabs Internos */}
-      <div className="flex border-b border-[#1E2B4D]">
+      {/* ── Tabs de Navegación Interna (3 Secciones Separadas) ── */}
+      <div className="flex border-b border-[#1E2B4D] overflow-x-auto">
         <button
           onClick={() => setActiveTab("diamond")}
-          className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all ${
+          className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all whitespace-nowrap ${
             activeTab === "diamond"
               ? "bg-[#0D152B] text-[#FDB827] border-t-2 border-[#FDB827] border-x border-[#1E2B4D]"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
-          Diamante de Batazos & Emulador de Estadios
+          Diamante de Batazos (Spray Chart)
         </button>
+
+        <button
+          onClick={() => setActiveTab("dong")}
+          className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === "dong"
+              ? "bg-[#0D152B] text-[#FDB827] border-t-2 border-[#FDB827] border-x border-[#1E2B4D]"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Building2 className="w-3.5 h-3.5 text-[#FDB827]" />
+          <span>Emulador de Estadios & "Would It Dong?"</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/20 font-mono">
+            {deepBallsCount}
+          </span>
+        </button>
+
         <button
           onClick={() => setActiveTab("zone")}
-          className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all ${
+          className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all whitespace-nowrap ${
             activeTab === "zone"
               ? "bg-[#0D152B] text-[#FDB827] border-t-2 border-[#FDB827] border-x border-[#1E2B4D]"
               : "text-slate-400 hover:text-slate-200"
@@ -301,13 +308,12 @@ export function SprayView({
         </button>
       </div>
 
-      {/* Tab 1: Diamante & Emulador de Estadios */}
+      {/* ── Sección 1: Diamante Tradicional (Puro y Limpio, Sin Sobrecarga) ── */}
       {activeTab === "diamond" && (
         <div className="p-5 rounded-xl bg-[#0D152B] border border-[#1E2B4D] space-y-6">
-          {/* Controles de Diamante: Color Mode & Barda de Estadio */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#1E2B4D]">
-            {/* Color Mode */}
-            <div className="flex flex-wrap items-center gap-3">
+          {/* Controles de color mode */}
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#1E2B4D]">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-slate-400 font-semibold uppercase">
                 Colorear Batazos:
               </span>
@@ -345,123 +351,41 @@ export function SprayView({
               </div>
             </div>
 
-            {/* Selector de Barda de Estadio y Botón Would It Dong */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-1.5 bg-[#070B19] px-2.5 py-1.5 rounded-lg border border-[#1E2B4D]">
-                <Building2 className="w-3.5 h-3.5 text-[#FDB827]" />
-                <span className="text-[11px] text-slate-400 font-medium">Barda:</span>
-                <select
-                  value={selectedStadiumId}
-                  onChange={(e) => setSelectedStadiumId(e.target.value)}
-                  className="bg-transparent text-[#FDB827] text-xs font-semibold focus:outline-none cursor-pointer max-w-[200px] truncate"
-                >
-                  <option value="monumental" className="bg-[#070B19] text-slate-200">
-                    Monumental Simón Bolívar (Caracas)
-                  </option>
-                  <option value="universitario" className="bg-[#070B19] text-slate-200">
-                    Universitario (Caracas UCV)
-                  </option>
-                  <option value="valencia" className="bg-[#070B19] text-slate-200">
-                    José Bernardo Pérez (Valencia)
-                  </option>
-                  <option value="barquisimeto" className="bg-[#070B19] text-slate-200">
-                    Antonio Herrera Gutiérrez (Lara)
-                  </option>
-                  <option value="maracay" className="bg-[#070B19] text-slate-200">
-                    José Pérez Colmenares (Aragua)
-                  </option>
-                  <option value="maracaibo" className="bg-[#070B19] text-slate-200">
-                    Luis Aparicio 'El Grande' (Zulia)
-                  </option>
-                  <option value="plc" className="bg-[#070B19] text-slate-200">
-                    Alfonso 'Chico' Carrasquel (Caribes)
-                  </option>
-                  <option value="macuto" className="bg-[#070B19] text-slate-200">
-                    Forum La Guaira (Macuto)
-                  </option>
-                  <option value="margarita" className="bg-[#070B19] text-slate-200">
-                    Nueva Esparta (Guatamare)
-                  </option>
-                  <option value="all" className="bg-[#070B19] text-[#FDB827]">
-                    ✨ Comparar Todos los Estadios LVBP
-                  </option>
-                </select>
-              </div>
-
-              {/* Botón Drawer "HR en X/8" */}
-              <button
-                onClick={() => setShowDeepDrawer(!showDeepDrawer)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
-                  showDeepDrawer
-                    ? "bg-[#FDB827] text-[#070B19] border-[#FDB827] shadow-md shadow-[#FDB827]/20"
-                    : "bg-[#070B19] text-[#FDB827] border-[#1E2B4D] hover:border-[#FDB827]/40"
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Simulador HR en X/8 ({deepBallsCount})</span>
-              </button>
+            {/* Leyenda interactiva */}
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-300">
+              {colorMode === "event" && (
+                <>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2ecc71]" /> 1B</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#3498db]" /> 2B</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#f39c12]" /> 3B</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#e74c3c]" /> HR</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#64748b]" /> Out</span>
+                </>
+              )}
+              {colorMode === "trajectory" && (
+                <>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#eab308]" /> Rolling (GB)</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" /> Línea (LD)</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#ec4899]" /> Elevado (FB)</span>
+                </>
+              )}
+              {colorMode === "hardness" && (
+                <>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" /> Fuerte (Hard)</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" /> Medio (Medium)</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" /> Suave (Soft)</span>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Leyenda interactiva */}
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-300">
-            {colorMode === "event" && (
-              <>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2ecc71]" /> 1B</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#3498db]" /> 2B</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#f39c12]" /> 3B</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#e74c3c]" /> HR</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#64748b]" /> Out</span>
-              </>
-            )}
-            {colorMode === "trajectory" && (
-              <>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#eab308]" /> Rolling (GB)</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" /> Línea (LD)</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#ec4899]" /> Elevado (FB)</span>
-              </>
-            )}
-            {colorMode === "hardness" && (
-              <>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" /> Fuerte (Hard)</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" /> Medio (Medium)</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" /> Suave (Soft)</span>
-              </>
-            )}
-          </div>
-
-          {/* Tarjeta Would It Dong (si hay un batazo seleccionado) */}
-          {selectedBall && (
-            <WouldItDongCard
-              ball={selectedBall}
-              onClose={() => setSelectedBall(null)}
-            />
-          )}
-
-          {/* Drawer / Tabla de Batazos Profundos */}
-          {showDeepDrawer && (
-            <div className="p-4 rounded-xl bg-[#070B19]/80 border border-[#1E2B4D]">
-              <DeepBallsDrawer
-                battedBalls={battedBalls}
-                selectedBall={selectedBall}
-                onSelectBall={(ball) => setSelectedBall(ball)}
-              />
-            </div>
-          )}
-
-          {/* Gráfico de Diamante con Barda de Estadio Dinámica */}
+          {/* Gráfico de Diamante Limpio */}
           {loading ? (
             <div className="h-96 flex items-center justify-center text-slate-400 text-xs">
               Cargando coordenadas de batazos...
             </div>
           ) : (
-            <BaseballDiamond
-              battedBalls={battedBalls}
-              colorMode={colorMode}
-              selectedStadiumId={selectedStadiumId}
-              selectedBall={selectedBall}
-              onSelectBall={(ball) => setSelectedBall(ball)}
-            />
+            <BaseballDiamond battedBalls={battedBalls} colorMode={colorMode} />
           )}
 
           {/* Resumen de Trayectorias y Direcciones */}
@@ -486,7 +410,16 @@ export function SprayView({
         </div>
       )}
 
-      {/* Tab 2: Zona de Strike */}
+      {/* ── Sección 2: Emulador de Estadios & Would It Dong? (Sección Dedicada) ── */}
+      {activeTab === "dong" && (
+        <StadiumSimulatorView
+          battedBalls={battedBalls}
+          colorMode={colorMode}
+          onColorModeChange={setColorMode}
+        />
+      )}
+
+      {/* ── Sección 3: Zona de Strike 3x3 ── */}
       {activeTab === "zone" && (
         <div className="p-5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
           <StrikeZoneHeatmap pitches={pitches} metrics={strikeMetrics} />
