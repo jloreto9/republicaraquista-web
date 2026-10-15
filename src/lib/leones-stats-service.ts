@@ -11,6 +11,7 @@ import {
 } from "@/types/leones-stats";
 import { ACTIVE_SEASON, getTeam, getPlayerHeadshotUrl } from "./constants";
 import { supabase, getBattingStats, getPitchingStats } from "./supabase";
+import { getSeasonWpaLeaders } from "./wpa-engine";
 import calendarData from "@/data/calendar_2026_27.json";
 
 // ── LÍNEA BASE LIMPIA / INICIAL EN CERO PARA NUEVAS TEMPORADAS ────────────────
@@ -440,35 +441,56 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
           gameDateFormatted = `${parseInt(parts[2], 10)} de ${months[mIndex]}, ${parts[0]}`;
         }
 
-        let mvp = BASELINE_2025_LAST_GAME.mvp;
+        let mvp = season === 2025 ? BASELINE_2025_LAST_GAME.mvp : null;
         try {
-          const { data: pStats } = await supabase
-            .from("batting_stats")
-            .select("player_id, ab, h, hr, rbi, players(full_name)")
-            .eq("game_id", g.id)
-            .eq("team_id", 695)
-            .order("rbi", { ascending: false })
-            .limit(1);
+          // Obtener los líderes oficiales de WPA para que el MVP coincida exactamente con la pestaña WPA
+          const wpaLeaders = getSeasonWpaLeaders(season);
+          const topLeader =
+            wpaLeaders && wpaLeaders.length > 0
+              ? [...wpaLeaders].sort((a, b) => b.wpa - a.wpa)[0]
+              : null;
 
-          if (pStats && pStats.length > 0) {
-            const best = pStats[0] as unknown as {
-              player_id: number;
-              ab: number;
-              h: number;
-              hr: number;
-              rbi: number;
-              players?: { full_name?: string };
-            };
-            const pName = best.players?.full_name || "Jugador Destacado";
+          if (topLeader) {
+            let headline = "";
+            if (topLeader.type === "pitcher") {
+              const { data: pitData } = await supabase
+                .from("pitching_stats")
+                .select("ip_string, er, so")
+                .eq("game_id", g.id)
+                .eq("player_id", topLeader.playerId)
+                .limit(1);
+
+              if (pitData && pitData.length > 0) {
+                const p = pitData[0];
+                headline = `${p.ip_string || "0.0"} IP, ${p.er ?? 0} CL, ${p.so ?? 0} K — Mayor impacto de victoria (+${topLeader.wpa.toFixed(3)} WPA)`;
+              } else {
+                headline = `Líder de WPA de Leones (+${topLeader.wpa.toFixed(3)})`;
+              }
+            } else {
+              const { data: batData } = await supabase
+                .from("batting_stats")
+                .select("ab, h, hr, rbi")
+                .eq("game_id", g.id)
+                .eq("player_id", topLeader.playerId)
+                .limit(1);
+
+              if (batData && batData.length > 0) {
+                const b = batData[0];
+                headline = `${b.h}-${b.ab}${b.hr > 0 ? `, ${b.hr} HR` : ""}, ${b.rbi} CI — Mayor impacto de victoria (+${topLeader.wpa.toFixed(3)} WPA)`;
+              } else {
+                headline = `Líder de WPA de Leones (+${topLeader.wpa.toFixed(3)})`;
+              }
+            }
+
             mvp = {
-              playerId: Number(best.player_id),
-              playerName: pName,
-              playerAvatar: getPlayerHeadshotUrl(best.player_id),
-              wpaTotal: 0.25,
-              wpaBat: 0.25,
-              wpaPit: 0.0,
-              clutch: 0.15,
-              headline: `${best.h}-${best.ab}, ${best.hr > 0 ? `${best.hr} HR, ` : ""}${best.rbi} CI`,
+              playerId: topLeader.playerId,
+              playerName: topLeader.player,
+              playerAvatar: getPlayerHeadshotUrl(topLeader.playerId),
+              wpaTotal: topLeader.wpa,
+              wpaBat: topLeader.type === "batter" ? topLeader.wpa : 0.0,
+              wpaPit: topLeader.type === "pitcher" ? topLeader.wpa : 0.0,
+              clutch: topLeader.clutch,
+              headline,
             };
           }
         } catch {
