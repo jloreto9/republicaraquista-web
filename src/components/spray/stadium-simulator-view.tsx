@@ -379,39 +379,34 @@ export function StadiumSimulatorView({
                 const isHomeRun = ball.event === "Home Run";
 
                 return (
-                  <g key={idx} className="cursor-pointer" onClick={() => setSelectedBall(ball)}>
+                  <g
+                    key={idx}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedBall(ball)}
+                    onMouseEnter={() => setHoveredBall(ball)}
+                  >
                     {/* Anillo de enfoque cuando el batazo está seleccionado */}
                     {isSelected && (
                       <circle
                         cx={bx}
                         cy={by}
-                        r="10"
-                        fill="none"
-                        stroke="#FDB827"
-                        strokeWidth="2"
-                        className="animate-ping opacity-75"
-                      />
-                    )}
-                    {isSelected && (
-                      <circle
-                        cx={bx}
-                        cy={by}
-                        r="8.5"
+                        r="9"
                         fill="none"
                         stroke="#FDB827"
                         strokeWidth="2.5"
+                        strokeDasharray="3,2"
+                        pointerEvents="none"
                       />
                     )}
 
                     <circle
                       cx={bx}
                       cy={by}
-                      r={isHovered ? 6 : isHomeRun ? 5 : 3.5}
+                      r={isSelected ? 6.5 : isHovered ? 6 : isHomeRun ? 5 : 3.5}
                       fill={ballColor}
                       stroke={isHovered || isSelected ? "#FFFFFF" : "#070B19"}
                       strokeWidth={isHovered || isSelected ? 2 : 1}
-                      className="transition-transform duration-100 hover:scale-125"
-                      onMouseEnter={() => setHoveredBall(ball)}
+                      className="transition-colors duration-150"
                     />
                   </g>
                 );
