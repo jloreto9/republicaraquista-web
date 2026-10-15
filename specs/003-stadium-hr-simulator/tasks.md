@@ -7,4 +7,4 @@
 - [x] **Tarea 5**: Crear `src/components/spray/deep-balls-drawer.tsx` con la tabla/lista interactiva de batazos $\ge 300$ pies del bateador seleccionado para exploración rápida.
 - [x] **Tarea 6**: Integrar todos los componentes en `src/components/spray/spray-view.tsx` con barra de herramientas de estadios y sincronización de estado.
 - [x] **Tarea 7**: Ejecutar `npx tsc --noEmit` y `npm run build` para garantizar cero errores de TypeScript y compilación perfecta.
-- [ ] **Tarea 8**: Desplegar a producción vía `git push origin main` y validar en Vercel.
+- [x] **Tarea 8**: Desplegar a producción vía `git push origin main` y validar en Vercel.
