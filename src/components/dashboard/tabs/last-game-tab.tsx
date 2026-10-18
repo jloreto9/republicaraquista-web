@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { LastGameDetail } from "@/types/leones-stats";
-import { Trophy, Calendar, MapPin, Zap } from "lucide-react";
+import { Trophy, Calendar, MapPin, Zap, ExternalLink } from "lucide-react";
 
 interface LastGameTabProps {
   lastGame: LastGameDetail | null;
@@ -99,7 +100,7 @@ export function LastGameTab({ lastGame }: LastGameTabProps) {
           </div>
         </div>
 
-        {/* Footer con fecha y estadio */}
+        {/* Footer con fecha, estadio y enlace al Game Center */}
         <div className="pt-4 border-t border-[#1E2B4D] flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2 font-mono">
           <div className="flex items-center space-x-1.5">
             <Calendar className="w-3.5 h-3.5 text-[#FDB827]" />
@@ -109,6 +110,13 @@ export function LastGameTab({ lastGame }: LastGameTabProps) {
             <MapPin className="w-3.5 h-3.5 text-[#FDB827]" />
             <span>{lastGame.venue}</span>
           </div>
+          <Link
+            href="/game-center"
+            className="flex items-center space-x-1 text-[#FDB827] hover:underline font-bold text-[11px] bg-[#FDB827]/10 px-2.5 py-1 rounded-lg border border-[#FDB827]/30"
+          >
+            <span>Ver en Game Center</span>
+            <ExternalLink className="w-3 h-3 ml-0.5" />
+          </Link>
         </div>
       </div>
 
