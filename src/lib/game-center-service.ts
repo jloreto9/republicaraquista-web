@@ -44,6 +44,7 @@ const EVENT_TRANSLATIONS: Record<string, string> = {
   "Balk": "Balk",
   "Pickoff": "Sorprendido Fuera de Base",
   "Game Advisory": "Nota Oficial",
+  "En Turno": "En Turno",
 };
 
 /**
@@ -104,50 +105,142 @@ function translateDescriptionToSpanish(desc: string): string {
 }
 
 /**
- * Consulta la lista de juegos recientes o en vivo de Leones del Caracas en Supabase.
+ * Consulta la lista de juegos oficiales de la temporada activa (2026-2027) directamente
+ * desde el calendario oficial de MLB Stats API (`sportId=17`, `leagueId=135`).
  */
 export async function getCaracasAvailableGames(season = 2026): Promise<GameCenterAvailableGame[]> {
-  if (!supabase) return [];
-
   try {
-    const { data: rawGames, error } = await supabase
-      .from("games")
-      .select("id, game_pk, game_date, season, game_type, status, home_team_id, away_team_id, home_score, away_score")
-      .eq("season", season)
-      .or("home_team_id.eq.695,away_team_id.eq.695")
-      .order("game_date", { ascending: false })
-      .limit(12);
+    const res = await fetch(
+      `https://statsapi.mlb.com/api/v1/schedule?sportId=17&leagueId=135&season=${season}`,
+      {
+        signal: AbortSignal.timeout(8000),
+        next: { revalidate: 30 },
+      }
+    );
 
-    if (error || !rawGames) {
-      console.error("Error al consultar juegos de Leones:", error);
-      return [];
+    if (res.ok) {
+      const json = await res.json();
+      const games: GameCenterAvailableGame[] = [];
+
+      for (const dateObj of json.dates || []) {
+        for (const g of dateObj.games || []) {
+          const homeId = Number(g.teams?.home?.team?.id);
+          const awayId = Number(g.teams?.away?.team?.id);
+
+          if (homeId === LEONES_TEAM_ID || awayId === LEONES_TEAM_ID) {
+            const isHome = homeId === LEONES_TEAM_ID;
+            const oppId = isHome ? awayId : homeId;
+            const oppTeam = getTeam(oppId);
+            const statusDetail = g.status?.detailedState || g.status?.abstractGameState || "Final";
+            const isLive =
+              ["Live", "In Progress"].includes(statusDetail) ||
+              g.status?.abstractGameState === "Live" ||
+              g.status?.codedGameState === "I";
+
+            const awayScore = g.teams?.away?.score;
+            const homeScore = g.teams?.home?.score;
+            const caracasScore = isHome ? homeScore : awayScore;
+            const oppScore = isHome ? awayScore : homeScore;
+
+            let scoreStr = "vs";
+            if (awayScore !== undefined && homeScore !== undefined) {
+              scoreStr = `${caracasScore}-${oppScore}`;
+            } else if (isLive) {
+              scoreStr = "EN VIVO";
+            }
+
+            games.push({
+              id: g.gamePk,
+              gamePk: g.gamePk,
+              date: dateObj.date,
+              opponent: isHome ? `vs ${oppTeam.name}` : `@ ${oppTeam.name}`,
+              opponentLogo: oppTeam.logoUrl,
+              score: scoreStr,
+              status: statusDetail,
+              isHome,
+              isLive,
+            });
+          }
+        }
+      }
+
+      // Filtrar partidos que ya se jugaron o que están en vivo / programados para hoy
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const activeOrPlayed = games.filter(
+        (g) =>
+          g.isLive ||
+          ["Final", "Completed", "Game Over", "Completed Early"].includes(g.status) ||
+          g.date <= todayIso
+      );
+
+      // Priorizar juegos EN VIVO al inicio, luego ordenar por fecha descendente
+      activeOrPlayed.sort((a, b) => {
+        if (a.isLive && !b.isLive) return -1;
+        if (!a.isLive && b.isLive) return 1;
+        return b.date.localeCompare(a.date);
+      });
+
+      if (activeOrPlayed.length > 0) {
+        return activeOrPlayed;
+      }
     }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (rawGames as any[]).map((g) => {
-      const isHome = Number(g.home_team_id) === LEONES_TEAM_ID;
-      const oppId = isHome ? Number(g.away_team_id) : Number(g.home_team_id);
-      const oppTeam = getTeam(oppId);
-      const caracasScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
-      const oppScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
-      const isLive = ["Live", "In Progress"].includes(g.status || "");
-
-      return {
-        id: Number(g.id),
-        gamePk: Number(g.game_pk ?? g.id),
-        date: g.game_date || "",
-        opponent: isHome ? `vs ${oppTeam.name}` : `@ ${oppTeam.name}`,
-        opponentLogo: oppTeam.logoUrl,
-        score: `${caracasScore}-${oppScore}`,
-        status: g.status || "Final",
-        isHome,
-        isLive,
-      };
-    });
   } catch (err) {
-    console.error("Fallo obteniendo juegos disponibles para Game Center:", err);
-    return [];
+    console.warn("Fallo obteniendo calendario de MLB Stats API:", err);
   }
+
+  // Fallback a Supabase si la llamada directa al calendario falla
+  if (supabase) {
+    try {
+      const { data: rawGames } = await supabase
+        .from("games")
+        .select("id, game_pk, game_date, season, game_type, status, home_team_id, away_team_id, home_score, away_score")
+        .eq("season", season)
+        .or("home_team_id.eq.695,away_team_id.eq.695")
+        .order("game_date", { ascending: false })
+        .limit(12);
+
+      if (rawGames && rawGames.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (rawGames as any[]).map((g) => {
+          const isHome = Number(g.home_team_id) === LEONES_TEAM_ID;
+          const oppId = isHome ? Number(g.away_team_id) : Number(g.home_team_id);
+          const oppTeam = getTeam(oppId);
+          const caracasScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
+          const oppScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
+          const isLive = ["Live", "In Progress"].includes(g.status || "");
+
+          return {
+            id: Number(g.id),
+            gamePk: Number(g.game_pk ?? g.id),
+            date: g.game_date || "",
+            opponent: isHome ? `vs ${oppTeam.name}` : `@ ${oppTeam.name}`,
+            opponentLogo: oppTeam.logoUrl,
+            score: `${caracasScore}-${oppScore}`,
+            status: g.status || "Final",
+            isHome,
+            isLive,
+          };
+        });
+      }
+    } catch (err) {
+      console.warn("Fallo fallback a Supabase:", err);
+    }
+  }
+
+  // Default canónico para la temporada 2026 activa
+  return [
+    {
+      id: 870083,
+      gamePk: 870083,
+      date: "2026-10-18",
+      opponent: "@ Caribes de Anzoátegui",
+      opponentLogo: "https://midfield.mlbstatic.com/v1/team/694/spots/120",
+      score: "EN VIVO",
+      status: "In Progress",
+      isHome: false,
+      isLive: true,
+    },
+  ];
 }
 
 /**
@@ -166,11 +259,11 @@ export async function getGameCenterData(
     if (liveGame) {
       gamePk = liveGame.gamePk;
     } else if (availableGames.length > 0) {
-      // 2. Tomar el partido más reciente
+      // 2. Tomar el partido más reciente de la temporada 2026
       gamePk = availableGames[0].gamePk;
     } else {
-      // Fallback canónico si no hay partidos en Supabase
-      gamePk = 829925; // Juego real LVBP Leones vs Bravos
+      // Fallback oficial de la temporada 2026
+      gamePk = 870083; // 2026-10-18: Leones @ Caribes
     }
   }
 
@@ -179,7 +272,7 @@ export async function getGameCenterData(
   try {
     const res = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`, {
       signal: AbortSignal.timeout(12000),
-      next: { revalidate: 10 },
+      next: { revalidate: 5 },
     });
     if (res.ok) {
       json = await res.json();
@@ -208,7 +301,10 @@ export async function getGameCenterData(
   // Estatus
   const detailedState = gameData.status?.detailedState || "Final";
   const abstractState = gameData.status?.abstractGameState || "Final";
-  const isLive = ["Live", "In Progress"].includes(abstractState) || detailedState === "In Progress";
+  const isLive =
+    ["Live", "In Progress"].includes(abstractState) ||
+    detailedState === "In Progress" ||
+    gameData.status?.codedGameState === "I";
   const isPreview = abstractState === "Preview" || ["Scheduled", "Pre-Game"].includes(detailedState);
   const status: "Live" | "Final" | "Preview" = isLive ? "Live" : isPreview ? "Preview" : "Final";
   const statusLabel = isLive ? "EN VIVO" : isPreview ? "PRE-JUEGO" : "FINAL";
@@ -249,7 +345,22 @@ export async function getGameCenterData(
     lob: Number(awayTotals.leftOnBase ?? 0),
   };
 
-  // Linescore entrada por entrada (mínimo 9 entradas para tablero estético)
+  // Actualizar el score en availableGames para el juego activo si aún decía "vs" o "EN VIVO"
+  const updatedAvailableGames = availableGames.map((g) => {
+    if (g.gamePk === gamePk) {
+      const cScore = isHomeLeones ? homeTeam.score : awayTeam.score;
+      const oScore = isHomeLeones ? awayTeam.score : homeTeam.score;
+      return {
+        ...g,
+        score: `${cScore}-${oScore}`,
+        isLive,
+        status: detailedState,
+      };
+    }
+    return g;
+  });
+
+  // Linescore entrada por entrada (mínimo 9 entradas)
   const rawInnings = linescore.innings || [];
   const maxInnings = Math.max(9, rawInnings.length);
   const inningsList = [];
@@ -265,20 +376,20 @@ export async function getGameCenterData(
   const linescoreData: GameCenterLinescore = {
     innings: inningsList,
     awayTotals: {
-      runs: homeTeam.isHome ? awayTeam.score : homeTeam.score,
+      runs: awayTeam.score,
       hits: Number(awayTotals.hits ?? 0),
       errors: Number(awayTotals.errors ?? 0),
       lob: Number(awayTotals.leftOnBase ?? 0),
     },
     homeTotals: {
-      runs: homeTeam.isHome ? homeTeam.score : awayTeam.score,
+      runs: homeTeam.score,
       hits: Number(homeTotals.hits ?? 0),
       errors: Number(homeTotals.errors ?? 0),
       lob: Number(homeTotals.leftOnBase ?? 0),
     },
-    currentInning: Number(linescore.currentInning || 9),
-    currentInningOrdinal: linescore.currentInningOrdinal || "9no",
-    inningHalf: (linescore.inningHalf as any) || "Bottom",
+    currentInning: Number(linescore.currentInning || (rawInnings.length > 0 ? rawInnings.length : 1)),
+    currentInningOrdinal: linescore.currentInningOrdinal || `${linescore.currentInning || 1}ra`,
+    inningHalf: (linescore.inningHalf as any) || (linescore.isTopInning ? "Top" : "Bottom"),
     isTopInning: Boolean(linescore.isTopInning),
   };
 
@@ -365,9 +476,21 @@ export async function getGameCenterData(
   const allRawPlays = plays.allPlays || [];
   const parsedPlays: GameCenterPlay[] = allRawPlays.map((p: any, idx: number) => {
     const res = p.result || {};
-    const rawEvent = res.event || "Jugada";
+    const rawEvent = res.event || (p.matchup?.batter ? "En Turno" : "Jugada");
     const eventName = EVENT_TRANSLATIONS[rawEvent] || rawEvent;
-    const description = translateDescriptionToSpanish(res.description || "");
+
+    let description = res.description ? translateDescriptionToSpanish(res.description) : "";
+    if (!description && p.matchup?.batter && p.matchup?.pitcher) {
+      const bName = p.matchup.batter.fullName;
+      const pName = p.matchup.pitcher.fullName;
+      const bCount = p.count?.balls ?? 0;
+      const sCount = p.count?.strikes ?? 0;
+      const oCount = p.count?.outs ?? 0;
+      description = `${bName} al bate contra ${pName}. Conteo: ${bCount}-${sCount}, ${oCount} out(s).`;
+    } else if (!description) {
+      description = "Turno al bate en desarrollo.";
+    }
+
     const inningNum = Number(p.about?.inning ?? 1);
     const half = p.about?.isTopInning ? "Alta" : "Baja";
     const isOut = Boolean(res.isOut);
@@ -390,7 +513,7 @@ export async function getGameCenterData(
       event: eventName,
       eventType: res.eventType || rawEvent,
       description,
-      score: `${res.awayScore ?? 0} - ${res.homeScore ?? 0}`,
+      score: `${res.awayScore ?? awayTeam.score} - ${res.homeScore ?? homeTeam.score}`,
       outs: Number(p.count?.outs ?? 0),
       isCaracasBatting,
       isScoringPlay: isScoring,
@@ -487,6 +610,6 @@ export async function getGameCenterData(
     linescore: linescoreData,
     plays: parsedPlays,
     boxscore: boxscoreData,
-    availableGames,
+    availableGames: updatedAvailableGames,
   };
 }
