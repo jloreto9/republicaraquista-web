@@ -72,8 +72,21 @@ export function StaffTab() {
                   </span>
                 </div>
 
-                <div className="w-8 h-8 rounded-lg bg-[#070B19] border border-[#1E2B4D] flex items-center justify-center shrink-0 text-slate-400">
-                  <User className="w-4 h-4" />
+                <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#070B19] border border-[#1E2B4D] flex items-center justify-center shrink-0 text-slate-400">
+                  {staff.photoUrl && !staff.photoUrl.includes("no_picture") ? (
+                    <img
+                      src={staff.photoUrl}
+                      alt={staff.name}
+                      width={40}
+                      height={40}
+                      className="w-full h-full object-cover object-top"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <User className="w-5 h-5 text-slate-400" />
+                  )}
                 </div>
               </div>
 

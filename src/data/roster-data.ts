@@ -64,7 +64,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
   // ── Lanzadores (21) ──
   {
     number: 88,
-    name: "Dany Toussaint",
+    name: "Touki Toussaint",
     position: "P",
     positionCategory: "pitcher",
     batsThrows: "D/D",
@@ -75,11 +75,12 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Florida, USA",
     level: "OTRO",
     origin: "importado",
+    mlbId: 657053,
     isWeeklyActive: true,
   },
   {
     number: 95,
-    name: "Alberto Leandro",
+    name: "Simon Leandro",
     position: "P",
     positionCategory: "pitcher",
     batsThrows: "D/D",
@@ -90,6 +91,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Caracas, Venezuela",
     level: "OTRO",
     origin: "criollo",
+    mlbId: 814129,
     isWeeklyActive: true,
   },
   {
@@ -121,7 +123,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Iowa, USA",
     level: "AAA",
     origin: "importado",
-    mlbId: 681313,
+    mlbId: 681854,
     isWeeklyActive: true,
   },
   {
@@ -137,7 +139,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "New York, USA",
     level: "AAA",
     origin: "importado",
-    mlbId: 694852,
+    mlbId: 689359,
     isWeeklyActive: true,
   },
   {
@@ -153,7 +155,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Valencia, Edo. Carabobo",
     level: "OTRO",
     origin: "criollo",
-    mlbId: 622728,
+    mlbId: 612797,
     isWeeklyActive: true,
   },
   {
@@ -169,6 +171,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "República Dominicana",
     level: "IND. LEAGUE",
     origin: "importado",
+    mlbId: 802993,
     isWeeklyActive: true,
   },
   {
@@ -184,7 +187,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Valencia, Carabobo",
     level: "AAA",
     origin: "criollo",
-    mlbId: 678869,
+    mlbId: 678738,
     isWeeklyActive: true,
   },
   {
@@ -200,7 +203,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Camagüey, Cuba",
     level: "AAA",
     origin: "importado",
-    mlbId: 683526,
+    mlbId: 680588,
     isWeeklyActive: true,
   },
   {
@@ -216,7 +219,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Maracay, Edo. Aragua",
     level: "MLB",
     origin: "criollo",
-    mlbId: 678873,
+    mlbId: 678215,
     isWeeklyActive: true,
   },
   {
@@ -248,7 +251,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Cagua, Edo. Aragua",
     level: "AAA",
     origin: "criollo",
-    mlbId: 678875,
+    mlbId: 672712,
     isWeeklyActive: true,
   },
   {
@@ -264,6 +267,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "La Victoria, Edo. Aragua",
     level: "AA",
     origin: "criollo",
+    mlbId: 800421,
     isWeeklyActive: true,
   },
   {
@@ -279,7 +283,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Ocumare del Tuy, Miranda",
     level: "OTRO",
     origin: "criollo",
-    mlbId: 691763,
+    mlbId: 692350,
     isWeeklyActive: true,
   },
   {
@@ -295,7 +299,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Oklahoma, USA",
     level: "AAA",
     origin: "importado",
-    mlbId: 694340,
+    mlbId: 702462,
     isWeeklyActive: true,
   },
   {
@@ -311,7 +315,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Puerto Cabello, Carabobo",
     level: "OTRO",
     origin: "criollo",
-    mlbId: 660682,
+    mlbId: 660508,
     isWeeklyActive: true,
   },
   {
@@ -327,7 +331,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Barcelona, Anzoátegui",
     level: "ROK",
     origin: "criollo",
-    mlbId: 683525,
+    mlbId: 703148,
     isWeeklyActive: true,
   },
   {
@@ -343,7 +347,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Matanzas, Cuba",
     level: "AAA",
     origin: "importado",
-    mlbId: 681312,
+    mlbId: 682624,
     isWeeklyActive: true,
   },
   {
@@ -359,7 +363,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Caracas, Distrito Capital",
     level: "OTRO",
     origin: "criollo",
-    mlbId: 672582,
+    mlbId: 665859,
     isWeeklyActive: true,
   },
   {
@@ -375,7 +379,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Santa Teresa del Tuy, Miranda",
     level: "OTRO",
     origin: "criollo",
-    mlbId: 542486,
+    mlbId: 542467,
     isWeeklyActive: true,
   },
   {
@@ -391,7 +395,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Virginia, USA",
     level: "MLB",
     origin: "importado",
-    mlbId: 684851,
+    mlbId: 687849,
     isWeeklyActive: true,
   },
 
@@ -409,7 +413,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Coro, Falcón",
     level: "AA",
     origin: "criollo",
-    mlbId: 806967,
+    mlbId: 806957,
     isWeeklyActive: true,
   },
   {
@@ -425,7 +429,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Maracay, Aragua",
     level: "OTRO",
     origin: "criollo",
-    mlbId: 599824,
+    mlbId: 593449,
     isWeeklyActive: true,
   },
 
@@ -443,7 +447,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Ocumare del Tuy, Miranda",
     level: "IND. LEAGUE",
     origin: "criollo",
-    mlbId: 646249,
+    mlbId: 625506,
     isWeeklyActive: true,
   },
   {
@@ -459,7 +463,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Guatire, Edo. Miranda",
     level: "AAA",
     origin: "criollo",
-    mlbId: 666619,
+    mlbId: 660681,
     isWeeklyActive: true,
   },
   {
@@ -507,6 +511,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Anzoátegui",
     level: "A",
     origin: "criollo",
+    mlbId: 699698,
     isWeeklyActive: true,
   },
   {
@@ -540,7 +545,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Maiquetía, Edo. La Guaira",
     level: "OTRO",
     origin: "criollo",
-    mlbId: 683391,
+    mlbId: 682900,
     isWeeklyActive: true,
   },
   {
@@ -572,7 +577,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Maracaibo, Estado Zulia",
     level: "AAA",
     origin: "criollo",
-    mlbId: 681320,
+    mlbId: 685744,
     isWeeklyActive: true,
   },
   {
@@ -588,7 +593,7 @@ export const LEONES_WEEKLY_ROSTER: RosterPlayer[] = [
     birthPlace: "Río Tucaní, Edo. Mérida",
     level: "AAA",
     origin: "criollo",
-    mlbId: 694200,
+    mlbId: 686404,
     isWeeklyActive: true,
   },
   {
@@ -627,7 +632,7 @@ export const LEONES_COACHING_STAFF: StaffMember[] = [
     name: "Heberto Andrade",
     role: "Coach de Banca",
     category: "coach",
-    photoUrl: "https://cdn.tujonron.net/public_photos/coaches/534932.png",
+    photoUrl: "/assets/players/534932.png",
     bio: "Más de 20 años de experiencia en Grandes Ligas como instructor de receptores y coach de banca con Piratas y Padres.",
   },
   {
@@ -635,7 +640,7 @@ export const LEONES_COACHING_STAFF: StaffMember[] = [
     name: "Wilson Álvarez",
     role: "Coach de Pitcheo",
     category: "coach",
-    photoUrl: "https://cdn.tujonron.net/public_photos/no_picture.png",
+    photoUrl: "/assets/players/110209.png",
     bio: "'El Intocable'. Lanzador zurdo histórico de MLB (Juego sin hit ni carrera), arquitecto de cuerpos monticulares campeones.",
   },
   {

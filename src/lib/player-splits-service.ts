@@ -843,19 +843,19 @@ export async function getAllAvailablePlayersForSplits(
         { id: 682900, name: "Brainer Bonaci", avatarUrl: getPlayerHeadshotUrl(682900), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .333 AVG • 0 HR • 0 CI" },
         { id: 602074, name: "Yonathan Daza", avatarUrl: getPlayerHeadshotUrl(602074), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .333 AVG • 0 HR • 0 CI" },
         { id: 602922, name: "José Rondón", avatarUrl: getPlayerHeadshotUrl(602922), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
-        { id: 660821, name: "Leandro Cedeño", avatarUrl: getPlayerHeadshotUrl(660821), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
+        { id: 660681, name: "Leandro Cedeño", avatarUrl: getPlayerHeadshotUrl(660681), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
         { id: 672580, name: "Aldrem Corredor", avatarUrl: getPlayerHeadshotUrl(672580), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
-        { id: 814407, name: "Alfredo Duno", avatarUrl: getPlayerHeadshotUrl(814407), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
+        { id: 806957, name: "Alfredo Duno", avatarUrl: getPlayerHeadshotUrl(806957), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
         { id: 672820, name: "Lenyn Sosa", avatarUrl: getPlayerHeadshotUrl(672820), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
         { id: 541600, name: "Wilfredo Tovar", avatarUrl: getPlayerHeadshotUrl(541600), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
-        { id: 678876, name: "Kenedy Corona", avatarUrl: getPlayerHeadshotUrl(678876), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
+        { id: 685744, name: "Kenedy Corona", avatarUrl: getPlayerHeadshotUrl(685744), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "batter", subtitle: "CAR • .000 AVG • 0 HR • 0 CI" },
       ];
       const leones2026Pitchers: PlayerSelectorItem[] = [
         { id: 657053, name: "Touki Toussaint", avatarUrl: getPlayerHeadshotUrl(657053), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 2.0 IP • 2 K" },
-        { id: 687445, name: "Connor Van Scoyoc", avatarUrl: getPlayerHeadshotUrl(687445), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 2.0 IP • 3 K" },
-        { id: 702758, name: "Jose Leandro", avatarUrl: getPlayerHeadshotUrl(702758), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 1.0 IP • 1 K" },
-        { id: 683050, name: "Raimon Gomez", avatarUrl: getPlayerHeadshotUrl(683050), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 1.0 IP • 1 K" },
-        { id: 678848, name: "Juan Sanchez", avatarUrl: getPlayerHeadshotUrl(678848), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 1.0 IP • 1 K" },
+        { id: 681854, name: "Connor Van Scoyoc", avatarUrl: getPlayerHeadshotUrl(681854), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 2.0 IP • 3 K" },
+        { id: 814129, name: "Simon Leandro", avatarUrl: getPlayerHeadshotUrl(814129), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 1.0 IP • 1 K" },
+        { id: 703148, name: "Raimon Gomez", avatarUrl: getPlayerHeadshotUrl(703148), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 1.0 IP • 1 K" },
+        { id: 678738, name: "Juan Sanchez", avatarUrl: getPlayerHeadshotUrl(678738), teamId: 695, teamAbbr: "CAR", teamLogo: getTeam(695).logoUrl, type: "pitcher", subtitle: "CAR • 1.0 IP • 1 K" },
       ];
       items.push(...leones2026Batters, ...leones2026Pitchers);
     }

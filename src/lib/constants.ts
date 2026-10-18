@@ -2,10 +2,33 @@ import { Team } from "@/types/sports";
 
 export const MLB_SPOT_BASE = "https://midfield.mlbstatic.com/v1/team";
 
+import { hasLocalPlayerPhoto } from "./player-photos-data";
+
 /**
- * Retorna la URL oficial del Headshot de MLB (Cloudinary CDN con fallback de silueta oficial genérica)
+ * Retorna la URL del Headshot del pelotero implementando la cascada canónica:
+ * 1. Asset local optimizado (/assets/players/{id}.png) - Cero latencia, offline PWA y anti-bloqueos.
+ * 2. Fallback TuJonrón CDN (recorte uniforme oficial LVBP en RGBA transparente o foto estándar).
+ * 3. Fallback oficial Cloudinary CDN de MLB (con silueta oficial genérica).
  */
 export function getPlayerHeadshotUrl(playerId: number | string): string {
+  const cleanId = String(playerId).trim();
+  if (!cleanId || cleanId === "0") {
+    return "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/generic/headshot/67/current";
+  }
+
+  // Nivel 1: Si el archivo existe en los assets locales descargados de la app
+  if (hasLocalPlayerPhoto(cleanId)) {
+    return `/assets/players/${cleanId}.png`;
+  }
+
+  // Nivel 2: TuJonrón CDN (custom transparente con uniforme de equipo)
+  return `https://cdn.tujonron.net/public_photos/custom/${cleanId}.png`;
+}
+
+/**
+ * Retorna la URL oficial de MLB como fallback garantizado
+ */
+export function getMlbFallbackHeadshotUrl(playerId: number | string): string {
   const cleanId = String(playerId).trim();
   if (!cleanId || cleanId === "0") {
     return "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current/w_213,q_auto:best/v1/people/generic/headshot/67/current";
