@@ -6,12 +6,14 @@ import {
   ACTIVE_SEASON,
   getPlayerHeadshotUrl,
 } from "./constants";
+import { isDayGame } from "./utils";
 import { TeamStanding, GameSummary, SeasonKPIs, BattingStats, PitchingStats } from "@/types/sports";
 
 interface SupabaseGameRow {
   id: number;
   game_pk?: number;
   game_date?: string;
+  game_datetime?: string;
   season?: number;
   game_type?: string;
   status?: string;
@@ -370,7 +372,7 @@ export async function getRecentGames(
       awayScore: Number(g.away_score ?? 0),
       currentInning: g.current_inning,
       inningState: g.inning_state,
-      isDayGame: Boolean(g.is_day_game),
+      isDayGame: isDayGame(g.game_datetime, g.is_day_game),
     };
   });
 }
@@ -403,7 +405,7 @@ export async function getSeasonKPIs(season = ACTIVE_SEASON): Promise<SeasonKPIs>
       const caracasScore = isHome ? Number(g.home_score) : Number(g.away_score);
       const oppScore = isHome ? Number(g.away_score) : Number(g.home_score);
       const won = caracasScore > oppScore;
-      const isDay = Boolean(g.is_day_game);
+      const isDay = isDayGame(g.game_datetime, g.is_day_game);
 
       if (isDay) {
         if (won) dayWins++;

@@ -12,6 +12,7 @@ import {
 import { ACTIVE_SEASON, getTeam, getPlayerHeadshotUrl } from "./constants";
 import { supabase, getBattingStats, getPitchingStats } from "./supabase";
 import { getSeasonWpaLeaders } from "./wpa-engine";
+import { isDayGame } from "./utils";
 import calendarData from "@/data/calendar_2026_27.json";
 
 // ── LÍNEA BASE LIMPIA / INICIAL EN CERO PARA NUEVAS TEMPORADAS ────────────────
@@ -232,7 +233,8 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       if (isHome) { if (won) homeWins++; else homeLosses++; }
       else { if (won) awayWins++; else awayLosses++; }
 
-      if (g.is_day_game) { if (won) dayWins++; else dayLosses++; }
+      const isDay = isDayGame(g.game_datetime, g.is_day_game);
+      if (isDay) { if (won) dayWins++; else dayLosses++; }
       else { if (won) nightWins++; else nightLosses++; }
 
       if (won && oScore === 0) shutouts++;

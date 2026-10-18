@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { ACTIVE_SEASON, LVBP_TEAMS, LVBP_TEAM_IDS, getTeam, getPlayerHeadshotUrl } from "./constants";
+import { isDayGame } from "./utils";
 import {
   PlayerSplitRow,
   PitcherSplitRow,
@@ -89,22 +90,10 @@ export function formatInnings(ipDecimal: number): string {
 }
 
 /**
- * Determina si un juego se disputó de noche (>= 19:00 VET / UTC-4) o de día.
+ * Determina si un juego se disputó de noche (>= 18:00 VET / UTC-4) o de día (< 18:00 VET).
  */
 export function isNightGame(gameDatetime?: string, isDayGameFlag?: boolean): boolean {
-  if (isDayGameFlag !== undefined && isDayGameFlag !== null) {
-    return !isDayGameFlag;
-  }
-  if (!gameDatetime) return true; // La mayoría en LVBP son nocturnos (19:00 VET)
-  try {
-    const d = new Date(gameDatetime);
-    // VET es UTC-4
-    const utcHours = d.getUTCHours();
-    const vetHour = (utcHours - 4 + 24) % 24;
-    return vetHour >= 19;
-  } catch {
-    return true;
-  }
+  return !isDayGame(gameDatetime, isDayGameFlag);
 }
 
 /**
@@ -457,8 +446,8 @@ export async function getPlayerSplitsProfile(
       const contextSplits: PlayerSplitRow[] = [
         buildBatterSplitRow("En Casa (Local)", "context", "Local", homeRows),
         buildBatterSplitRow("En la Carretera (Visitante)", "context", "Visitante", awayRows),
-        buildBatterSplitRow("De Noche (≥ 7:00 PM)", "context", "Nocturno", nightRows),
-        buildBatterSplitRow("De Día (< 7:00 PM)", "context", "Diurno", dayRows),
+        buildBatterSplitRow("De Noche (≥ 6:00 PM)", "context", "Nocturno", nightRows),
+        buildBatterSplitRow("De Día (< 6:00 PM)", "context", "Diurno", dayRows),
         buildBatterSplitRow("En Victorias", "context", "Triunfos", winRows),
         buildBatterSplitRow("En Derrotas", "context", "Reveses", lossRows),
       ];
@@ -628,8 +617,8 @@ export async function getPlayerSplitsProfile(
         totalRow,
         buildPitcherSplitRow("En Casa (Local)", "context", "Local", homeRows),
         buildPitcherSplitRow("En la Carretera (Visitante)", "context", "Visitante", awayRows),
-        buildPitcherSplitRow("De Noche (≥ 7:00 PM)", "context", "Nocturno", nightRows),
-        buildPitcherSplitRow("De Día (< 7:00 PM)", "context", "Diurno", dayRows),
+        buildPitcherSplitRow("De Noche (≥ 6:00 PM)", "context", "Nocturno", nightRows),
+        buildPitcherSplitRow("De Día (< 6:00 PM)", "context", "Diurno", dayRows),
         buildPitcherSplitRow("En Victorias del Equipo", "context", "Triunfos", winRows),
         buildPitcherSplitRow("En Derrotas del Equipo", "context", "Reveses", lossRows),
       ];

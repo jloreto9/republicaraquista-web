@@ -6,6 +6,7 @@ import {
   GameCenterAvailableGame,
 } from "@/types/game-center";
 import { RefreshCw, Calendar, MapPin, ChevronDown } from "lucide-react";
+import { ShareButton } from "@/components/layout/share-button";
 
 interface GameHeroMatchupProps {
   homeTeam: GameCenterTeam;
@@ -86,6 +87,12 @@ export function GameHeroMatchup({
             )}
             <span>{statusLabel}</span>
           </span>
+
+          <ShareButton
+            title={`Game Center: ${awayTeam.name} vs ${homeTeam.name}`}
+            text={`¡Sigue el juego ${awayTeam.name} (${awayTeam.score}) vs ${homeTeam.name} (${homeTeam.score}) en vivo por REPUBLICARAQUISTAPP! 🦁⚾`}
+            compact
+          />
 
           <button
             onClick={onRefresh}

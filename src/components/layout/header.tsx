@@ -4,6 +4,7 @@ import Image from "next/image";
 import { getTeam, ACTIVE_SEASON, formatSeason } from "@/lib/constants";
 import { useSeason } from "@/context/season-context";
 import { ChevronDown } from "lucide-react";
+import { ShareButton } from "./share-button";
 
 interface HeaderProps {
   title: string;
@@ -32,7 +33,7 @@ export function Header({
         </div>
       </div>
 
-      <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
+      <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
         {/* Interactive Season Selector Dropdown */}
         <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#0D152B] border border-[#1E2B4D] text-xs shadow-sm hover:border-[#FDB827]/40 transition-colors">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
@@ -53,6 +54,12 @@ export function Header({
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-0 pointer-events-none opacity-80" />
           </div>
         </div>
+
+        {/* Share Button */}
+        <ShareButton
+          title={`${title} • REPUBLICARAQUISTAPP`}
+          text={`¡Sigue a los Leones del Caracas en ${title} en REPUBLICARAQUISTAPP! 🦁⚾`}
+        />
 
         {/* Leones Mini Badge */}
         <div className="flex items-center space-x-2 px-3 py-1 rounded-lg bg-[#002D62]/40 border border-[#FDB827]/30">
