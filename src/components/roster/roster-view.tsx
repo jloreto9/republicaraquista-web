@@ -27,6 +27,30 @@ export function RosterView() {
     "weekly"
   );
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [meta, setMeta] = useState(WEEKLY_ROSTER_META);
+  const [players, setPlayers] = useState(LEONES_WEEKLY_ROSTER);
+  const [movements, setMovements] = useState<{ entran: string[]; salen: string[] }>({
+    entran: [],
+    salen: [],
+  });
+
+  React.useEffect(() => {
+    fetch("/data/roster_latest.json")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.meta) {
+          setMeta((prev) => ({
+            ...prev,
+            officialDate: data.meta.officialDate || prev.officialDate,
+            pdfUrl: data.meta.pdfUrl || prev.pdfUrl,
+          }));
+          if (data.meta.movements) {
+            setMovements(data.meta.movements);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
@@ -75,7 +99,38 @@ export function RosterView() {
       </div>
 
       {/* ── KPIs Métricos de la Plantilla ── */}
-      <RosterKpis meta={WEEKLY_ROSTER_META} players={LEONES_WEEKLY_ROSTER} />
+      <RosterKpis meta={meta} players={players} />
+
+      {/* ── Movimientos Semanales (Altas y Bajas) ── */}
+      {(movements.entran.length > 0 || movements.salen.length > 0) && (
+        <div className="p-3.5 rounded-2xl bg-[#0D152B]/80 border border-[#1E2B4D] space-y-2">
+          <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-400">
+            Movimientos Confirmados de la Semana:
+          </span>
+          <div className="flex flex-wrap gap-4 items-center text-xs">
+            {movements.entran.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-bold text-emerald-400 font-mono text-[10px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30">
+                  ENTRAN:
+                </span>
+                <span className="text-slate-200 font-medium">
+                  {movements.entran.join(", ")}
+                </span>
+              </div>
+            )}
+            {movements.salen.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-bold text-rose-400 font-mono text-[10px] uppercase px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/30">
+                  SALEN:
+                </span>
+                <span className="text-slate-400 font-medium">
+                  {movements.salen.join(", ")}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Selector de Pestañas (Matching LVBP: Semanal / Staff / Plantel) ── */}
       <div className="border-b border-[#1E2B4D] flex items-center space-x-1 sm:space-x-2 overflow-x-auto pb-px">
@@ -123,7 +178,7 @@ export function RosterView() {
       <div>
         {activeTab === "weekly" && (
           <WeeklyRosterTab
-            players={LEONES_WEEKLY_ROSTER}
+            players={players}
             onOpenPdf={() => setIsPdfModalOpen(true)}
           />
         )}
@@ -135,7 +190,7 @@ export function RosterView() {
       <PdfViewerModal
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}
-        meta={WEEKLY_ROSTER_META}
+        meta={meta}
       />
     </div>
   );

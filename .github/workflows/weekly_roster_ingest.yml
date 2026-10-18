@@ -1,0 +1,45 @@
+name: Ingesta Semanal de Roster LVBP (Leones del Caracas)
+
+on:
+  schedule:
+    # Lunes en la tarde (18:00 UTC = 02:00 PM AST, 21:00 UTC = 05:00 PM AST, 23:00 UTC = 07:00 PM AST)
+    - cron: '0 18,21,23 * * 1'
+    # Martes en la mañana/tarde (14:00 UTC = 10:00 AM AST, 18:00 UTC = 02:00 PM AST)
+    - cron: '0 14,18 * * 2'
+  workflow_dispatch:
+
+jobs:
+  ingest_roster:
+    name: Verificación Semanal de Roster Oficial
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: |
+          pip install beautifulsoup4
+
+      - name: Run Ingest Script
+        run: |
+          python scripts/ingest_weekly_roster.py
+
+      - name: Commit and Push Changes (si hubo nuevo roster o PDF)
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/data/roster_latest.json public/documents/
+          if git diff --staged --quiet; then
+            echo "No se detectaron cambios en el roster semanal."
+          else
+            git commit -m "chore(roster): actualización semanal automática de roster oficial LVBP [skip ci]"
+            git push origin main
+          fi
