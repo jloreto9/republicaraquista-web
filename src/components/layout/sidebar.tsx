@@ -17,6 +17,7 @@ import {
   Calendar,
   TrendingUp,
   Newspaper,
+  UserCheck,
 } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ interface NavItem {
 const navigationItems: NavItem[] = [
   { name: "Centro de Mando", href: "/", icon: LayoutDashboard },
   { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
+  { name: "Roster Oficial & Staff", href: "/roster", icon: UserCheck, badge: "34" },
   { name: "Calendario Oficial", href: "/calendario", icon: Calendar },
   { name: "NotiCueva", href: "/noticueva", icon: Newspaper, badge: "NUEVO" },
   // { name: "Líneas & Probabilidades", href: "/probabilidades", icon: TrendingUp }, // Temporalmente oculto
