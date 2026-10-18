@@ -42,16 +42,20 @@ flowchart TD
 
 - **Frontend en Vercel:** Next.js 16.3.6 (Turbopack) con React 19, Tailwind CSS v4, temas Dark Navy (`#070B19`), Tarjetas Glassmorphism (`#0D152B`) y acentos oficiales Dorado Caraquista (`#FDB827`).
 - **PWA Instalable:** Experiencia nativa en móviles y tablets (iOS / Android) con manifest completo, iconos HD y diseño responsivo.
+- **Audio Streaming en Vivo:** Circuito radial integrado con streaming en directo de La Mega 107.3 FM (Unión Radio) para escuchar los juegos de Leones del Caracas sin interrumpir la navegación.
+- **Herramientas de Comunidad:** Botón de compartir nativo multicanal (WhatsApp, X, Telegram, portapapeles) en cabecera global, barra móvil y Game Center.
 - **Persistencia & Seguridad (RLS):** Supabase PostgreSQL blindado con Row Level Security (RLS) activo en todas las tablas, prevención estricta de borrado (`DELETE`) contra accesos no autorizados y proxy server-side.
-- **CDN Canónico de Fotos:** Headshots oficiales de peloteros servidos en alta resolución desde el CDN de MLB (`img.mlbstatic.com`) con siluetas oficiales de fallback.
+- **CDN Canónico de Fotos:** Headshots oficiales de peloteros servidos en alta resolución desde el CDN de MLB (`img.mlbstatic.com`) y TuJonrón con siluetas oficiales de fallback.
 
 ---
 
-## ⚾ Suite Completa de 13 Vistas Sabermétricas
+## ⚾ Suite Completa de Vistas Sabermétricas & Módulos en Vivo
 
 | Ruta | Módulo | Descripción y Capacidades Sabermétricas |
 | :--- | :--- | :--- |
-| `/` | **Centro de Mando** | Scoreboard cara a cara en vivo, series particulares, desglose Día/Noche, Semanas ISO. Pestaña activa por defecto **"Último Juego"** con marcador detallado y MVP de Leones (Tango RE24), Tendencias U10J, Líderes del Equipo y Leones Stats. |
+| `/` | **Centro de Mando** | Scoreboard cara a cara en vivo, series particulares, desglose canónico Día (< 18:00 VET) y Noche (≥ 18:00 VET), Semanas ISO. Pestaña activa por defecto **"Último Juego"** con marcador detallado y MVP de Leones (Tango RE24), Tendencias U10J, Líderes del Equipo y Leones Stats. |
+| `/game-center` | **Game Center (En Vivo)** | **Segunda pantalla oficial en vivo de Leones del Caracas**: diamante interactivo con corredores en base, conteo dinámico B-S-O, duelo actual lanzador vs bateador, linescore R-H-E por entradas, play-by-play en tiempo real, selector de partidos y botón directo de compartir en WhatsApp y redes. |
+| `/roster` | **Roster Oficial & Coaching Staff** | Nómina semanal oficial de 34 jugadores activos autorizada por la LVBP, clasificada por rol (Lanzadores, Receptores, Infielders, Jardineros) con fotos oficiales transparentes, datos biográficos, más el cuerpo técnico completo liderado por José Alguacil, filtros por posición y buscador por nombre/número. |
 | `/standings` | **Posiciones & ELO** | Tabla de clasificación oficial, Expectativa Pitagórica ($xW/xL$ con exponente 1.83), ratings ELO dinámicos y simulador Monte Carlo (5,000 iteraciones) de clasificación a Round Robin y Serie Final. |
 | `/calendario` | **Calendario Oficial LVBP 2026-2027** | Cuadrícula interactiva mensual (Octubre, Noviembre, Diciembre), diferenciación cromática de local (blanco) y visitante (dorado `#FDB827`), sincronización con Google Calendar y Apple Calendar (`webcal://`), badges y logotipos de televisoras y streaming (Televen, Venevisión, IVC, ByM Sport, 1Baseball, SimpleTV, YouTube). |
 | `/probabilidades` | **Líneas & Probabilidades (Tipster Hub)** | Proyecciones de partidos (ELO dinámico + delta FIP abridores + bullpen + factores de parque LVBP + Poisson/Skellam), cálculo de Cuotas Justas (Fair Odds), comparador de 4 casas de apuestas de Venezuela (**JuegaEnLínea**, **Betcris**, **SellaTuParley**, **Apuestas Royal**), detector de **Mejor Cuota** y **Cuotas Desfasadas ($EV \ge 12\%$)**, gestión de bankroll con **Quarter-Kelly** y exportador Canvas HTML5 de tarjetas de picks en formato dual HD (Cuadrado 1:1 a 2400x2400 y Vertical 9:16 a 1080x1920 a 300 DPI). |
@@ -64,6 +68,8 @@ flowchart TD
 | `/spray-charts` | **Spray Charts & Strike Zone** | Gráficos espaciales de batazos sobre diamante con modelo determinístico de dureza BIS (Hard, Medium, Soft) y mapas de calor 3x3 de disciplina en el plato (O-Swing%, Z-Contact%, SwStr%, CSW%). Prohibición estricta de Statcast en LVBP. |
 | `/pitching` | **Pitching Summary & Telemetría** | Buscador universal de lanzadores (MLB/MiLB y Leones del Caracas). Conmutador Salida Individual vs Temporada Completa. Rama MLB (Statcast Hawk-Eye: IVB, HB, Whiff%, Zone%) vs Rama Caracas (Play-by-Play Tango RE24: destinos, carga por entrada y splits LHB/RHB). Exportación de tarjeta oficial cuadrada (2400x2400 px a 300 DPI) estilo Thomas Nestico (@TJStats). |
 | `/noticueva` | **NotiCueva por Gilberto Méndez** | Espacio editorial oficial con crónicas de la cueva melenuda, feed oficial de X (@RepubCaraquista), y panel de redacción protegido (`/admin`) con barra de formato enriquecido, vista previa en tiempo real y persistencia relacional en Supabase. |
+| *Global* | **Circuito Radial en Vivo (Sticky Player)** | Reproductor flotante persistente con la señal oficial en directo de **La Mega 107.3 FM / Unión Radio** para sintonizar las transmisiones de los Leones del Caracas sin interrumpir la navegación. |
+| *Global* | **Compartir en WhatsApp & Redes** | Botón interactivo presente en la cabecera, barra móvil y Game Center para compartir marcadores, enlaces y análisis en WhatsApp, X, Telegram o Web Share API. |
 
 ---
 
