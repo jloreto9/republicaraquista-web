@@ -5,11 +5,15 @@
     "remotePdfUrl": "https://sapven.com/download/Leones_20261013.pdf",
     "maxLimit": 34,
     "totalActive": 33,
-    "updatedAt": "2026-10-18T22:41:09.910278+00:00",
+    "updatedAt": "2026-10-19T21:46:08.986852+00:00",
     "source": "Liga Venezolana de Béisbol Profesional (LVBP) · TuJonron.com",
     "movements": {
-      "entran": [],
-      "salen": []
+      "entran": [
+        "Aldrem Corredor"
+      ],
+      "salen": [
+        "Leandro Cedeño"
+      ]
     }
   },
   "players": [
@@ -388,6 +392,23 @@
       "photoUrl": "https://cdn.tujonron.net/public_photos/custom/593449.png"
     },
     {
+      "number": 37,
+      "name": "Aldrem Corredor",
+      "position": "IF",
+      "positionCategory": "infielder",
+      "batsThrows": "I/I",
+      "height": "1.83 m",
+      "weight": "92 kg",
+      "age": 30,
+      "birthDate": "",
+      "birthPlace": "Venezuela, Miranda",
+      "level": "LVBP",
+      "origin": "criollo",
+      "mlbId": 625506,
+      "isWeeklyActive": true,
+      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/625506.png"
+    },
+    {
       "number": 5,
       "name": "Brainer Bonaci",
       "position": "IF",
@@ -403,23 +424,6 @@
       "mlbId": 682900,
       "isWeeklyActive": true,
       "photoUrl": "https://cdn.tujonron.net/public_photos/custom/682900.png"
-    },
-    {
-      "number": 61,
-      "name": "Leandro Cedeño",
-      "position": "IF",
-      "positionCategory": "infielder",
-      "batsThrows": "D/D",
-      "height": "1.88 m",
-      "weight": "120 kg",
-      "age": 28,
-      "birthDate": "",
-      "birthPlace": "Venezuela, Guatire",
-      "level": "LVBP",
-      "origin": "criollo",
-      "mlbId": 660681,
-      "isWeeklyActive": true,
-      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/660681.png"
     },
     {
       "number": 50,
@@ -473,6 +477,23 @@
       "photoUrl": "https://cdn.tujonron.net/public_photos/photos/800421.png"
     },
     {
+      "number": 81,
+      "name": "Ricardo Cova",
+      "position": "IF",
+      "positionCategory": "infielder",
+      "batsThrows": "D/D",
+      "height": "1.75 m",
+      "weight": "66 kg",
+      "age": 22,
+      "birthDate": "",
+      "birthPlace": "Venezuela, Puerto La Cruz",
+      "level": "LVBP",
+      "origin": "criollo",
+      "mlbId": 699698,
+      "isWeeklyActive": true,
+      "photoUrl": "https://cdn.tujonron.net/public_photos/photos/699698.png"
+    },
+    {
       "number": 7,
       "name": "Wilfredo Tovar",
       "position": "IF",
@@ -522,23 +543,6 @@
       "mlbId": 685744,
       "isWeeklyActive": true,
       "photoUrl": "https://cdn.tujonron.net/public_photos/custom/685744.png"
-    },
-    {
-      "number": 81,
-      "name": "Ricardo Cova",
-      "position": "OF",
-      "positionCategory": "outfielder",
-      "batsThrows": "D/D",
-      "height": "1.75 m",
-      "weight": "66 kg",
-      "age": 22,
-      "birthDate": "",
-      "birthPlace": "Venezuela, Puerto La Cruz",
-      "level": "LVBP",
-      "origin": "criollo",
-      "mlbId": 699698,
-      "isWeeklyActive": true,
-      "photoUrl": "https://cdn.tujonron.net/public_photos/photos/699698.png"
     },
     {
       "number": 43,
