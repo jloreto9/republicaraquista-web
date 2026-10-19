@@ -13,6 +13,7 @@ import { ACTIVE_SEASON, getTeam, getPlayerHeadshotUrl } from "./constants";
 import { supabase, getBattingStats, getPitchingStats } from "./supabase";
 import { getSeasonWpaLeaders } from "./wpa-engine";
 import { isDayGame } from "./utils";
+import { fetchGameLiveFeed } from "./game-feed-service";
 import calendarData from "@/data/calendar_2026_27.json";
 
 // ── LÍNEA BASE LIMPIA / INICIAL EN CERO PARA NUEVAS TEMPORADAS ────────────────
@@ -278,11 +279,88 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
     const l10Losses = last10Slice.filter((w) => !w).length;
     const last10 = `${l10Wins}-${l10Losses}`;
 
-    // Para la temporada 2026-2027 en curso (1 juego disputado, derrota del abridor)
-    const starterLosses = losses;
-    const starterWins = 0;
-    const relieverWins = wins;
-    const relieverLosses = 0;
+    // Cálculo dinámico de situaciones de presión y decisiones de pitcheo vía MLB Stats API
+    let remontados = 0;
+    let arribaWins = 0;
+    let arribaLosses = 0;
+    let terreneadas = 0;
+    let starterWins = 0;
+    let starterLosses = 0;
+    let relieverWins = 0;
+    let relieverLosses = 0;
+    let saves = 0;
+
+    await Promise.all(
+      sortedGames.map(async (g) => {
+        try {
+          const feed = await fetchGameLiveFeed(Number(g.id));
+          if (!feed) return;
+
+          const isHome = Number(g.home_team_id) === 695;
+          const live = feed.liveData || {};
+          const linescore = live.linescore || {};
+          const box = live.boxscore || {};
+          const dec = live.decisions || {};
+
+          const hScore = Number(linescore.teams?.home?.runs ?? g.home_score ?? 0);
+          const aScore = Number(linescore.teams?.away?.runs ?? g.away_score ?? 0);
+          const cScore = isHome ? hScore : aScore;
+          const oScore = isHome ? aScore : hScore;
+          const won = cScore > oScore;
+
+          // Carreras acumuladas al término del 6to inning
+          let cRuns6 = 0;
+          let oRuns6 = 0;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (linescore.innings || []).slice(0, 6).forEach((inn: any) => {
+            cRuns6 += Number((isHome ? inn.home?.runs : inn.away?.runs) || 0);
+            oRuns6 += Number((isHome ? inn.away?.runs : inn.home?.runs) || 0);
+          });
+
+          const ledAfter6 = cRuns6 > oRuns6;
+          const trailedAfter6 = cRuns6 < oRuns6;
+
+          if (trailedAfter6 && won) remontados++;
+          if (ledAfter6 && won) arribaWins++;
+          if (ledAfter6 && !won) arribaLosses++;
+
+          // Terreneadas: Leones como home team gana en el 9no o extrainning dejando en el terreno
+          const allPlays = live.plays?.allPlays || [];
+          const lastPlay = allPlays[allPlays.length - 1] || {};
+          const lastPlayHalf = lastPlay.about?.halfInning;
+          const lastPlayInning = Number(lastPlay.about?.inning || 1);
+          const isWalkoffPlay = Boolean(lastPlay.about?.isWalkOff);
+
+          if (isHome && won && ((lastPlayHalf === "bottom" && lastPlayInning >= 9) || isWalkoffPlay)) {
+            terreneadas++;
+          }
+
+          // Decisiones oficiales de pitcheo
+          const winnerId = dec.winner?.id;
+          const loserId = dec.loser?.id;
+          const saveId = dec.save?.id;
+
+          const leoBox = box.teams?.[isHome ? "home" : "away"] || {};
+          const pitchers = (leoBox.pitchers || []).map(Number);
+          const starterId = pitchers[0];
+          const relievers = pitchers.slice(1);
+
+          if (won && winnerId && winnerId === starterId) starterWins++;
+          if (!won && loserId && loserId === starterId) starterLosses++;
+          if (won && winnerId && relievers.includes(winnerId)) relieverWins++;
+          if (!won && loserId && relievers.includes(loserId)) relieverLosses++;
+          if (won && saveId && pitchers.includes(saveId)) saves++;
+        } catch (err) {
+          console.warn(`Error procesando feed de juego ${g.id} para métricas avanzadas:`, err);
+        }
+      })
+    );
+
+    // Fallbacks defensivos si fallara la red de MLB
+    const effectiveStarters =
+      starterWins + starterLosses > 0 ? `${starterWins}-${starterLosses}` : `0-${losses}`;
+    const effectiveRelievers =
+      relieverWins + relieverLosses > 0 ? `${relieverWins}-${relieverLosses}` : `${wins}-0`;
 
     return {
       totalGames: rawGames.length,
@@ -296,12 +374,12 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       extraInning: `${extraWins}-${extraLosses}`,
       last10,
       oneRun: `${oneRunWins}-${oneRunLosses}`,
-      remontados: 0,
-      up: "0-0",
-      terreneadas: 0,
-      starters: `${starterWins}-${starterLosses}`,
-      relievers: `${relieverWins}-${relieverLosses}`,
-      saves: 0,
+      remontados,
+      up: `${arribaWins}-${arribaLosses}`,
+      terreneadas,
+      starters: effectiveStarters,
+      relievers: effectiveRelievers,
+      saves,
       oct: `${octW}G-${octL}P`,
       nov: `${novW}G-${novL}P`,
       dec: `${decW}G-${decL}P`,
