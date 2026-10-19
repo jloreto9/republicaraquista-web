@@ -128,10 +128,34 @@ function simulateFinalSeries(
   return w1 > w2 ? team1 : team2;
 }
 
+function generateSyntheticRemainingSchedule(
+  standingsMap: Map<number, TeamStanding>,
+  balancedSchedule: [number, number][]
+): [number, number][] {
+  const neededGames = new Map<number, number>();
+  for (const tid of LVBP_TEAM_IDS) {
+    const played = standingsMap.get(tid)?.gamesPlayed ?? 0;
+    neededGames.set(tid, Math.max(0, 56 - played));
+  }
+
+  const result: [number, number][] = [];
+  for (const [h, a] of balancedSchedule) {
+    const needH = neededGames.get(h) ?? 0;
+    const needA = neededGames.get(a) ?? 0;
+    if (needH > 0 && needA > 0) {
+      result.push([h, a]);
+      neededGames.set(h, needH - 1);
+      neededGames.set(a, needA - 1);
+    }
+  }
+  return result;
+}
+
 export function runMonteCarloSimulation(
   standings: TeamStanding[],
   mode: "actual" | "scratch" = "actual",
-  nSimulations: number = 3000
+  nSimulations: number = 3000,
+  remainingGames?: [number, number][]
 ): MonteCarloResults {
   const teams = LVBP_TEAM_IDS;
   const eloMap = new Map<number, number>();
@@ -159,9 +183,11 @@ export function runMonteCarloSimulation(
     champCounts.set(tid, 0);
   }
 
-  // Comprobar si la temporada regular ya completó 56 juegos
-  const totalGames = standings.reduce((acc, s) => acc + s.gamesPlayed, 0);
-  const isCompleted = totalGames >= 224;
+  // Comprobar si la temporada regular ya completó 56 juegos por equipo (448 acumulados en tabla)
+  const totalGamesPlayed = standings.reduce((acc, s) => acc + s.gamesPlayed, 0);
+  const isCompleted =
+    totalGamesPlayed >= 448 ||
+    (remainingGames !== undefined && remainingGames.length === 0 && totalGamesPlayed > 0);
 
   // Generar calendario balanceado para modo scratch
   const balancedSchedule: [number, number][] = [];
@@ -175,6 +201,12 @@ export function runMonteCarloSimulation(
       }
     }
   }
+
+  // Resolver calendario de partidos restantes para modo actual
+  const actualRemainingSchedule: [number, number][] =
+    remainingGames && remainingGames.length > 0
+      ? remainingGames
+      : generateSyntheticRemainingSchedule(standingsMap, balancedSchedule);
 
   for (let sim = 0; sim < nSimulations; sim++) {
     let ranked: number[];
@@ -209,10 +241,20 @@ export function runMonteCarloSimulation(
         return (eloMap.get(b) ?? BASE_ELO) - (eloMap.get(a) ?? BASE_ELO);
       });
     } else {
-      // Simular restante a partir de victorias actuales
+      // Simular restante a partir de victorias actuales + calendario de juegos restantes
       const simWins = new Map<number, number>();
       for (const t of teams) {
         simWins.set(t, standingsMap.get(t)?.wins ?? 0);
+      }
+
+      for (const [h, a] of actualRemainingSchedule) {
+        const eloH = eloMap.get(h) ?? BASE_ELO;
+        const eloA = eloMap.get(a) ?? BASE_ELO;
+        if (simulateGame(eloH, eloA)) {
+          simWins.set(h, (simWins.get(h) ?? 0) + 1);
+        } else {
+          simWins.set(a, (simWins.get(a) ?? 0) + 1);
+        }
       }
 
       ranked = [...teams].sort((a, b) => {
@@ -279,8 +321,15 @@ export function runMonteCarloSimulation(
     };
   });
 
-  // Ordenar por probabilidad de campeonato descendente
-  projections.sort((a, b) => b.champProb - a.champProb);
+  // Ordenar por probabilidad de campeonato descendente con desempates canónicos
+  projections.sort((a, b) => {
+    if (b.champProb !== a.champProb) return b.champProb - a.champProb;
+    if (b.finalProb !== a.finalProb) return b.finalProb - a.finalProb;
+    if (b.rrProb !== a.rrProb) return b.rrProb - a.rrProb;
+    if (b.top4Prob !== a.top4Prob) return b.top4Prob - a.top4Prob;
+    if (b.wcProb !== a.wcProb) return b.wcProb - a.wcProb;
+    return b.elo - a.elo;
+  });
 
   const caracasProjection = projections.find((p) => p.teamId === 695) ?? null;
 

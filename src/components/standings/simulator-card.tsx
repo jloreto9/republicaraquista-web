@@ -9,11 +9,13 @@ import { Dice5, RefreshCw, Trophy, Shield, Flame, Activity } from "lucide-react"
 interface SimulatorCardProps {
   standings: TeamStanding[];
   initialResults: MonteCarloResults;
+  remainingGames?: [number, number][];
 }
 
 export function SimulatorCard({
   standings,
   initialResults,
+  remainingGames,
 }: SimulatorCardProps) {
   const [mode, setMode] = useState<"actual" | "scratch">("actual");
   const [results, setResults] = useState<MonteCarloResults>(initialResults);
@@ -21,7 +23,7 @@ export function SimulatorCard({
 
   const handleSimulate = (selectedMode: "actual" | "scratch") => {
     startTransition(() => {
-      const res = runMonteCarloSimulation(standings, selectedMode, 3000);
+      const res = runMonteCarloSimulation(standings, selectedMode, 3000, remainingGames);
       setResults(res);
     });
   };

@@ -1,6 +1,6 @@
 import { Header } from "@/components/layout/header";
 import { StandingsView } from "@/components/standings/standings-view";
-import { getStandings } from "@/lib/supabase";
+import { getStandings, getScheduledGames } from "@/lib/supabase";
 import { runMonteCarloSimulation } from "@/lib/monte-carlo";
 import { getActiveSeason } from "@/lib/constants";
 
@@ -13,8 +13,16 @@ export const metadata = {
 
 export default async function StandingsPage() {
   const activeSeason = await getActiveSeason();
-  const standings = await getStandings(activeSeason, "regular");
-  const initialSimulation = runMonteCarloSimulation(standings, "actual", 3000);
+  const [standings, remainingGames] = await Promise.all([
+    getStandings(activeSeason, "regular"),
+    getScheduledGames(activeSeason),
+  ]);
+  const initialSimulation = runMonteCarloSimulation(
+    standings,
+    "actual",
+    3000,
+    remainingGames
+  );
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -28,6 +36,7 @@ export default async function StandingsPage() {
         <StandingsView
           standings={standings}
           initialSimulation={initialSimulation}
+          remainingGames={remainingGames}
         />
       </main>
     </div>

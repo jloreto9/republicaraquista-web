@@ -249,6 +249,32 @@ export async function getStandings(
     }
   });
 
+  // Calcular Rating ELO dinámico secuencial oficial (K=24, ventaja local = +35)
+  const dynamicEloMap: Record<number, number> = {};
+  LVBP_TEAM_IDS.forEach((id) => {
+    dynamicEloMap[id] = 1500;
+  });
+
+  sortedGames.forEach((g: SupabaseGameRow) => {
+    const homeId = Number(g.home_team_id);
+    const awayId = Number(g.away_team_id);
+    const homeScore = Number(g.home_score ?? 0);
+    const awayScore = Number(g.away_score ?? 0);
+    if (homeScore === awayScore) return;
+
+    const rHome = dynamicEloMap[homeId] ?? 1500;
+    const rAway = dynamicEloMap[awayId] ?? 1500;
+    const eHome = 1.0 / (1.0 + Math.pow(10, (rAway - (rHome + 35)) / 400.0));
+    const eAway = 1.0 - eHome;
+
+    const sHome = homeScore > awayScore ? 1.0 : 0.0;
+    const sAway = 1.0 - sHome;
+
+    const k = 24;
+    dynamicEloMap[homeId] = rHome + k * (sHome - eHome);
+    dynamicEloMap[awayId] = rAway + k * (sAway - eAway);
+  });
+
   // Construir tabla
   const standings: TeamStanding[] = LVBP_TEAM_IDS.map((teamId) => {
     const team = getTeam(teamId);
@@ -275,8 +301,8 @@ export async function getStandings(
     const l10Losses = last10Games.length - l10Wins;
     const last10 = `${l10Wins}-${l10Losses}`;
 
-    // Rating ELO estimado base
-    const eloRating = Math.round(1500 + (pct - 0.5) * 400 + (rec.runsFor - rec.runsAgainst) * 1.2);
+    // Rating ELO dinámico secuencial oficial
+    const eloRating = Math.round((dynamicEloMap[teamId] ?? 1500) * 10) / 10;
 
     return {
       teamId,
@@ -321,6 +347,33 @@ export async function getStandings(
   }
 
   return standings;
+}
+
+/**
+ * Consulta los juegos programados pendientes (Scheduled) de la temporada regular.
+ */
+export async function getScheduledGames(
+  season = ACTIVE_SEASON
+): Promise<[number, number][]> {
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from("games")
+      .select("home_team_id, away_team_id")
+      .eq("season", season)
+      .eq("status", "Scheduled")
+      .in("game_type", ["regular", "R"]);
+
+    if (error || !data) return [];
+
+    return data
+      .filter((g) => g.home_team_id && g.away_team_id)
+      .map((g) => [Number(g.home_team_id), Number(g.away_team_id)]);
+  } catch (err) {
+    console.warn("Error al consultar juegos programados de Supabase:", err);
+    return [];
+  }
 }
 
 /**

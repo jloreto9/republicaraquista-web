@@ -11,11 +11,13 @@ import { Trophy, Dice5, Zap } from "lucide-react";
 interface StandingsViewProps {
   standings: TeamStanding[];
   initialSimulation: MonteCarloResults;
+  remainingGames?: [number, number][];
 }
 
 export function StandingsView({
   standings,
   initialSimulation,
+  remainingGames,
 }: StandingsViewProps) {
   const [activeTab, setActiveTab] = useState<"standings" | "simulator" | "elo">(
     "standings"
@@ -84,6 +86,7 @@ export function StandingsView({
         <SimulatorCard
           standings={standings}
           initialResults={initialSimulation}
+          remainingGames={remainingGames}
         />
       ) : (
         <div className="max-w-2xl mx-auto">
