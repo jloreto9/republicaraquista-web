@@ -37,9 +37,15 @@ export function RosterView() {
             ...prev,
             officialDate: data.meta.officialDate || prev.officialDate,
             pdfUrl: data.meta.pdfUrl || prev.pdfUrl,
+            totalActive: data.meta.totalActive || prev.totalActive,
+            dateRange: data.meta.dateRange || prev.dateRange,
+            weekNumber: data.meta.weekNumber || prev.weekNumber,
           }));
           if (data.meta.movements) {
             setMovements(data.meta.movements);
+          }
+          if (data.players && data.players.length > 0) {
+            setPlayers(data.players);
           }
         }
       })
