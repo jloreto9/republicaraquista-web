@@ -5,15 +5,11 @@
     "remotePdfUrl": "https://sapven.com/download/Leones_20261013.pdf",
     "maxLimit": 34,
     "totalActive": 33,
-    "updatedAt": "2026-10-20T12:01:42.301078+00:00",
+    "updatedAt": "2026-10-20T18:24:07.473458+00:00",
     "source": "Liga Venezolana de Béisbol Profesional (LVBP) · TuJonron.com",
     "movements": {
-      "entran": [
-        "Aldrem Corredor"
-      ],
-      "salen": [
-        "Leandro Cedeño"
-      ]
+      "entran": [],
+      "salen": []
     }
   },
   "players": [
