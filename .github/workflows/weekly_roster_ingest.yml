@@ -4,8 +4,8 @@ on:
   schedule:
     # Lunes en la tarde (18:00 UTC = 02:00 PM AST, 21:00 UTC = 05:00 PM AST, 23:00 UTC = 07:00 PM AST)
     - cron: '0 18,21,23 * * 1'
-    # Martes en la mañana/tarde (14:00 UTC = 10:00 AM AST, 18:00 UTC = 02:00 PM AST)
-    - cron: '0 14,18 * * 2'
+    # Martes en la mañana y tarde (14:00 UTC = 10:00 AM AST, 18:00 UTC = 02:00 PM AST, 20:00 UTC = 04:00 PM AST, 22:00 UTC = 06:00 PM AST)
+    - cron: '0 14,18,20,22 * * 2'
   workflow_dispatch:
 
 jobs:
