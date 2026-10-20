@@ -8,8 +8,12 @@
     "updatedAt": "2026-10-20T18:24:07.473458+00:00",
     "source": "Liga Venezolana de Béisbol Profesional (LVBP) · TuJonron.com",
     "movements": {
-      "entran": [],
-      "salen": []
+      "entran": [
+        "Aldrem Corredor"
+      ],
+      "salen": [
+        "Leandro Cedeño"
+      ]
     }
   },
   "players": [

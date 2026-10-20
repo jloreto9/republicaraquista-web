@@ -18,6 +18,9 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -41,5 +44,10 @@ jobs:
             echo "No se detectaron cambios en el roster semanal."
           else
             git commit -m "chore(roster): actualización semanal automática de roster oficial LVBP [skip ci]"
-            git push origin main
+            for i in {1..3}; do
+              git pull --rebase origin main && git push origin main && break || {
+                echo "Push rechazado o en conflicto. Reintentando pull --rebase ($i/3)..."
+                sleep 2
+              }
+            done
           fi

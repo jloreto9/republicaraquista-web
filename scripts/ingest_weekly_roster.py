@@ -201,7 +201,10 @@ def main():
         except Exception as e:
             logger.warning(f"No se pudo leer snapshot anterior: {e}")
 
-    prev_date = previous_snapshot.get("meta", {}).get("officialDate", "")
+    prev_meta = previous_snapshot.get("meta", {})
+    prev_date = prev_meta.get("officialDate", "")
+    prev_pdf = prev_meta.get("remotePdfUrl", "")
+    prev_movements = prev_meta.get("movements", {"entran": [], "salen": []})
     prev_players = {p["name"]: p for p in previous_snapshot.get("players", [])}
 
     try:
@@ -220,7 +223,7 @@ def main():
 
     pdf_filename = os.path.basename(pdf_url)
 
-    # Descargar PDF siempre para garantizar su disponibilidad local
+    # Descargar PDF siempre para garantizar su disponibilidad local si no existe
     target_pdf_path = os.path.join(DOCUMENTS_DIR, pdf_filename)
     if not os.path.exists(target_pdf_path):
         try:
@@ -232,12 +235,28 @@ def main():
     new_players = parse_players(soup)
     logger.info(f"Total jugadores extraídos: {len(new_players)}")
 
-    # Calcular Altas (ENTRAN) y Bajas (SALEN)
+    if not new_players:
+        logger.warning("No se pudieron extraer jugadores del roster.")
+        sys.exit(0)
+
     current_names = {p["name"] for p in new_players}
     prev_names = set(prev_players.keys())
 
-    entran = sorted(list(current_names - prev_names)) if prev_names else []
-    salen = sorted(list(prev_names - current_names)) if prev_names else []
+    is_new_bulletin = bool((official_date and official_date != prev_date) or (pdf_url and pdf_url != prev_pdf))
+    players_changed = bool(current_names != prev_names)
+
+    # Si no hay nuevo boletín ni cambios en la plantilla, mantener snapshot intacto
+    if not is_new_bulletin and not players_changed and prev_players:
+        logger.info("El boletín oficial y la plantilla no presentan cambios. Conservando snapshot y movimientos vigentes.")
+        return
+
+    # Si es nuevo boletín o cambiaron jugadores, calcular altas y bajas
+    if is_new_bulletin or players_changed:
+        entran = sorted(list(current_names - prev_names)) if prev_names else []
+        salen = sorted(list(prev_names - current_names)) if prev_names else []
+    else:
+        entran = prev_movements.get("entran", [])
+        salen = prev_movements.get("salen", [])
 
     # Actualizar snapshot
     new_snapshot = {
@@ -260,7 +279,7 @@ def main():
     with open(SNAPSHOT_FILE, "w", encoding="utf-8") as f:
         json.dump(new_snapshot, f, ensure_ascii=False, indent=2)
 
-    logger.info(f"Snapshot semanal guardado exitosamente en {SNAPSHOT_FILE} con {len(new_players)} peloteros.")
+    logger.info(f"Snapshot semanal guardado exitosamente en {SNAPSHOT_FILE} con {len(new_players)} peloteros. (+{len(entran)} / -{len(salen)})")
 
 
 if __name__ == "__main__":
