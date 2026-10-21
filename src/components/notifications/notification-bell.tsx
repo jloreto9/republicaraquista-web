@@ -27,10 +27,6 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
     }
   }, []);
 
-  if (!isSupported) {
-    return null;
-  }
-
   return (
     <>
       <button
