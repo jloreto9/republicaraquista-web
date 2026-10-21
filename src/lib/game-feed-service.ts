@@ -19,6 +19,7 @@ import {
 import { BattedBall, PitchEvent, StrikeZoneMetrics, SprayPlayerOption } from "@/types/spray";
 import { getBullpenAndLineups } from "./bullpen";
 import { BullpenAndLineupsData } from "@/types/bullpen";
+import { getKnownPitcherHand } from "./pitcher-hand-service";
 
 const LEONES_TEAM_ID = 695;
 
@@ -375,7 +376,8 @@ export async function getDynamicSituationalData(season = 2026): Promise<Situatio
       const batterName = matchup.batter?.fullName || "Bateador";
       const pitcherId = matchup.pitcher?.id || 0;
       const pitcherName = matchup.pitcher?.fullName || "Lanzador";
-      const throwsRhp = matchup.pitcherHand?.code !== "L";
+      const isLeftHanded = matchup.pitcherHand?.code === "L" || (!matchup.pitcherHand?.code && getKnownPitcherHand(pitcherId) === "L");
+      const throwsRhp = !isLeftHanded;
 
       const on1b = Boolean(matchup.postOnFirst);
       const on2b = Boolean(matchup.postOnSecond);

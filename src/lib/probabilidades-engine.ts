@@ -211,9 +211,10 @@ export function resolveParkFactor(stadiumName?: string): ParkFactor {
 export const DEFAULT_STARTING_ROTATIONS: Record<number, ProbablePitcher[]> = {
   695: [
     { id: 605330, name: "Erick Leal", teamId: 695, teamAbbr: "CAR", throws: "R", era: 4.55, fip: 4.35, whip: 1.34, k9: 7.8, bb9: 3.1, inningsPitched: 46.0 },
+    { id: 646242, name: "Jhonathan Díaz", teamId: 695, teamAbbr: "CAR", throws: "L", era: 3.65, fip: 3.50, whip: 1.20, k9: 8.5, bb9: 2.7, inningsPitched: 45.0 },
     { id: 518553, name: "Jhoulys Chacín", teamId: 695, teamAbbr: "CAR", throws: "R", era: 4.40, fip: 4.20, whip: 1.30, k9: 7.0, bb9: 2.9, inningsPitched: 48.0 },
+    { id: 672712, name: "Luis Palacios", teamId: 695, teamAbbr: "CAR", throws: "L", era: 4.10, fip: 3.95, whip: 1.28, k9: 7.2, bb9: 2.8, inningsPitched: 42.0 },
     { id: 672804, name: "Jesús Vargas", teamId: 695, teamAbbr: "CAR", throws: "R", era: 4.70, fip: 4.45, whip: 1.38, k9: 6.6, bb9: 3.2, inningsPitched: 40.0 },
-    { id: 642544, name: "Ronald Herrera", teamId: 695, teamAbbr: "CAR", throws: "R", era: 4.85, fip: 4.55, whip: 1.40, k9: 6.4, bb9: 3.3, inningsPitched: 38.0 },
     { id: 672580, name: "Albert Suárez", teamId: 695, teamAbbr: "CAR", throws: "R", era: 3.80, fip: 3.65, whip: 1.25, k9: 8.0, bb9: 2.5, inningsPitched: 30.0 },
   ],
   696: [
@@ -224,16 +225,20 @@ export const DEFAULT_STARTING_ROTATIONS: Record<number, ProbablePitcher[]> = {
   ],
   698: [
     { id: 620982, name: "Ricardo Pinto", teamId: 698, teamAbbr: "LAG", throws: "R", era: 3.18, fip: 3.05, whip: 1.16, k9: 8.5, bb9: 2.4, inningsPitched: 54.0 },
+    { id: 661265, name: "Yoennis Yera", teamId: 698, teamAbbr: "LAG", throws: "L", era: 3.60, fip: 3.48, whip: 1.23, k9: 7.9, bb9: 2.6, inningsPitched: 45.0 },
     { id: 670060, name: "Miguel Romero", teamId: 698, teamAbbr: "LAG", throws: "R", era: 3.95, fip: 3.80, whip: 1.29, k9: 7.6, bb9: 2.9, inningsPitched: 43.1 },
+    { id: 622066, name: "Tyler Alexander", teamId: 698, teamAbbr: "LAG", throws: "L", era: 3.75, fip: 3.62, whip: 1.25, k9: 7.5, bb9: 2.5, inningsPitched: 40.0 },
     { id: 622663, name: "David Reyes", teamId: 698, teamAbbr: "LAG", throws: "R", era: 3.88, fip: 3.75, whip: 1.27, k9: 7.1, bb9: 2.6, inningsPitched: 46.0 },
   ],
   693: [
     { id: 666721, name: "Máximo Castillo", teamId: 693, teamAbbr: "LAR", throws: "R", era: 3.05, fip: 2.92, whip: 1.12, k9: 8.9, bb9: 2.0, inningsPitched: 56.0 },
     { id: 468480, name: "Raúl Rivero", teamId: 693, teamAbbr: "LAR", throws: "R", era: 3.72, fip: 3.60, whip: 1.24, k9: 6.8, bb9: 2.5, inningsPitched: 47.0 },
+    { id: 677644, name: "Brayan Pérez", teamId: 693, teamAbbr: "LAR", throws: "L", era: 3.85, fip: 3.72, whip: 1.26, k9: 7.3, bb9: 2.8, inningsPitched: 38.0 },
     { id: 486790, name: "Néstor Molina", teamId: 693, teamAbbr: "LAR", throws: "R", era: 4.25, fip: 4.10, whip: 1.34, k9: 6.4, bb9: 2.8, inningsPitched: 40.0 },
   ],
   699: [
     { id: 453056, name: "Guillermo Moscoso", teamId: 699, teamAbbr: "ARA", throws: "R", era: 4.02, fip: 3.95, whip: 1.30, k9: 6.9, bb9: 2.8, inningsPitched: 44.0 },
+    { id: 664069, name: "Ben Braymer", teamId: 699, teamAbbr: "ARA", throws: "L", era: 3.90, fip: 3.78, whip: 1.27, k9: 7.5, bb9: 3.0, inningsPitched: 41.0 },
     { id: 671040, name: "José E. Martínez", teamId: 699, teamAbbr: "ARA", throws: "R", era: 4.35, fip: 4.20, whip: 1.35, k9: 7.1, bb9: 3.2, inningsPitched: 37.0 },
   ],
   692: [
@@ -242,6 +247,7 @@ export const DEFAULT_STARTING_ROTATIONS: Record<number, ProbablePitcher[]> = {
   ],
   694: [
     { id: 650828, name: "Luis Escobar", teamId: 694, teamAbbr: "ORI", throws: "R", era: 4.65, fip: 4.45, whip: 1.42, k9: 7.5, bb9: 3.6, inningsPitched: 42.0 },
+    { id: 620978, name: "Liarvis Breto", teamId: 694, teamAbbr: "ORI", throws: "L", era: 4.45, fip: 4.30, whip: 1.38, k9: 7.2, bb9: 3.4, inningsPitched: 39.0 },
     { id: 664030, name: "David Richardson", teamId: 694, teamAbbr: "ORI", throws: "R", era: 4.80, fip: 4.60, whip: 1.45, k9: 7.0, bb9: 3.8, inningsPitched: 38.0 },
   ],
   697: [

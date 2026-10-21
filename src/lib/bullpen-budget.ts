@@ -1,4 +1,5 @@
 import { getTeam, getPlayerHeadshotUrl } from "./constants";
+import { getKnownPitcherHand, resolvePitchersHandedness } from "./pitcher-hand-service";
 import {
   BullpenBudgetData,
   RelieverBudgetItem,
@@ -265,7 +266,7 @@ export async function getBullpenBudget(
         if (!pData) continue;
         const stats = pData.stats?.pitching || {};
         const name = pData.person?.fullName || "Lanzador";
-        const throws = (pData.pitchHand?.code as "R" | "L") || "R";
+        const throws = (pData.pitchHand?.code as "R" | "L") || getKnownPitcherHand(pId);
         const isStarter = pId === starterId || Number(stats.gamesStarted || 0) > 0;
 
         if (!pitcherMap.has(pId)) {
@@ -376,6 +377,13 @@ export async function getBullpenBudget(
           });
         }
       }
+    }
+
+    // 4.1 Resolver lateralidad real (Zurdo 'L' vs Derecho 'R') dinámicamente con Roster hidratado, MLB API y catálogo
+    const allPitcherIds = Array.from(pitcherMap.keys());
+    const handsMap = await resolvePitchersHandedness(allPitcherIds, teamId, effectiveSeason);
+    for (const [pId, pRec] of pitcherMap.entries()) {
+      pRec.throws = handsMap.get(pId) || getKnownPitcherHand(pId);
     }
 
     // 5. Construir ítems de cada lanzador y clasificar roles tácticos

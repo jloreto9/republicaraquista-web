@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CARACAS_FEATURED_PITCHERS } from "@/lib/pitching-constants";
+import { getKnownPitcherHand } from "@/lib/pitcher-hand-service";
 import { PitcherProfile } from "@/types/pitching";
 
 const HEADERS = {
@@ -27,6 +28,9 @@ const CARACAS_PITCHER_IDS = new Set([
   506693, // Henderson Álvarez
   640470, // Adbert Alzolay
   692350, // Mikell Manzano
+  646242, // Jhonathan Díaz (LHP)
+  672712, // Luis Palacios (LHP)
+  682845, // Rito Lugo (LHP)
 ]);
 
 export async function GET(request: NextRequest) {
@@ -64,7 +68,7 @@ export async function GET(request: NextRequest) {
             name: p.fullName || `Lanzador #${pId}`,
             position: p.primaryPosition?.abbreviation || "P",
             team: isCaracas ? "Leones del Caracas" : p.currentTeam?.name || "Agente Libre",
-            throws: p.pitchHand?.code || "R",
+            throws: (p.pitchHand?.code as "R" | "L") || getKnownPitcherHand(pId),
             hasLvbpHistory: isCaracas,
             hasCaracasHistory: isCaracas,
             lvbpTeamId: isCaracas ? 695 : undefined,
@@ -114,7 +118,7 @@ export async function GET(request: NextRequest) {
           name: p.fullName || "Lanzador",
           position: pos,
           team: isCaracas ? "Leones del Caracas" : p.currentTeam?.name || "Agente Libre",
-          throws: p.pitchHand?.code || "R",
+          throws: (p.pitchHand?.code as "R" | "L") || getKnownPitcherHand(pId),
           hasLvbpHistory: isCaracas,
           hasCaracasHistory: isCaracas,
           lvbpTeamId: isCaracas ? 695 : undefined,

@@ -502,7 +502,14 @@ export function BullpenBudgetTab({
                             </span>
                           </Link>
                           <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
-                            <span className="px-1 py-0.2 rounded bg-white/5 border border-white/5 font-semibold">
+                            <span
+                              className={cn(
+                                "px-1.5 py-0.5 rounded text-[10px] font-semibold border",
+                                r.throws === "L"
+                                  ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                                  : "bg-white/5 text-slate-300 border-white/5"
+                              )}
+                            >
                               {r.throws === "L" ? "Zurdo" : "Derecho"}
                             </span>
                             <span>•</span>
