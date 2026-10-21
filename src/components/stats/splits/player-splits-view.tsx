@@ -23,6 +23,7 @@ import {
   MapPin,
   ShieldAlert,
 } from "lucide-react";
+import { getMlbFallbackHeadshotUrl } from "@/lib/constants";
 
 interface PlayerSplitsViewProps {
   initialPlayerId?: number;
@@ -309,7 +310,10 @@ export function PlayerSplitsView({
                   unoptimized
                   onError={(e) => {
                     const target = e.currentTarget;
-                    if (target.src !== profile.teamLogo) {
+                    const mlbFallback = getMlbFallbackHeadshotUrl(profile.playerId);
+                    if (target.src !== mlbFallback && !target.src.includes("mlbstatic.com")) {
+                      target.src = mlbFallback;
+                    } else if (target.src !== profile.teamLogo) {
                       target.src = profile.teamLogo;
                     }
                   }}

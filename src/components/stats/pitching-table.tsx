@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { PitchingStats } from "@/types/sports";
 import { ArrowUpDown } from "lucide-react";
+import { getMlbFallbackHeadshotUrl } from "@/lib/constants";
 
 interface PitchingTableProps {
   stats: PitchingStats[];
@@ -183,7 +184,10 @@ export function PitchingTable({ stats, onSelectPlayerForSplits }: PitchingTableP
                           unoptimized
                           onError={(e) => {
                             const target = e.currentTarget;
-                            if (target.src !== pitcher.teamLogo) {
+                            const mlbFallback = getMlbFallbackHeadshotUrl(pitcher.playerId);
+                            if (target.src !== mlbFallback && !target.src.includes("mlbstatic.com")) {
+                              target.src = mlbFallback;
+                            } else if (target.src !== pitcher.teamLogo) {
                               target.src = pitcher.teamLogo;
                             }
                           }}

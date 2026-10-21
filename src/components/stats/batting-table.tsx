@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { BattingStats } from "@/types/sports";
 import { ArrowUpDown } from "lucide-react";
+import { getMlbFallbackHeadshotUrl } from "@/lib/constants";
 
 interface BattingTableProps {
   stats: BattingStats[];
@@ -206,7 +207,10 @@ export function BattingTable({ stats, onSelectPlayerForSplits }: BattingTablePro
                           unoptimized
                           onError={(e) => {
                             const target = e.currentTarget;
-                            if (target.src !== player.teamLogo) {
+                            const mlbFallback = getMlbFallbackHeadshotUrl(player.playerId);
+                            if (target.src !== mlbFallback && !target.src.includes("mlbstatic.com")) {
+                              target.src = mlbFallback;
+                            } else if (target.src !== player.teamLogo) {
                               target.src = player.teamLogo;
                             }
                           }}

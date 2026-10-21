@@ -16,6 +16,11 @@ const nextConfig: NextConfig = {
         hostname: "img.mlbstatic.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "cdn.tujonron.net",
+        pathname: "/**",
+      },
     ],
   },
 };

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { BatterLeaderItem, PitcherLeaderItem } from "@/types/leones-stats";
 import { Award, Zap } from "lucide-react";
+import { getMlbFallbackHeadshotUrl } from "@/lib/constants";
 
 interface TeamLeadersTabProps {
   batters: BatterLeaderItem[];
@@ -58,6 +59,10 @@ export function TeamLeadersTab({ batters, pitchers }: TeamLeadersTabProps) {
                           width={28}
                           height={28}
                           className="object-cover"
+                          unoptimized
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = getMlbFallbackHeadshotUrl(b.playerId);
+                          }}
                         />
                       </div>
                       <span className="font-semibold text-slate-100 truncate max-w-[130px]">
@@ -140,6 +145,10 @@ export function TeamLeadersTab({ batters, pitchers }: TeamLeadersTabProps) {
                             width={28}
                             height={28}
                             className="object-cover"
+                            unoptimized
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = getMlbFallbackHeadshotUrl(p.playerId);
+                            }}
                           />
                         </div>
                         <span className="font-semibold text-slate-100 truncate max-w-[130px]">

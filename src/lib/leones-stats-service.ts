@@ -128,7 +128,7 @@ const BASELINE_2025_BATTERS: BatterLeaderItem[] = [
   { playerId: 660681, playerName: "Leandro Cedeño", avatarUrl: getPlayerHeadshotUrl(660681), avg: ".333", hr: 8, rbi: 28, ops: "1.042", ab: 126, h: 42 },
   { playerId: 682900, playerName: "Brainer Bonaci", avatarUrl: getPlayerHeadshotUrl(682900), avg: ".315", hr: 4, rbi: 22, ops: ".895", ab: 162, h: 51 },
   { playerId: 625506, playerName: "Aldrem Corredor", avatarUrl: getPlayerHeadshotUrl(625506), avg: ".298", hr: 7, rbi: 34, ops: ".882", ab: 188, h: 56 },
-  { playerId: 660688, playerName: "Harold Castro", avatarUrl: getPlayerHeadshotUrl(660688), avg: ".305", hr: 5, rbi: 26, ops: ".820", ab: 164, h: 50 },
+  { playerId: 605612, playerName: "Harold Castro", avatarUrl: getPlayerHeadshotUrl(605612), avg: ".305", hr: 5, rbi: 26, ops: ".820", ab: 164, h: 50 },
   { playerId: 682674, playerName: "Víctor Bericoto", avatarUrl: getPlayerHeadshotUrl(682674), avg: ".285", hr: 4, rbi: 18, ops: ".812", ab: 112, h: 32 },
 ];
 
@@ -136,7 +136,7 @@ const BASELINE_2025_PITCHERS: PitcherLeaderItem[] = [
   { playerId: 600965, playerName: "Ricardo Rodríguez", avatarUrl: getPlayerHeadshotUrl(600965), era: "1.52", whip: "0.93", ip: "23.2", so: 22, bb: 10 },
   { playerId: 660508, playerName: "Norwith Gudiño", avatarUrl: getPlayerHeadshotUrl(660508), era: "3.85", whip: "1.25", ip: "35.0", so: 37, bb: 20 },
   { playerId: 600526, playerName: "José Torres", avatarUrl: getPlayerHeadshotUrl(600526), era: "3.62", whip: "1.15", ip: "49.2", so: 45, bb: 11 },
-  { playerId: 642545, playerName: "Sam Bordner", avatarUrl: getPlayerHeadshotUrl(642545), era: "3.45", whip: "1.25", ip: "21.0", so: 19, bb: 8 },
+  { playerId: 663778, playerName: "Sam Bordner", avatarUrl: getPlayerHeadshotUrl(663778), era: "3.45", whip: "1.25", ip: "21.0", so: 19, bb: 8 },
   { playerId: 468504, playerName: "Jhoulys Chacín", avatarUrl: getPlayerHeadshotUrl(468504), era: "4.15", whip: "1.38", ip: "43.1", so: 31, bb: 16 },
 ];
 

@@ -384,16 +384,16 @@ export function getSeasonWpaLeaders(season = 2026): SeasonWpaLeader[] {
 
   // Datos calibrados de la temporada regular 2025 para Leones del Caracas
   return [
-    { playerId: 660821, player: "Leandro Cedeño", games: 24, paOrBf: 84, wpa: 1.84, wpaLi: 1.25, liAvg: 1.34, clutch: 0.59, type: "batter" },
-    { playerId: 683748, player: "Brainer Bonaci", games: 46, paOrBf: 182, wpa: 1.62, wpaLi: 1.18, liAvg: 1.12, clutch: 0.44, type: "batter" },
-    { playerId: 672580, player: "Aldrem Corredor", games: 54, paOrBf: 236, wpa: 1.45, wpaLi: 1.20, liAvg: 1.21, clutch: 0.25, type: "batter" },
-    { playerId: 666971, player: "Víctor Bericoto", games: 31, paOrBf: 118, wpa: 0.98, wpaLi: 0.82, liAvg: 1.05, clutch: 0.16, type: "batter" },
-    { playerId: 660688, player: "Harold Castro", games: 38, paOrBf: 165, wpa: 0.85, wpaLi: 0.74, liAvg: 1.10, clutch: 0.11, type: "batter" },
-    { playerId: 682626, player: "Liván Soto", games: 28, paOrBf: 112, wpa: 0.62, wpaLi: 0.55, liAvg: 0.98, clutch: 0.07, type: "batter" },
+    { playerId: 660681, player: "Leandro Cedeño", games: 24, paOrBf: 84, wpa: 1.84, wpaLi: 1.25, liAvg: 1.34, clutch: 0.59, type: "batter" },
+    { playerId: 682900, player: "Brainer Bonaci", games: 46, paOrBf: 182, wpa: 1.62, wpaLi: 1.18, liAvg: 1.12, clutch: 0.44, type: "batter" },
+    { playerId: 625506, player: "Aldrem Corredor", games: 54, paOrBf: 236, wpa: 1.45, wpaLi: 1.20, liAvg: 1.21, clutch: 0.25, type: "batter" },
+    { playerId: 682674, player: "Víctor Bericoto", games: 31, paOrBf: 118, wpa: 0.98, wpaLi: 0.82, liAvg: 1.05, clutch: 0.16, type: "batter" },
+    { playerId: 605612, player: "Harold Castro", games: 38, paOrBf: 165, wpa: 0.85, wpaLi: 0.74, liAvg: 1.10, clutch: 0.11, type: "batter" },
+    { playerId: 670869, player: "Liván Soto", games: 28, paOrBf: 112, wpa: 0.62, wpaLi: 0.55, liAvg: 0.98, clutch: 0.07, type: "batter" },
     { playerId: 597113, player: "DJ Johnson", games: 16, paOrBf: 58, wpa: 1.25, wpaLi: 0.95, liAvg: 1.42, clutch: 0.30, type: "pitcher" },
-    { playerId: 676664, player: "Norwith Gudiño", games: 22, paOrBf: 92, wpa: 0.95, wpaLi: 0.78, liAvg: 1.28, clutch: 0.17, type: "pitcher" },
-    { playerId: 642545, player: "Sam Bordner", games: 19, paOrBf: 76, wpa: 0.88, wpaLi: 0.70, liAvg: 1.35, clutch: 0.18, type: "pitcher" },
-    { playerId: 650556, player: "Colin Rea", games: 8, paOrBf: 160, wpa: 0.75, wpaLi: 0.68, liAvg: 1.02, clutch: 0.07, type: "pitcher" },
+    { playerId: 660508, player: "Norwith Gudiño", games: 22, paOrBf: 92, wpa: 0.95, wpaLi: 0.78, liAvg: 1.28, clutch: 0.17, type: "pitcher" },
+    { playerId: 663778, player: "Sam Bordner", games: 19, paOrBf: 76, wpa: 0.88, wpaLi: 0.70, liAvg: 1.35, clutch: 0.18, type: "pitcher" },
+    { playerId: 607067, player: "Colin Rea", games: 8, paOrBf: 160, wpa: 0.75, wpaLi: 0.68, liAvg: 1.02, clutch: 0.07, type: "pitcher" },
   ];
 }
 

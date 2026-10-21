@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { LastGameDetail } from "@/types/leones-stats";
 import { Trophy, Calendar, MapPin, Zap, ExternalLink } from "lucide-react";
+import { getMlbFallbackHeadshotUrl } from "@/lib/constants";
 
 interface LastGameTabProps {
   lastGame: LastGameDetail | null;
@@ -145,6 +146,10 @@ export function LastGameTab({ lastGame }: LastGameTabProps) {
                     width={56}
                     height={56}
                     className="object-cover"
+                    unoptimized
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = getMlbFallbackHeadshotUrl(mvp.playerId);
+                    }}
                   />
                 </div>
                 <div>
