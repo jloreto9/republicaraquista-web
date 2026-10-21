@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { getTeam, ACTIVE_SEASON, formatSeason } from "@/lib/constants";
+import { getTeam, ACTIVE_SEASON } from "@/lib/constants";
 import { useSeason } from "@/context/season-context";
 import { ChevronDown } from "lucide-react";
 import { ShareButton } from "./share-button";
@@ -16,9 +16,8 @@ interface HeaderProps {
 export function Header({
   title,
   subtitle = "Estadísticas y Seguimiento en Vivo • LVBP",
-  season: initialSeason = ACTIVE_SEASON,
 }: HeaderProps) {
-  const { season, setSeason, availableSeasons } = useSeason();
+  const { season, setSeason } = useSeason();
   const caracas = getTeam(695);
 
   return (
@@ -56,17 +55,21 @@ export function Header({
           </div>
         </div>
 
-        {/* Share Button */}
-        <ShareButton
-          title={`${title} • REPUBLICARAQUISTAPP`}
-          text={`¡Sigue a los Leones del Caracas en ${title} en REPUBLICARAQUISTAPP! 🦁⚾`}
-        />
+        {/* Share Button (Desktop only; mobile already has it in the top bar) */}
+        <div className="hidden lg:block">
+          <ShareButton
+            title={`${title} • REPUBLICARAQUISTAPP`}
+            text={`¡Sigue a los Leones del Caracas en ${title} en REPUBLICARAQUISTAPP! 🦁⚾`}
+          />
+        </div>
 
-        {/* Notifications Bell */}
-        <NotificationBell />
+        {/* Notifications Bell (Desktop only; mobile already has it in the top bar) */}
+        <div className="hidden lg:block">
+          <NotificationBell />
+        </div>
 
-        {/* Leones Mini Badge */}
-        <div className="flex items-center space-x-2 px-3 py-1 rounded-lg bg-[#002D62]/40 border border-[#FDB827]/30">
+        {/* Leones Mini Badge (Tablet and Desktop only; prevents crowding on small mobile) */}
+        <div className="hidden sm:flex items-center space-x-2 px-3 py-1 rounded-lg bg-[#002D62]/40 border border-[#FDB827]/30">
           <div className="w-5 h-5 relative">
             <Image
               src={caracas.logoUrl}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, Check, Loader2, Share2, X, AlertCircle } from 'lucide-react';
 import {
   DEFAULT_PREFERENCES,
@@ -22,15 +23,20 @@ interface NotificationModalProps {
 }
 
 export function NotificationModal({ isOpen, onClose, onSubscriptionChange }: NotificationModalProps) {
-  const [supported, setSupported] = useState<boolean>(true);
-  const [isIos, setIsIos] = useState<boolean>(false);
-  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+  const [mounted, setMounted] = useState(false);
+  const [supported, setSupported] = useState(true);
+  const [isIos, setIsIos] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>('default');
-  const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
   const [preferences, setPreferences] = useState<UserNotificationPreferences>(DEFAULT_PREFERENCES);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [testing, setTesting] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -57,7 +63,7 @@ export function NotificationModal({ isOpen, onClose, onSubscriptionChange }: Not
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, onSubscriptionChange]);
 
-  if (!isOpen) return null;
+  if (!mounted || !isOpen) return null;
 
   const handleToggleTopic = (topic: NotificationTopic) => {
     setPreferences((prev) => ({
@@ -115,19 +121,21 @@ export function NotificationModal({ isOpen, onClose, onSubscriptionChange }: Not
 
   const needsIosInstall = isIos && !isStandalone;
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150"
+      className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md max-h-[90vh] flex flex-col rounded-2xl bg-[#0D152B] border border-[#1E2B4D] shadow-2xl overflow-hidden my-auto animate-in zoom-in-95 duration-150 text-slate-100"
+        className="relative w-full sm:max-w-md max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-[#0D152B] border-t sm:border border-[#1E2B4D] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-150 text-slate-100"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Glow de ambientación caraquista */}
-        <div className="absolute top-0 right-1/4 w-32 h-32 bg-[#FDB827]/10 rounded-full blur-2xl pointer-events-none" />
+        {/* Manija táctil en móvil */}
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 bg-[#070B19]/70 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-slate-700" />
+        </div>
 
-        {/* Encabezado fijo */}
+        {/* Encabezado */}
         <div className="flex items-center justify-between border-b border-[#1E2B4D] px-5 py-3.5 bg-[#070B19]/70 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/30">
@@ -158,8 +166,7 @@ export function NotificationModal({ isOpen, onClose, onSubscriptionChange }: Not
         </div>
 
         {/* Cuerpo scrolleable */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
-          {/* Mensaje si navegador no soporta */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
           {!supported && (
             <div className="flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
@@ -167,20 +174,18 @@ export function NotificationModal({ isOpen, onClose, onSubscriptionChange }: Not
             </div>
           )}
 
-          {/* Guía iOS */}
           {needsIosInstall && (
             <div className="flex items-start gap-2.5 rounded-xl border border-[#FDB827]/40 bg-[#FDB827]/10 p-3.5 text-xs text-slate-200">
               <Share2 className="h-4 w-4 shrink-0 text-[#FDB827] mt-0.5" />
               <div className="space-y-1">
                 <p className="font-bold text-[#FDB827]">Requisito en iPhone / iPad</p>
                 <p className="text-slate-300 text-[11px] leading-relaxed">
-                  Para recibir alertas en iOS, pulsa el botón <strong>Compartir</strong> en Safari y selecciona <strong>&quot;Agregar a pantalla de inicio&quot;</strong>.
+                  Para recibir alertas en iOS, pulsa <strong>Compartir</strong> en Safari y selecciona <strong>&quot;Agregar a pantalla de inicio&quot;</strong>.
                 </p>
               </div>
             </div>
           )}
 
-          {/* Permiso bloqueado */}
           {permission === 'denied' && (
             <div className="flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
@@ -188,7 +193,6 @@ export function NotificationModal({ isOpen, onClose, onSubscriptionChange }: Not
             </div>
           )}
 
-          {/* Lista de Categorías */}
           <div className="space-y-2">
             <p className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
               Selecciona qué alertas recibir
@@ -222,7 +226,6 @@ export function NotificationModal({ isOpen, onClose, onSubscriptionChange }: Not
             })}
           </div>
 
-          {/* Mensajes de resultado */}
           {statusMessage && (
             <div
               className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
@@ -240,7 +243,7 @@ export function NotificationModal({ isOpen, onClose, onSubscriptionChange }: Not
           )}
         </div>
 
-        {/* Pie de acción fijo */}
+        {/* Pie de acción */}
         <div className="flex items-center justify-between border-t border-[#1E2B4D] bg-[#070B19]/80 px-5 py-3 shrink-0">
           <div>
             {isSubscribed && (
@@ -288,4 +291,6 @@ export function NotificationModal({ isOpen, onClose, onSubscriptionChange }: Not
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

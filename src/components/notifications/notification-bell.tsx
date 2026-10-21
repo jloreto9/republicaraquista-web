@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { getCurrentSubscription, isPushNotificationSupported } from '@/lib/push-client';
 import { NotificationModal } from './notification-modal';
 
@@ -12,15 +13,11 @@ interface NotificationBellProps {
 export function NotificationBell({ className = '' }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
-  const [isSupported, setIsSupported] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const supp = isPushNotificationSupported();
-    setIsSupported(supp);
-
-    if (supp) {
+    if (isPushNotificationSupported()) {
       getCurrentSubscription().then((sub) => {
         setIsSubscribed(Boolean(sub));
       });
@@ -34,7 +31,10 @@ export function NotificationBell({ className = '' }: NotificationBellProps) {
         onClick={() => setIsOpen(true)}
         aria-label="Configurar notificaciones"
         title="Configurar notificaciones"
-        className={`relative flex items-center justify-center p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/70 border border-slate-800/80 transition-all ${className}`}
+        className={cn(
+          "relative flex items-center justify-center p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/70 border border-slate-800/80 transition-all",
+          className
+        )}
       >
         <Bell className="h-4 w-4" />
         {isSubscribed && (

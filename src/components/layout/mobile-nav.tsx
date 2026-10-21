@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ACTIVE_SEASON, formatSeason } from "@/lib/constants";
 import { ShareButton } from "./share-button";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 interface NavItem {
   name: string;
@@ -79,7 +80,8 @@ export function MobileNav() {
           </span>
         </Link>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5">
+          <NotificationBell className="p-2 rounded-lg bg-[#0D152B] border border-[#1E2B4D] text-slate-300 hover:text-[#FDB827]" />
           <ShareButton compact />
           <button
             onClick={() => setIsOpen(!isOpen)}
