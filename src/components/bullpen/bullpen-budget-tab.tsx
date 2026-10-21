@@ -27,6 +27,12 @@ const ROLE_CONFIG: Record<
   string,
   { label: string; badgeClass: string; order: number; desc: string }
 > = {
+  SP: {
+    label: "Abridor (Rotación)",
+    badgeClass: "bg-teal-500/15 text-teal-300 border-teal-500/40",
+    order: 0,
+    desc: "Lanzador abridor de la rotación (Game Started / GS)",
+  },
   CL: {
     label: "Cerrador",
     badgeClass: "bg-[#FDB827]/15 text-[#FDB827] border-[#FDB827]/40",
@@ -98,7 +104,9 @@ export function BullpenBudgetTab({
     }
 
     // Filtro por rol
-    if (roleFilter !== "ALL") {
+    if (roleFilter === "BULLPEN") {
+      list = list.filter((r) => r.roleAbbr !== "SP");
+    } else if (roleFilter !== "ALL") {
       list = list.filter((r) => r.roleAbbr === roleFilter);
     }
 
@@ -111,8 +119,8 @@ export function BullpenBudgetTab({
     list.sort((a, b) => {
       let comparison = 0;
       if (sortBy === "role") {
-        const orderA = ROLE_CONFIG[a.roleAbbr]?.order || 99;
-        const orderB = ROLE_CONFIG[b.roleAbbr]?.order || 99;
+        const orderA = ROLE_CONFIG[a.roleAbbr]?.order ?? 99;
+        const orderB = ROLE_CONFIG[b.roleAbbr]?.order ?? 99;
         comparison = orderA - orderB;
       } else if (sortBy === "p3d") {
         comparison = b.summary.pitchesLast3Days - a.summary.pitchesLast3Days;
@@ -194,7 +202,7 @@ export function BullpenBudgetTab({
         <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              CARGA BULLPEN (3 DÍAS)
+              CARGA STAFF (3 DÍAS)
             </span>
             <Activity className="w-3.5 h-3.5 text-[#38BDF8]" />
           </div>
@@ -233,7 +241,7 @@ export function BullpenBudgetTab({
           </span>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-[#070B19] border border-white/10" />
-            <span className="text-slate-400 text-[11px]">Descanso</span>
+            <span className="text-slate-400 text-[11px]">Descanso / Libre</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-500/50" />
@@ -249,10 +257,16 @@ export function BullpenBudgetTab({
           </div>
         </div>
 
-        {/* Badges de Decisión */}
+        {/* Badges de Decisión y Apertura */}
         <div className="flex flex-wrap items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-[#1E2B4D]">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            Decisiones:
+            Etiquetas:
+          </span>
+          <span
+            className="px-1.5 py-0.5 rounded bg-teal-500/30 text-teal-200 border border-teal-500/40 font-black text-[10px]"
+            title="Abridor / Apertura (Game Started)"
+          >
+            GS
           </span>
           <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 font-black text-[10px]">
             SV
@@ -276,7 +290,7 @@ export function BullpenBudgetTab({
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Buscar relevista..."
+            placeholder="Buscar lanzador..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-[#070B19] border border-[#1E2B4D] rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#FDB827]"
@@ -294,7 +308,9 @@ export function BullpenBudgetTab({
               onChange={(e) => setRoleFilter(e.target.value)}
               className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer"
             >
-              <option value="ALL" className="bg-[#070B19]">Todos los Roles</option>
+              <option value="ALL" className="bg-[#070B19]">Todo el Staff (Abridores + Bullpen)</option>
+              <option value="BULLPEN" className="bg-[#070B19]">Solo Bullpen (CL, SU, HL, MR, LR)</option>
+              <option value="SP" className="bg-[#070B19]">Rotación Abridora (SP)</option>
               <option value="CL" className="bg-[#070B19]">Cerrador (CL)</option>
               <option value="SU" className="bg-[#070B19]">Preparador (SU)</option>
               <option value="HL" className="bg-[#070B19]">Alto Apalancamiento (HL)</option>
@@ -326,11 +342,11 @@ export function BullpenBudgetTab({
           <div className="flex items-center space-x-2">
             <Shield className="w-4 h-4 text-[#FDB827]" />
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-              Jerarquía de Bullpen y Carga Rolling (FanGraphs Depth Chart)
+              Jerarquía de Lanzadores y Carga Rolling (FanGraphs Depth Chart)
             </h3>
           </div>
           <div className="text-[11px] text-slate-400 font-mono">
-            Mostrando {filteredRelievers.length} de {relievers.length} relevistas
+            Mostrando {filteredRelievers.length} de {relievers.length} lanzadores
           </div>
         </div>
 
@@ -367,6 +383,9 @@ export function BullpenBudgetTab({
                 <th className="py-3 px-2 text-center" title="WHIP en la temporada">
                   WHIP
                 </th>
+                <th className="py-3 px-2 text-center text-teal-300 font-bold" title="Juegos Iniciados (Aperturas)">
+                  GS
+                </th>
                 <th className="py-3 px-2 text-center text-[#FDB827] font-bold" title="Salvados">
                   SV
                 </th>
@@ -374,17 +393,27 @@ export function BullpenBudgetTab({
                   HLD
                 </th>
 
-                {/* Columnas Dinámicas de Fechas Recientes */}
-                {dates.map((d: { date: string; dayLabel: string; dayOfWeek: string; opponent: string; gamePk: number }) => (
+                {/* Columnas Dinámicas de Fechas Recientes (con Días Libres explícitos) */}
+                {dates.map((d: { date: string; dayLabel: string; dayOfWeek: string; opponent: string; gamePk: number; isOffDay?: boolean }) => (
                   <th
                     key={d.date}
-                    className="py-2.5 px-2 text-center min-w-[80px] border-l border-[#1E2B4D]/60 bg-[#0A1024]"
+                    className={cn(
+                      "py-2.5 px-2 text-center min-w-[80px] border-l border-[#1E2B4D]/60",
+                      d.isOffDay ? "bg-[#060A18]" : "bg-[#0A1024]"
+                    )}
                   >
                     <div className="font-mono text-[10px] text-slate-300 font-bold whitespace-nowrap">
                       {d.dayLabel}
                     </div>
-                    <div className="text-[9px] font-semibold truncate text-[#FDB827]">
-                      {d.opponent}
+                    <div
+                      className={cn(
+                        "text-[9px] font-semibold truncate",
+                        d.isOffDay
+                          ? "text-slate-500 italic"
+                          : "text-[#FDB827]"
+                      )}
+                    >
+                      {d.isOffDay ? "Día Libre" : d.opponent}
                     </div>
                   </th>
                 ))}
@@ -478,6 +507,12 @@ export function BullpenBudgetTab({
                             </span>
                             <span>•</span>
                             <span>{r.seasonStats.games} JJ</span>
+                            {r.seasonStats.gs > 0 && (
+                              <>
+                                <span>•</span>
+                                <span className="text-teal-300 font-bold">{r.seasonStats.gs} GS</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -490,6 +525,9 @@ export function BullpenBudgetTab({
                     <td className="py-3 px-2 text-center font-mono text-slate-400">
                       {r.seasonStats.whip}
                     </td>
+                    <td className="py-3 px-2 text-center font-mono font-bold text-teal-300">
+                      {r.seasonStats.gs > 0 ? r.seasonStats.gs : "—"}
+                    </td>
                     <td className="py-3 px-2 text-center font-mono font-bold text-[#FDB827]">
                       {r.seasonStats.sv > 0 ? r.seasonStats.sv : "—"}
                     </td>
@@ -497,8 +535,24 @@ export function BullpenBudgetTab({
                       {r.seasonStats.holds > 0 ? r.seasonStats.holds : "—"}
                     </td>
 
-                    {/* Columnas de Fechas Diarias */}
-                    {dates.map((d: { date: string }, idx: number) => {
+                    {/* Columnas de Fechas Diarias (Manejo de Días Libres y Aperturas GS) */}
+                    {dates.map((d: { date: string; isOffDay?: boolean }, idx: number) => {
+                      if (d.isOffDay) {
+                        return (
+                          <td
+                            key={d.date}
+                            className="py-2.5 px-2 text-center border-l border-[#1E2B4D]/30 bg-[#060A18]/50"
+                          >
+                            <span
+                              className="text-slate-600 font-mono text-[11px] select-none"
+                              title={`${r.pitcherName}: Día Libre (Descanso de Calendario)`}
+                            >
+                              —
+                            </span>
+                          </td>
+                        );
+                      }
+
                       const usage: RelieverDayUsage | undefined =
                         r.dailyUsage.find((u) => u.date === d.date) || r.dailyUsage[idx];
                       const pitched = usage && usage.pitched && usage.pitches > 0;
@@ -537,10 +591,18 @@ export function BullpenBudgetTab({
                               "rounded-lg p-1.5 border text-center transition-transform hover:scale-105",
                               cellClass
                             )}
-                            title={`${r.pitcherName} lanzó ${usage.pitches} pitcheos (${usage.strikes} strikes) en ${usage.ip} IP vs ${usage.opponent}`}
+                            title={`${r.pitcherName} ${usage.isGS ? "inició el juego (GS) y " : ""}lanzó ${usage.pitches} pitcheos (${usage.strikes} strikes) en ${usage.ip} IP vs ${usage.opponent}`}
                           >
-                            <div className="flex items-center justify-center gap-1 font-mono font-black text-xs">
+                            <div className="flex items-center justify-center gap-1 font-mono font-black text-xs flex-wrap">
                               <span>{usage.pitches}P</span>
+                              {usage.isGS && (
+                                <span
+                                  className="text-[9px] font-black px-1 rounded bg-teal-500/30 text-teal-200 border border-teal-500/40"
+                                  title="Apertura / Juego Iniciado (GS)"
+                                >
+                                  GS
+                                </span>
+                              )}
                               {usage.decision && (
                                 <span
                                   className={cn(
@@ -632,20 +694,20 @@ export function BullpenBudgetTab({
         <div className="flex items-center space-x-2 border-b border-[#1E2B4D] pb-3">
           <HelpCircle className="w-4 h-4 text-[#FDB827]" />
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-            Metodología del Bullpen Budget & Reglas de Fatiga
+            Metodología del Bullpen Budget, Días Libres y Trazabilidad de Abridores
           </h4>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-400">
           <div className="space-y-1">
             <span className="font-bold text-slate-200">
-              1. Criterios de Disponibilidad:
+              1. Trazabilidad de Abridores (GS) & Días Libres:
             </span>
             <p className="leading-relaxed">
-              Un lanzador entra en estado de{" "}
-              <strong className="text-rose-400">Fatiga / Descanso</strong> si
-              lanzó más de 25 pitcheos en el juego anterior, si ha lanzado en 2 o
-              más días consecutivos (Back-to-Back), o si acumula más de 45 pitcheos
-              en los últimos 3 días.
+              La cuadrícula abarca la rotación abridora identificando cada salida
+              iniciada con la etiqueta <strong className="text-teal-300">GS</strong>.
+              Los días de descanso de la liga (como los lunes sin jornada) se exhiben
+              explícitamente como <strong className="text-slate-300">Día Libre</strong>,
+              computando el descanso fisiológico real de los brazos.
             </p>
           </div>
           <div className="space-y-1">
@@ -653,23 +715,25 @@ export function BullpenBudgetTab({
               2. Jerarquía FanGraphs Closer Depth Chart:
             </span>
             <p className="leading-relaxed">
-              Los roles se clasifican dinámicamente según su asignación táctica:{" "}
+              Los lanzadores se organizan por rol táctico:{" "}
+              <strong className="text-teal-300">SP (Abridor)</strong> para los
+              brazos de la rotación,{" "}
               <strong className="text-[#FDB827]">CL (Cerrador)</strong> para el
               noveno inning,{" "}
               <strong className="text-[#38BDF8]">SU (Preparador)</strong> para el
-              octavo inning con ventaja, y{" "}
+              octavo con ventaja, y{" "}
               <strong className="text-purple-400">HL (High Leverage)</strong> para
-              entradas críticas con corredores en base.
+              entradas de alto apalancamiento.
             </p>
           </div>
           <div className="space-y-1">
             <span className="font-bold text-slate-200">
-              3. Sincronización y Boxscores:
+              3. Criterios de Recuperación y Disponibilidad:
             </span>
             <p className="leading-relaxed">
-              La carga diaria y conteos de pitcheos se extraen de los boxscores
-              oficiales de la MLB Stats API (sportId=17, leagueId=135) y se
-              recalculan de forma determinística en cada actualización.
+              Para los abridores tras aperturas de 50+ pitcheos, se exige un ciclo
+              de descanso de 4 a 5 días antes de retornar a estado Disponible. Para
+              relevistas, se alerta tras 25+ pitcheos o 2 días consecutivos de acción.
             </p>
           </div>
         </div>

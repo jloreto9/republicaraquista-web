@@ -70,6 +70,9 @@ export interface RelieverDayUsage {
   dayOfWeek: string;
   gamePk: number;
   opponent: string;
+  isOffDay?: boolean;
+  isStarter?: boolean;
+  isGS?: boolean;
   pitched: boolean;
   pitches: number;
   strikes: number;
@@ -87,11 +90,13 @@ export interface RelieverBudgetItem {
   pitcherId: number;
   pitcherName: string;
   headshot: string;
-  role: "Closer" | "Setup" | "High Leverage" | "Middle Relief" | "Long Relief";
-  roleAbbr: "CL" | "SU" | "HL" | "MR" | "LR";
+  role: "Starter" | "Closer" | "Setup" | "High Leverage" | "Middle Relief" | "Long Relief";
+  roleAbbr: "SP" | "CL" | "SU" | "HL" | "MR" | "LR";
   throws: "R" | "L";
+  isStarterStaff?: boolean;
   seasonStats: {
     games: number;
+    gs: number;
     era: string;
     whip: string;
     sv: number;
@@ -124,6 +129,7 @@ export interface BullpenBudgetData {
     dayOfWeek: string;
     opponent: string;
     gamePk: number;
+    isOffDay?: boolean;
   }[];
   relievers: RelieverBudgetItem[];
   kpis: {

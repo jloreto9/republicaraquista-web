@@ -48,12 +48,14 @@ function formatOutsToIp(totalOuts: number): string {
 }
 
 export async function getBullpenBudget(
-  season = 2026,
-  teamId = 695
+  season: number,
+  teamId: number = 695
 ): Promise<BullpenBudgetData> {
   const cacheKey = `${season}_${teamId}`;
   const cached = budgetCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < 180000) { // 3 min cache
+  const now = Date.now();
+  // TTL de 2 minutos para datos vivos
+  if (cached && now - cached.timestamp < 120_000) {
     return cached.data;
   }
 
@@ -72,20 +74,28 @@ export async function getBullpenBudget(
       totalRelievers: 0,
       teamPitchesLast3Days: 0,
       teamPitchesLast5Days: 0,
-      mostWorkedReliever: "N/A",
+      mostWorkedReliever: "Sin datos",
       mostWorkedPitches: 0,
     },
   };
 
   try {
-    // 1. Consultar calendario del equipo en la temporada solicitada
-    let targetSeason = season;
-    let schedUrl = `https://statsapi.mlb.com/api/v1/schedule?sportId=17&leagueId=135&season=${targetSeason}&teamId=${teamId}&hydrate=linescore`;
-    let res = await fetch(schedUrl, { headers: HEADERS, next: { revalidate: 300 } });
-    let schedData = res.ok ? await res.json() : null;
+    // 1. Obtener calendario oficial del equipo para la temporada
+    let schedRes = await fetch(
+      `https://statsapi.mlb.com/api/v1/schedule?sportId=17&leagueId=135&season=${season}&teamId=${teamId}`,
+      {
+        headers: HEADERS,
+        signal: AbortSignal.timeout(6000),
+        next: { revalidate: 300 },
+      }
+    );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let allGames = (schedData?.dates || [])
+    if (!schedRes.ok) {
+      return emptyBudget;
+    }
+
+    let schedData = await schedRes.json();
+    let allGames = (schedData.dates || [])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .flatMap((d: any) => d.games || [])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,29 +105,37 @@ export async function getBullpenBudget(
         )
       );
 
-    // Fallback si la temporada solicitada (ej. 2026 antes de iniciar) no tiene juegos finalizados aún
-    if (allGames.length === 0 && season >= 2026) {
-      targetSeason = 2025;
-      schedUrl = `https://statsapi.mlb.com/api/v1/schedule?sportId=17&leagueId=135&season=${targetSeason}&teamId=${teamId}&hydrate=linescore`;
-      res = await fetch(schedUrl, { headers: HEADERS, next: { revalidate: 300 } });
-      schedData = res.ok ? await res.json() : null;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      allGames = (schedData?.dates || [])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .flatMap((d: any) => d.games || [])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((g: any) =>
-          ["Final", "Completed", "Game Over", "Completed Early"].includes(
-            g.status?.detailedState || g.status?.abstractGameState
-          )
-        );
+    // Fallback a 2025 si la temporada 2026 aún no tiene juegos completados
+    let effectiveSeason = season;
+    if (!allGames.length && season >= 2026) {
+      effectiveSeason = 2025;
+      schedRes = await fetch(
+        `https://statsapi.mlb.com/api/v1/schedule?sportId=17&leagueId=135&season=${effectiveSeason}&teamId=${teamId}`,
+        {
+          headers: HEADERS,
+          signal: AbortSignal.timeout(6000),
+          next: { revalidate: 300 },
+        }
+      );
+      if (schedRes.ok) {
+        schedData = await schedRes.json();
+        allGames = (schedData.dates || [])
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .flatMap((d: any) => d.games || [])
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .filter((g: any) =>
+            ["Final", "Completed", "Game Over", "Completed Early"].includes(
+              g.status?.detailedState || g.status?.abstractGameState
+            )
+          );
+      }
     }
 
     if (!allGames.length) {
       return emptyBudget;
     }
 
-    // Tomar los últimos 6 juegos del equipo (ciclo semanal típico en LVBP)
+    // Tomar los últimos 6 juegos completados del equipo
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recentGames = allGames.slice(-6);
 
@@ -167,19 +185,55 @@ export async function getBullpenBudget(
     const validBoxes = boxscores.filter(Boolean);
     if (!validBoxes.length) return emptyBudget;
 
-    // Metadatos de columnas de fechas
-    const datesMeta = validBoxes.map((b) => {
-      const { dayLabel, dayOfWeek } = formatDayLabel(b.gameDate);
+    // 3. Generar secuencia continua de días calendario (incluyendo Días Libres / Descanso)
+    const firstDateStr = validBoxes[0].gameDate;
+    const lastDateStr = validBoxes[validBoxes.length - 1].gameDate;
+
+    const endMs = new Date(`${lastDateStr}T12:00:00Z`).getTime();
+    let startMs = new Date(`${firstDateStr}T12:00:00Z`).getTime();
+
+    // Asegurar al menos 7 días de ventana rolling
+    const minStartMs = endMs - 6 * 86_400_000;
+    if (startMs > minStartMs) {
+      startMs = minStartMs;
+    }
+    // Limitar el ancho máximo a 8 días para preservar la ergonomía visual
+    const maxSpanMs = 8 * 86_400_000;
+    if (endMs - startMs > maxSpanMs) {
+      startMs = endMs - maxSpanMs;
+    }
+
+    const calendarDates: string[] = [];
+    let currMs = startMs;
+    while (currMs <= endMs) {
+      const dStr = new Date(currMs).toISOString().slice(0, 10);
+      calendarDates.push(dStr);
+      currMs += 86_400_000;
+    }
+
+    // Metadatos de columnas de fechas (con detección explícita de Día Libre)
+    const datesMeta = calendarDates.map((dStr) => {
+      const { dayLabel, dayOfWeek } = formatDayLabel(dStr);
+      const boxesOnDate = validBoxes.filter((b) => b.gameDate === dStr);
+      const isOffDay = boxesOnDate.length === 0;
+
+      const opponent = isOffDay
+        ? "Día Libre"
+        : boxesOnDate.length > 1
+        ? `${boxesOnDate[0].isHome ? "vs" : "@"} ${boxesOnDate[0].oppAbbr} (DH)`
+        : `${boxesOnDate[0].isHome ? "vs" : "@"} ${boxesOnDate[0].oppAbbr}`;
+
       return {
-        date: b.gameDate,
+        date: dStr,
         dayLabel,
         dayOfWeek,
-        opponent: b.isHome ? `vs ${b.oppAbbr}` : `@ ${b.oppAbbr}`,
-        gamePk: b.gamePk,
+        opponent,
+        gamePk: isOffDay ? 0 : boxesOnDate[0].gamePk,
+        isOffDay,
       };
     });
 
-    // 3. Recopilar relevistas únicos que hayan lanzado en la ventana
+    // 4. Recopilar lanzadores (Tanto Abridores GS como Relevistas)
     const pitcherMap = new Map<
       number,
       {
@@ -187,6 +241,8 @@ export async function getBullpenBudget(
         name: string;
         throws: "R" | "L";
         gamesCount: number;
+        startsCount: number;
+        reliefCount: number;
         totalEr: number;
         totalSo: number;
         totalIpOuts: number;
@@ -195,22 +251,22 @@ export async function getBullpenBudget(
         totalBb: number;
         totalH: number;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        gameOutings: Map<number, any>;
+        gameOutingsByDate: Map<string, any>;
       }
     >();
 
     for (const b of validBoxes) {
-      // El abridor es el primer lanzador registrado en el boxscore
       const starterId = b.pitchers[0];
-      const relievers = b.pitchers.slice(1);
 
-      for (const pId of relievers) {
+      for (let pIdx = 0; pIdx < b.pitchers.length; pIdx++) {
+        const pId = b.pitchers[pIdx];
         if (!pId) continue;
         const pData = b.players[`ID${pId}`];
         if (!pData) continue;
         const stats = pData.stats?.pitching || {};
-        const name = pData.person?.fullName || "Relevista";
+        const name = pData.person?.fullName || "Lanzador";
         const throws = (pData.pitchHand?.code as "R" | "L") || "R";
+        const isStarter = pId === starterId || Number(stats.gamesStarted || 0) > 0;
 
         if (!pitcherMap.has(pId)) {
           pitcherMap.set(pId, {
@@ -218,6 +274,8 @@ export async function getBullpenBudget(
             name,
             throws,
             gamesCount: 0,
+            startsCount: 0,
+            reliefCount: 0,
             totalEr: 0,
             totalSo: 0,
             totalIpOuts: 0,
@@ -225,11 +283,18 @@ export async function getBullpenBudget(
             totalHolds: 0,
             totalBb: 0,
             totalH: 0,
-            gameOutings: new Map(),
+            gameOutingsByDate: new Map(),
           });
         }
 
         const pRec = pitcherMap.get(pId)!;
+        pRec.gamesCount += 1;
+        if (isStarter) {
+          pRec.startsCount += 1;
+        } else {
+          pRec.reliefCount += 1;
+        }
+
         const ipStr = String(stats.inningsPitched || "0.0");
         const outs = parseOuts(ipStr);
         const pitches = Number(stats.numberOfPitches || 0);
@@ -249,7 +314,6 @@ export async function getBullpenBudget(
         else if (isW) decision = "W";
         else if (isL) decision = "L";
 
-        pRec.gamesCount += 1;
         pRec.totalEr += er;
         pRec.totalSo += so;
         pRec.totalIpOuts += outs;
@@ -263,44 +327,108 @@ export async function getBullpenBudget(
         else if (pitches >= 16) loadLevel = "medium";
         else if (pitches >= 1) loadLevel = "low";
 
-        pRec.gameOutings.set(b.gamePk, {
-          gamePk: b.gamePk,
-          date: b.gameDate,
-          opponent: b.isHome ? `vs ${b.oppAbbr}` : `@ ${b.oppAbbr}`,
-          pitched: true,
-          pitches,
-          strikes,
-          ip: ipStr,
-          ipDecimal: outs / 3,
-          er,
-          so,
-          bb,
-          h,
-          decision,
-          loadLevel,
-        });
+        // Acumular si hubo doble juego el mismo día
+        const existing = pRec.gameOutingsByDate.get(b.gameDate);
+        if (existing) {
+          const combinedPitches = existing.pitches + pitches;
+          let combLoad: "rest" | "low" | "medium" | "high" = "low";
+          if (combinedPitches >= 26) combLoad = "high";
+          else if (combinedPitches >= 16) combLoad = "medium";
+
+          pRec.gameOutingsByDate.set(b.gameDate, {
+            gamePk: b.gamePk,
+            date: b.gameDate,
+            opponent: existing.opponent,
+            isOffDay: false,
+            isStarter: existing.isStarter || isStarter,
+            isGS: existing.isGS || isStarter,
+            pitched: true,
+            pitches: combinedPitches,
+            strikes: existing.strikes + strikes,
+            ip: formatOutsToIp(parseOuts(existing.ip) + outs),
+            ipDecimal: existing.ipDecimal + outs / 3,
+            er: existing.er + er,
+            so: existing.so + so,
+            bb: existing.bb + bb,
+            h: existing.h + h,
+            decision: decision || existing.decision,
+            loadLevel: combLoad,
+          });
+        } else {
+          pRec.gameOutingsByDate.set(b.gameDate, {
+            gamePk: b.gamePk,
+            date: b.gameDate,
+            opponent: b.isHome ? `vs ${b.oppAbbr}` : `@ ${b.oppAbbr}`,
+            isOffDay: false,
+            isStarter,
+            isGS: isStarter,
+            pitched: true,
+            pitches,
+            strikes,
+            ip: ipStr,
+            ipDecimal: outs / 3,
+            er,
+            so,
+            bb,
+            h,
+            decision,
+            loadLevel,
+          });
+        }
       }
     }
 
-    // 4. Construir ítems de cada relevista y clasificar rol FanGraphs
+    // 5. Construir ítems de cada lanzador y clasificar rol FanGraphs
     const relieversList: RelieverBudgetItem[] = Array.from(pitcherMap.values()).map((p) => {
-      // Matriz de uso diaria para los juegos en orden cronológico
-      const dailyUsage: RelieverDayUsage[] = validBoxes.map((b) => {
-        const { dayLabel, dayOfWeek } = formatDayLabel(b.gameDate);
-        if (p.gameOutings.has(b.gamePk)) {
-          const app = p.gameOutings.get(b.gamePk);
+      // Matriz de uso diaria para todos los días del calendario (incluyendo Días Libres)
+      const dailyUsage: RelieverDayUsage[] = calendarDates.map((dStr) => {
+        const { dayLabel, dayOfWeek } = formatDayLabel(dStr);
+        const boxesOnDate = validBoxes.filter((b) => b.gameDate === dStr);
+        const isOffDay = boxesOnDate.length === 0;
+
+        if (isOffDay) {
+          return {
+            date: dStr,
+            dayLabel,
+            dayOfWeek,
+            gamePk: 0,
+            opponent: "Día Libre",
+            isOffDay: true,
+            isStarter: false,
+            isGS: false,
+            pitched: false,
+            pitches: 0,
+            strikes: 0,
+            ip: "0.0",
+            ipDecimal: 0,
+            er: 0,
+            so: 0,
+            bb: 0,
+            h: 0,
+            decision: "",
+            loadLevel: "rest",
+          };
+        }
+
+        if (p.gameOutingsByDate.has(dStr)) {
+          const app = p.gameOutingsByDate.get(dStr);
           return {
             ...app,
             dayLabel,
             dayOfWeek,
           };
         }
+
+        const mainBox = boxesOnDate[0];
         return {
-          date: b.gameDate,
+          date: dStr,
           dayLabel,
           dayOfWeek,
-          gamePk: b.gamePk,
-          opponent: b.isHome ? `vs ${b.oppAbbr}` : `@ ${b.oppAbbr}`,
+          gamePk: mainBox.gamePk,
+          opponent: mainBox.isHome ? `vs ${mainBox.oppAbbr}` : `@ ${mainBox.oppAbbr}`,
+          isOffDay: false,
+          isStarter: false,
+          isGS: false,
           pitched: false,
           pitches: 0,
           strikes: 0,
@@ -315,7 +443,7 @@ export async function getBullpenBudget(
         };
       });
 
-      // Cálculo de cargas acumuladas rolling
+      // Cálculo de cargas acumuladas rolling (en la ventana de días calendario)
       const last3 = dailyUsage.slice(-3);
       const last5 = dailyUsage.slice(-5);
 
@@ -325,7 +453,7 @@ export async function getBullpenBudget(
       const totalOutsWeek = dailyUsage.reduce((sum, u) => sum + Math.round(u.ipDecimal * 3), 0);
       const totalInningsWeek = formatOutsToIp(totalOutsWeek);
 
-      // Días consecutivos lanzados en el tramo final
+      // Días consecutivos lanzados en el tramo final (los días libres rompen la racha)
       let consecutiveDaysPitched = 0;
       for (let i = dailyUsage.length - 1; i >= 0; i--) {
         if (dailyUsage[i].pitched && dailyUsage[i].pitches > 0) {
@@ -344,42 +472,16 @@ export async function getBullpenBudget(
         }
       }
 
-      // Veredicto de disponibilidad / fatiga
-      const lastApp = dailyUsage[dailyUsage.length - 1];
-      const prevApp = dailyUsage[dailyUsage.length - 2];
-
-      let availabilityStatus: "available" | "caution" | "unavailable" = "available";
-      let availabilityLabel: "Disponible" | "Precaución" | "Fatiga / Descanso" = "Disponible";
-
-      if (consecutiveDaysPitched >= 3) {
-        availabilityStatus = "unavailable";
-        availabilityLabel = "Fatiga / Descanso";
-      } else if (lastApp.pitches >= 30) {
-        availabilityStatus = "unavailable";
-        availabilityLabel = "Fatiga / Descanso";
-      } else if (
-        consecutiveDaysPitched === 2 &&
-        lastApp.pitches + (prevApp?.pitches || 0) >= 32
-      ) {
-        availabilityStatus = "unavailable";
-        availabilityLabel = "Fatiga / Descanso";
-      } else if (consecutiveDaysPitched === 2) {
-        availabilityStatus = "caution";
-        availabilityLabel = "Precaución";
-      } else if (lastApp.pitches >= 18) {
-        availabilityStatus = "caution";
-        availabilityLabel = "Precaución";
-      } else if (pitchesLast3Days >= 38) {
-        availabilityStatus = "caution";
-        availabilityLabel = "Precaución";
-      }
-
-      // Asignar Rol FanGraphs
-      let role: "Closer" | "Setup" | "High Leverage" | "Middle Relief" | "Long Relief" =
+      // Clasificación de Rol FanGraphs Depth Chart
+      const isStarterStaff = p.startsCount > 0 && p.startsCount >= p.gamesCount * 0.5;
+      let role: "Starter" | "Closer" | "Setup" | "High Leverage" | "Middle Relief" | "Long Relief" =
         "Middle Relief";
-      let roleAbbr: "CL" | "SU" | "HL" | "MR" | "LR" = "MR";
+      let roleAbbr: "SP" | "CL" | "SU" | "HL" | "MR" | "LR" = "MR";
 
-      if (p.totalSaves >= 2) {
+      if (isStarterStaff) {
+        role = "Starter";
+        roleAbbr = "SP";
+      } else if (p.totalSaves >= 2) {
         role = "Closer";
         roleAbbr = "CL";
       } else if (p.totalHolds >= 2 || (p.totalSaves >= 1 && p.totalHolds >= 1)) {
@@ -388,9 +490,54 @@ export async function getBullpenBudget(
       } else if (p.gamesCount >= 3 && p.totalSo >= 4) {
         role = "High Leverage";
         roleAbbr = "HL";
-      } else if (p.totalIpOuts / Math.max(1, p.gamesCount) >= 4.5) { // 1.2+ IP por salida
+      } else if (p.totalIpOuts / Math.max(1, p.gamesCount) >= 4.5 || p.startsCount > 0) {
         role = "Long Relief";
         roleAbbr = "LR";
+      }
+
+      // Veredicto de disponibilidad / fatiga
+      const lastApp = dailyUsage[dailyUsage.length - 1];
+      const prevApp = dailyUsage[dailyUsage.length - 2];
+
+      let availabilityStatus: "available" | "caution" | "unavailable" = "available";
+      let availabilityLabel: "Disponible" | "Precaución" | "Fatiga / Descanso" = "Disponible";
+
+      if (isStarterStaff) {
+        // Criterios fisiológicos para abridores (recuperación de 4-5 días tras 50+ pitcheos)
+        if (daysSinceLastPitched <= 2) {
+          availabilityStatus = "unavailable";
+          availabilityLabel = "Fatiga / Descanso";
+        } else if (daysSinceLastPitched === 3) {
+          availabilityStatus = "caution";
+          availabilityLabel = "Precaución";
+        } else {
+          availabilityStatus = "available";
+          availabilityLabel = "Disponible";
+        }
+      } else {
+        // Criterios para cuerpo de relevo
+        if (consecutiveDaysPitched >= 3) {
+          availabilityStatus = "unavailable";
+          availabilityLabel = "Fatiga / Descanso";
+        } else if (lastApp.pitches >= 30) {
+          availabilityStatus = "unavailable";
+          availabilityLabel = "Fatiga / Descanso";
+        } else if (
+          consecutiveDaysPitched === 2 &&
+          lastApp.pitches + (prevApp?.pitches || 0) >= 32
+        ) {
+          availabilityStatus = "unavailable";
+          availabilityLabel = "Fatiga / Descanso";
+        } else if (consecutiveDaysPitched === 2) {
+          availabilityStatus = "caution";
+          availabilityLabel = "Precaución";
+        } else if (lastApp.pitches >= 18) {
+          availabilityStatus = "caution";
+          availabilityLabel = "Precaución";
+        } else if (pitchesLast3Days >= 38) {
+          availabilityStatus = "caution";
+          availabilityLabel = "Precaución";
+        }
       }
 
       // Métricas de temporada para la tarjeta
@@ -405,8 +552,10 @@ export async function getBullpenBudget(
         role,
         roleAbbr,
         throws: p.throws,
+        isStarterStaff,
         seasonStats: {
           games: p.gamesCount,
+          gs: p.startsCount,
           era: eraVal.toFixed(2),
           whip: whipVal.toFixed(2),
           sv: p.totalSaves,
@@ -429,13 +578,14 @@ export async function getBullpenBudget(
       };
     });
 
-    // Ordenar por Jerarquía de Bullpen FanGraphs: CL -> SU -> HL -> MR -> LR
+    // Ordenar por Jerarquía FanGraphs: SP -> CL -> SU -> HL -> MR -> LR
     const roleWeight: Record<string, number> = {
-      CL: 1,
-      SU: 2,
-      HL: 3,
-      MR: 4,
-      LR: 5,
+      SP: 1,
+      CL: 2,
+      SU: 3,
+      HL: 4,
+      MR: 5,
+      LR: 6,
     };
 
     relieversList.sort((a, b) => {
@@ -445,7 +595,7 @@ export async function getBullpenBudget(
       return b.seasonStats.games - a.seasonStats.games || b.summary.totalPitchesWeek - a.summary.totalPitchesWeek;
     });
 
-    // 5. KPIs de Salud del Bullpen
+    // 6. KPIs de Salud del Staff
     const availableArms = relieversList.filter((r) => r.summary.availabilityStatus === "available").length;
     const cautionArms = relieversList.filter((r) => r.summary.availabilityStatus === "caution").length;
     const unavailableArms = relieversList.filter((r) => r.summary.availabilityStatus === "unavailable").length;
@@ -459,7 +609,7 @@ export async function getBullpenBudget(
       teamId,
       teamName: teamObj.name || "Equipo",
       teamLogo: teamObj.logoUrl,
-      season: targetSeason,
+      season: effectiveSeason,
       dates: datesMeta,
       relievers: relieversList,
       kpis: {
@@ -469,15 +619,15 @@ export async function getBullpenBudget(
         totalRelievers: relieversList.length,
         teamPitchesLast3Days,
         teamPitchesLast5Days,
-        mostWorkedReliever: mostWorked ? mostWorked.pitcherName : "N/A",
-        mostWorkedPitches: mostWorked ? mostWorked.summary.totalPitchesWeek : 0,
+        mostWorkedReliever: mostWorked ? mostWorked.pitcherName : "Sin datos",
+        mostWorkedPitches: mostWorked ? mostWorked.summary.pitchesLast3Days : 0,
       },
     };
 
-    budgetCache.set(cacheKey, { timestamp: Date.now(), data: budgetData });
+    budgetCache.set(cacheKey, { timestamp: now, data: budgetData });
     return budgetData;
-  } catch (err) {
-    console.error("Exception in getBullpenBudget:", err);
+  } catch (error) {
+    console.error("Error computing bullpen budget:", error);
     return emptyBudget;
   }
 }
