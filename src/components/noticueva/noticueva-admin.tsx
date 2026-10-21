@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { NotiCuevaPost } from "@/types/noticueva";
 import { FormattedContent } from "./formatted-content";
+import { PushBroadcastPanel } from "@/components/admin/push-broadcast-panel";
 import {
   Lock,
   Send,
@@ -832,6 +833,9 @@ export function NotiCuevaAdmin() {
           </div>
         )}
       </div>
+
+      {/* Panel de Despacho de Notificaciones Web Push */}
+      <PushBroadcastPanel adminPassword={password} />
     </div>
   );
 }

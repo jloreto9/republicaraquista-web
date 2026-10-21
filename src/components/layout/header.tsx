@@ -5,6 +5,7 @@ import { getTeam, ACTIVE_SEASON, formatSeason } from "@/lib/constants";
 import { useSeason } from "@/context/season-context";
 import { ChevronDown } from "lucide-react";
 import { ShareButton } from "./share-button";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 interface HeaderProps {
   title: string;
@@ -60,6 +61,9 @@ export function Header({
           title={`${title} • REPUBLICARAQUISTAPP`}
           text={`¡Sigue a los Leones del Caracas en ${title} en REPUBLICARAQUISTAPP! 🦁⚾`}
         />
+
+        {/* Notifications Bell */}
+        <NotificationBell />
 
         {/* Leones Mini Badge */}
         <div className="flex items-center space-x-2 px-3 py-1 rounded-lg bg-[#002D62]/40 border border-[#FDB827]/30">
