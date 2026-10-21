@@ -26,8 +26,9 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
   const [activeTab, setActiveTab] = useState<"splits" | "lob" | "bvp">("splits");
   const [bvpSearch, setBvpSearch] = useState("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [splitMode, setSplitMode] = useState<"batting" | "pitching">("batting");
 
-  const { splits, lobSummary, lobBatterRanking, bvpRecords } = data;
+  const { splits = [], pitchingSplits = [], lobSummary, lobBatterRanking, bvpRecords } = data;
 
   const handleSeasonChange = async (newSeason: number) => {
     setCurrentSeason(newSeason);
@@ -67,6 +68,10 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
   // Encontrar splits clave para KPIs
   const rispSplit = splits.find((s) => s.situacion.includes("RISP") && !s.situacion.includes("2 Outs"));
   const clutchSplit = splits.find((s) => s.situacion.includes("Clutch") || s.situacion.includes("2 Outs"));
+
+  const pitchTotal = pitchingSplits.find((s) => s.situacion.includes("Total General")) || pitchingSplits[0];
+  const pitchRisp = pitchingSplits.find((s) => s.situacion.includes("RISP") && !s.situacion.includes("2 Outs"));
+  const pitchClutch = pitchingSplits.find((s) => s.situacion.includes("Clutch") || s.situacion.includes("2 Outs"));
 
   const filteredBvp = bvpRecords.filter((b) =>
     b.pitcherName.toLowerCase().includes(bvpSearch.toLowerCase()) ||
@@ -117,59 +122,117 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
         </div>
       </div>
 
-      {/* 4 KPIs Clave */}
+      {/* 4 KPIs Clave (Bateo o Pitcheo según splitMode) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-            <span>AVG EN RISP</span>
-            <Target className="w-4 h-4 text-[#FDB827]" />
-          </div>
-          <div className="text-xl font-mono font-extrabold text-[#FDB827]">
-            {rispSplit?.avg || ".327"}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            OPS en RISP: <span className="text-slate-200 font-mono font-bold">{rispSplit?.ops || ".915"}</span>
-          </div>
-        </div>
+        {splitMode === "batting" ? (
+          <>
+            <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+                <span>AVG EN RISP</span>
+                <Target className="w-4 h-4 text-[#FDB827]" />
+              </div>
+              <div className="text-xl font-mono font-extrabold text-[#FDB827]">
+                {rispSplit?.avg || ".327"}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                OPS en RISP: <span className="text-slate-200 font-mono font-bold">{rispSplit?.ops || ".915"}</span>
+              </div>
+            </div>
 
-        <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-            <span>CLUTCH (2 OUTS RISP)</span>
-            <Flame className="w-4 h-4 text-rose-400" />
-          </div>
-          <div className="text-xl font-mono font-extrabold text-rose-400">
-            {clutchSplit?.avg || ".311"}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            OPS: <span className="text-slate-200 font-mono font-bold">{clutchSplit?.ops || ".882"}</span>
-          </div>
-        </div>
+            <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+                <span>CLUTCH (2 OUTS RISP)</span>
+                <Flame className="w-4 h-4 text-rose-400" />
+              </div>
+              <div className="text-xl font-mono font-extrabold text-rose-400">
+                {clutchSplit?.avg || ".311"}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                OPS: <span className="text-slate-200 font-mono font-bold">{clutchSplit?.ops || ".882"}</span>
+              </div>
+            </div>
 
-        <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-            <span>LOB AL TERMINAR INNING</span>
-            <Shield className="w-4 h-4 text-blue-400" />
-          </div>
-          <div className="text-xl font-mono font-extrabold text-slate-100">
-            {lobSummary.totalLobEnding}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            Corredores en base con 3er out
-          </div>
-        </div>
+            <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+                <span>LOB AL TERMINAR INNING</span>
+                <Shield className="w-4 h-4 text-blue-400" />
+              </div>
+              <div className="text-xl font-mono font-extrabold text-slate-100">
+                {lobSummary.totalLobEnding}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                Corredores en base con 3er out
+              </div>
+            </div>
 
-        <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
-            <span>TOTAL RISP LOB</span>
-            <Users className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="text-xl font-mono font-extrabold text-amber-400">
-            {lobSummary.totalRispLob}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            Oportunidades en 2B/3B no remolcadas
-          </div>
-        </div>
+            <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+                <span>TOTAL RISP LOB</span>
+                <Users className="w-4 h-4 text-amber-500" />
+              </div>
+              <div className="text-xl font-mono font-extrabold text-amber-400">
+                {lobSummary.totalRispLob}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                Oportunidades en 2B/3B no remolcadas
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+                <span>OPP BAA EN RISP</span>
+                <Target className="w-4 h-4 text-[#FDB827]" />
+              </div>
+              <div className="text-xl font-mono font-extrabold text-[#FDB827]">
+                {pitchRisp?.baa || ".231"}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                OPS Rival: <span className="text-slate-200 font-mono font-bold">{pitchRisp?.ops || ".650"}</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+                <span>OPP CLUTCH (2 OUTS RISP)</span>
+                <Flame className="w-4 h-4 text-rose-400" />
+              </div>
+              <div className="text-xl font-mono font-extrabold text-rose-400">
+                {pitchClutch?.baa || ".198"}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                OPS Rival: <span className="text-slate-200 font-mono font-bold">{pitchClutch?.ops || ".590"}</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+                <span>WHIP COLECTIVO</span>
+                <Shield className="w-4 h-4 text-blue-400" />
+              </div>
+              <div className="text-xl font-mono font-extrabold text-slate-100">
+                {pitchTotal?.whip || "1.25"}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                BB/9: <span className="text-slate-200 font-mono font-bold">{pitchTotal?.bbPer9 || "3.2"}</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
+                <span>EFECTIVIDAD & K/9</span>
+                <Users className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div className="text-xl font-mono font-extrabold text-emerald-400">
+                {pitchTotal?.era || "3.60"}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                K/9: <span className="text-slate-200 font-mono font-bold">{pitchTotal?.kPer9 || "8.8"}</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Tabs */}
@@ -209,70 +272,160 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
       {/* Tab 1: Splits Situacionales */}
       {activeTab === "splits" && (
         <div className="p-5 rounded-xl bg-[#0D152B] border border-[#1E2B4D] space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <PieChart className="w-4 h-4 text-[#FDB827]" />
-              Rendimiento Colectivo por Situación de Juego
-            </h3>
-            <span className="text-[10px] font-mono px-2 py-1 rounded bg-[#070B19] border border-[#1E2B4D] text-[#FDB827]">
-              Temporada {season}-{String(season + 1).slice(-2)}
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <PieChart className="w-4 h-4 text-[#FDB827]" />
+                {splitMode === "batting"
+                  ? "Rendimiento Ofensivo por Situación de Juego"
+                  : "Rendimiento Monticular por Situación de Juego"}
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {splitMode === "batting"
+                  ? "Producción de los bateadores de Leones según el contexto del turno."
+                  : "Contención del cuerpo de lanzadores caraquista frente a la ofensiva rival."}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D] self-start sm:self-auto">
+              <button
+                onClick={() => setSplitMode("batting")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                  splitMode === "batting"
+                    ? "bg-[#FDB827] text-[#070B19] font-bold shadow"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <span>🏏 Bateo</span>
+              </button>
+              <button
+                onClick={() => setSplitMode("pitching")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                  splitMode === "pitching"
+                    ? "bg-[#FDB827] text-[#070B19] font-bold shadow"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <span>⚾ Pitcheo</span>
+              </button>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="border-b border-[#1E2B4D] text-[10px] uppercase tracking-wider text-slate-400">
-                  <th className="py-2.5 px-3">Situación</th>
-                  <th className="py-2.5 px-3 text-center">PA</th>
-                  <th className="py-2.5 px-3 text-center">AB</th>
-                  <th className="py-2.5 px-3 text-center">H</th>
-                  <th className="py-2.5 px-3 text-center">2B</th>
-                  <th className="py-2.5 px-3 text-center">3B</th>
-                  <th className="py-2.5 px-3 text-center">HR</th>
-                  <th className="py-2.5 px-3 text-center">RBI</th>
-                  <th className="py-2.5 px-3 text-center">BB</th>
-                  <th className="py-2.5 px-3 text-center">SO</th>
-                  <th className="py-2.5 px-3 text-right">AVG</th>
-                  <th className="py-2.5 px-3 text-right">OBP</th>
-                  <th className="py-2.5 px-3 text-right">SLG</th>
-                  <th className="py-2.5 px-3 text-right">OPS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#1E2B4D]/60 font-mono">
-                {splits.map((s, idx) => (
-                  <tr
-                    key={s.situacion}
-                    className={`hover:bg-[#070B19]/50 transition-colors ${
-                      idx === 0 ? "bg-[#070B19]/40 font-semibold" : ""
-                    }`}
-                  >
-                    <td className="py-2.5 px-3 font-sans font-bold text-slate-100 flex items-center gap-2">
-                      {s.situacion}
-                      {s.badge && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/20 font-sans">
-                          {s.badge}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-300">{s.pa}</td>
-                    <td className="py-2.5 px-3 text-center text-slate-300">{s.ab}</td>
-                    <td className="py-2.5 px-3 text-center text-slate-200">{s.h}</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">{s.doubles}</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">{s.triples}</td>
-                    <td className="py-2.5 px-3 text-center text-slate-200">{s.hr}</td>
-                    <td className="py-2.5 px-3 text-center text-emerald-400 font-bold">{s.rbi}</td>
-                    <td className="py-2.5 px-3 text-center text-slate-300">{s.bb}</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">{s.so}</td>
-                    <td className="py-2.5 px-3 text-right text-slate-100 font-bold">{s.avg}</td>
-                    <td className="py-2.5 px-3 text-right text-slate-300">{s.obp}</td>
-                    <td className="py-2.5 px-3 text-right text-slate-300">{s.slg}</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-[#FDB827]">{s.ops}</td>
+          {splitMode === "batting" ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-[#1E2B4D] text-[10px] uppercase tracking-wider text-slate-400">
+                    <th className="py-2.5 px-3">Situación</th>
+                    <th className="py-2.5 px-3 text-center">PA</th>
+                    <th className="py-2.5 px-3 text-center">AB</th>
+                    <th className="py-2.5 px-3 text-center">H</th>
+                    <th className="py-2.5 px-3 text-center">2B</th>
+                    <th className="py-2.5 px-3 text-center">3B</th>
+                    <th className="py-2.5 px-3 text-center">HR</th>
+                    <th className="py-2.5 px-3 text-center">RBI</th>
+                    <th className="py-2.5 px-3 text-center">BB</th>
+                    <th className="py-2.5 px-3 text-center">SO</th>
+                    <th className="py-2.5 px-3 text-right">AVG</th>
+                    <th className="py-2.5 px-3 text-right">OBP</th>
+                    <th className="py-2.5 px-3 text-right">SLG</th>
+                    <th className="py-2.5 px-3 text-right">OPS</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-[#1E2B4D]/60 font-mono">
+                  {splits.map((s, idx) => (
+                    <tr
+                      key={s.situacion}
+                      className={`hover:bg-[#070B19]/50 transition-colors ${
+                        idx === 0 ? "bg-[#070B19]/40 font-semibold" : ""
+                      }`}
+                    >
+                      <td className="py-2.5 px-3 font-sans font-bold text-slate-100 flex items-center gap-2">
+                        {s.situacion}
+                        {s.badge && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/20 font-sans">
+                            {s.badge}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center text-slate-300">{s.pa}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-300">{s.ab}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-200">{s.h}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-400">{s.doubles}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-400">{s.triples}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-200">{s.hr}</td>
+                      <td className="py-2.5 px-3 text-center text-emerald-400 font-bold">{s.rbi}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-300">{s.bb}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-400">{s.so}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-100 font-bold">{s.avg}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-300">{s.obp}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-300">{s.slg}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-[#FDB827]">{s.ops}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-[#1E2B4D] text-[10px] uppercase tracking-wider text-slate-400">
+                    <th className="py-2.5 px-3">Situación</th>
+                    <th className="py-2.5 px-3 text-center">IP</th>
+                    <th className="py-2.5 px-3 text-center">BF</th>
+                    <th className="py-2.5 px-3 text-center">AB</th>
+                    <th className="py-2.5 px-3 text-center">H</th>
+                    <th className="py-2.5 px-3 text-center">2B</th>
+                    <th className="py-2.5 px-3 text-center">3B</th>
+                    <th className="py-2.5 px-3 text-center">HR</th>
+                    <th className="py-2.5 px-3 text-center">BB</th>
+                    <th className="py-2.5 px-3 text-center">SO</th>
+                    <th className="py-2.5 px-3 text-right">ERA</th>
+                    <th className="py-2.5 px-3 text-right">WHIP</th>
+                    <th className="py-2.5 px-3 text-right">BAA</th>
+                    <th className="py-2.5 px-3 text-right">OBP</th>
+                    <th className="py-2.5 px-3 text-right">SLG</th>
+                    <th className="py-2.5 px-3 text-right">OPS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1E2B4D]/60 font-mono">
+                  {pitchingSplits.map((s, idx) => (
+                    <tr
+                      key={s.situacion}
+                      className={`hover:bg-[#070B19]/50 transition-colors ${
+                        idx === 0 ? "bg-[#070B19]/40 font-semibold" : ""
+                      }`}
+                    >
+                      <td className="py-2.5 px-3 font-sans font-bold text-slate-100 flex items-center gap-2">
+                        {s.situacion}
+                        {s.badge && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/20 font-sans">
+                            {s.badge}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center text-slate-200 font-bold">{s.ipDisplay}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-300">{s.bf}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-400">{s.ab}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-200">{s.h}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-400">{s.doubles}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-400">{s.triples}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-200">{s.hr}</td>
+                      <td className="py-2.5 px-3 text-center text-slate-300">{s.bb}</td>
+                      <td className="py-2.5 px-3 text-center text-emerald-400 font-bold">{s.so}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-100 font-bold">{s.era}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-200 font-bold">{s.whip}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-300">{s.baa}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-400">{s.obp}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-400">{s.slg}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-[#FDB827]">{s.ops}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -415,6 +568,9 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
         </p>
         <p>
           • <strong>RISP LOB Dentro de Inning:</strong> Oportunidad con 0 o 1 out donde el bateador fue retirado o no remolcó a los corredores en posición anotadora.
+        </p>
+        <p>
+          • <strong>Splits de Pitcheo (Montículo):</strong> BAA (Batting Average Against / Promedio de bateo permitido a los rivales), WHIP (Bases por bolas + Hits permitidos por inning) y BF (Batters Faced / Bateadores enfrentados) clasificados por situación.
         </p>
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { BattingStats, PitchingStats } from "@/types/sports";
 import { StatsFilters } from "@/components/stats/stats-filters";
 import { BattingTable } from "@/components/stats/batting-table";
@@ -46,6 +47,32 @@ export function IndividualesView({
     id: number;
     type: "batter" | "pitcher";
   } | null>(null);
+
+  const searchParams = useSearchParams();
+
+  // Escuchar parámetros de URL para deep-linking (ej: ?tab=splits&player=682949&type=pitcher)
+  useEffect(() => {
+    if (!searchParams) return;
+    const tabParam = searchParams.get("tab");
+    const playerParam = searchParams.get("player");
+    const typeParam = searchParams.get("type");
+
+    if (tabParam === "splits") {
+      setActiveTab("splits");
+      if (playerParam) {
+        setTargetSplitPlayer({
+          id: Number(playerParam),
+          type: typeParam === "pitcher" ? "pitcher" : "batter",
+        });
+      }
+    } else if (tabParam === "pitching") {
+      setActiveTab("pitching");
+    } else if (tabParam === "fielding") {
+      setActiveTab("fielding");
+    } else if (tabParam === "batting") {
+      setActiveTab("batting");
+    }
+  }, [searchParams]);
 
   // Sincronizar si la temporada global cambia desde el Header u otra vista
   useEffect(() => {

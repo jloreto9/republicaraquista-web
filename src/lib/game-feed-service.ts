@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { getTeam } from "./constants";
-import { calculateSlashLine, formatRate } from "./situational-engine";
+import { calculateSlashLine, calculatePitchingSplit, formatRate } from "./situational-engine";
 import {
   transformCoordinates,
   classifyDirection,
@@ -12,6 +12,7 @@ import { GameOption, SeasonWpaLeader, GameWpaData } from "@/types/wpa";
 import {
   SituationalData,
   SituationalSplit,
+  PitchingSituationalSplit,
   LobSummary,
   BatterLobRecord,
   BvpRecord,
@@ -308,6 +309,48 @@ function recordPlayInBucket(bucket: SplitBucket, event: string, rbi: number) {
   bucket.rbi += rbi;
 }
 
+interface PitchingBucket {
+  pa: number;
+  ab: number;
+  h: number;
+  doubles: number;
+  triples: number;
+  hr: number;
+  bb: number;
+  so: number;
+  er: number;
+  outs: number;
+}
+
+function emptyPitchingBucket(): PitchingBucket {
+  return { pa: 0, ab: 0, h: 0, doubles: 0, triples: 0, hr: 0, bb: 0, so: 0, er: 0, outs: 0 };
+}
+
+function recordPitchingPlayInBucket(bucket: PitchingBucket, event: string, outsMade: number, rbi: number) {
+  bucket.pa += 1;
+  const isBB = event.includes("Walk");
+  const isHBP = event.includes("Hit By Pitch");
+  const isSF = event.includes("Sac Fly");
+  const isSH = event.includes("Sac Bunt");
+  const isHit = ["Single", "Double", "Triple", "Home Run"].includes(event);
+
+  if (!isBB && !isHBP && !isSF && !isSH) {
+    bucket.ab += 1;
+  }
+  if (isHit) bucket.h += 1;
+  if (event === "Double") bucket.doubles += 1;
+  if (event === "Triple") bucket.triples += 1;
+  if (event === "Home Run") {
+    bucket.hr += 1;
+    bucket.er += Math.max(1, rbi);
+  } else if (rbi > 0) {
+    bucket.er += rbi;
+  }
+  if (isBB) bucket.bb += 1;
+  if (event.includes("Strikeout")) bucket.so += 1;
+  bucket.outs += outsMade;
+}
+
 export async function getDynamicSituationalData(season = 2026): Promise<SituationalData> {
   const feeds = await getSeasonLiveFeeds(season);
   if (!feeds.length) {
@@ -327,6 +370,20 @@ export async function getDynamicSituationalData(season = 2026): Promise<Situatio
     early: emptyBucket(),
     mid: emptyBucket(),
     late: emptyBucket(),
+  };
+
+  const pitchBuckets: Record<string, PitchingBucket> = {
+    total: emptyPitchingBucket(),
+    bases_limpias: emptyPitchingBucket(),
+    hombres_base: emptyPitchingBucket(),
+    risp: emptyPitchingBucket(),
+    risp_2outs: emptyPitchingBucket(),
+    bases_llenas: emptyPitchingBucket(),
+    vs_rhb: emptyPitchingBucket(),
+    vs_lhb: emptyPitchingBucket(),
+    early: emptyPitchingBucket(),
+    mid: emptyPitchingBucket(),
+    late: emptyPitchingBucket(),
   };
 
   let totalLobEnding = 0;
@@ -367,100 +424,136 @@ export async function getDynamicSituationalData(season = 2026): Promise<Situatio
     for (const play of plays) {
       const isBottom = play.about?.halfInning === "bottom";
       const leonesBatting = isHome ? isBottom : !isBottom;
-      if (!leonesBatting) continue;
 
-      const inn = play.about?.inning || 1;
-      const outsBefore = play.count?.outs ?? 0;
-      const matchup = play.matchup || {};
-      const batterId = matchup.batter?.id || 0;
-      const batterName = matchup.batter?.fullName || "Bateador";
-      const pitcherId = matchup.pitcher?.id || 0;
-      const pitcherName = matchup.pitcher?.fullName || "Lanzador";
-      const isLeftHanded = matchup.pitcherHand?.code === "L" || (!matchup.pitcherHand?.code && getKnownPitcherHand(pitcherId) === "L");
-      const throwsRhp = !isLeftHanded;
+      if (leonesBatting) {
+        const inn = play.about?.inning || 1;
+        const outsBefore = play.count?.outs ?? 0;
+        const matchup = play.matchup || {};
+        const batterId = matchup.batter?.id || 0;
+        const batterName = matchup.batter?.fullName || "Bateador";
+        const pitcherId = matchup.pitcher?.id || 0;
+        const pitcherName = matchup.pitcher?.fullName || "Lanzador";
+        const isLeftHanded = matchup.pitcherHand?.code === "L" || (!matchup.pitcherHand?.code && getKnownPitcherHand(pitcherId) === "L");
+        const throwsRhp = !isLeftHanded;
 
-      const on1b = Boolean(matchup.postOnFirst);
-      const on2b = Boolean(matchup.postOnSecond);
-      const on3b = Boolean(matchup.postOnThird);
-      const isRisp = on2b || on3b;
-      const isLoaded = on1b && on2b && on3b;
-      const isBasesEmpty = !on1b && !on2b && !on3b;
+        const on1b = Boolean(matchup.postOnFirst);
+        const on2b = Boolean(matchup.postOnSecond);
+        const on3b = Boolean(matchup.postOnThird);
+        const isRisp = on2b || on3b;
+        const isLoaded = on1b && on2b && on3b;
+        const isBasesEmpty = !on1b && !on2b && !on3b;
 
-      const event = play.result?.event || "Out";
-      const rbi = play.result?.rbi || 0;
-      const isHit = ["Single", "Double", "Triple", "Home Run"].includes(event);
-      const isAb = !event.includes("Walk") && !event.includes("Hit By Pitch") && !event.includes("Sac");
+        const event = play.result?.event || "Out";
+        const rbi = play.result?.rbi || 0;
+        const isHit = ["Single", "Double", "Triple", "Home Run"].includes(event);
+        const isAb = !event.includes("Walk") && !event.includes("Hit By Pitch") && !event.includes("Sac");
 
-      // Categorizar en buckets
-      recordPlayInBucket(buckets.total, event, rbi);
-      if (isBasesEmpty) recordPlayInBucket(buckets.bases_limpias, event, rbi);
-      else recordPlayInBucket(buckets.hombres_base, event, rbi);
+        // Categorizar en buckets ofensivos
+        recordPlayInBucket(buckets.total, event, rbi);
+        if (isBasesEmpty) recordPlayInBucket(buckets.bases_limpias, event, rbi);
+        else recordPlayInBucket(buckets.hombres_base, event, rbi);
 
-      if (isRisp) {
-        recordPlayInBucket(buckets.risp, event, rbi);
-        if (outsBefore === 2) recordPlayInBucket(buckets.risp_2outs, event, rbi);
-      }
-      if (isLoaded) recordPlayInBucket(buckets.bases_llenas, event, rbi);
-
-      if (throwsRhp) recordPlayInBucket(buckets.rhp, event, rbi);
-      else recordPlayInBucket(buckets.lhp, event, rbi);
-
-      if (inn <= 3) recordPlayInBucket(buckets.early, event, rbi);
-      else if (inn <= 6) recordPlayInBucket(buckets.mid, event, rbi);
-      else recordPlayInBucket(buckets.late, event, rbi);
-
-      // BVP (Batter vs Pitcher rival)
-      if (pitcherId) {
-        if (!bvpMap[pitcherId]) {
-          bvpMap[pitcherId] = { name: pitcherName, oppTeam: oppTeamName, bucket: emptyBucket() };
-        }
-        recordPlayInBucket(bvpMap[pitcherId].bucket, event, rbi);
-      }
-
-      // LOB Tracker por bateador
-      if (batterId) {
-        if (!batterLobMap[batterId]) {
-          batterLobMap[batterId] = {
-            name: batterName,
-            pa: 0,
-            paRisp: 0,
-            hRisp: 0,
-            abRisp: 0,
-            rbi: 0,
-            lobEnding: 0,
-            rispLobEnding: 0,
-            rispLobMid: 0,
-          };
-        }
-        const bRec = batterLobMap[batterId];
-        bRec.pa += 1;
-        bRec.rbi += rbi;
         if (isRisp) {
-          bRec.paRisp += 1;
-          if (isAb) bRec.abRisp += 1;
-          if (isHit) bRec.hRisp += 1;
+          recordPlayInBucket(buckets.risp, event, rbi);
+          if (outsBefore === 2) recordPlayInBucket(buckets.risp_2outs, event, rbi);
+        }
+        if (isLoaded) recordPlayInBucket(buckets.bases_llenas, event, rbi);
+
+        if (throwsRhp) recordPlayInBucket(buckets.rhp, event, rbi);
+        else recordPlayInBucket(buckets.lhp, event, rbi);
+
+        if (inn <= 3) recordPlayInBucket(buckets.early, event, rbi);
+        else if (inn <= 6) recordPlayInBucket(buckets.mid, event, rbi);
+        else recordPlayInBucket(buckets.late, event, rbi);
+
+        // BVP (Batter vs Pitcher rival)
+        if (pitcherId) {
+          if (!bvpMap[pitcherId]) {
+            bvpMap[pitcherId] = { name: pitcherName, oppTeam: oppTeamName, bucket: emptyBucket() };
+          }
+          recordPlayInBucket(bvpMap[pitcherId].bucket, event, rbi);
         }
 
-        // Dejados en Base: si el turno terminó en out
-        const outsMade = (play.count?.outs ?? 0) - outsBefore;
-        if (outsMade > 0) {
-          const isThirdOut = play.count?.outs === 3;
-          let runnersOn = 0;
-          let rispRunners = 0;
-          if (on1b) runnersOn++;
-          if (on2b) { runnersOn++; rispRunners++; }
-          if (on3b) { runnersOn++; rispRunners++; }
+        // LOB Tracker por bateador
+        if (batterId) {
+          if (!batterLobMap[batterId]) {
+            batterLobMap[batterId] = {
+              name: batterName,
+              pa: 0,
+              paRisp: 0,
+              hRisp: 0,
+              abRisp: 0,
+              rbi: 0,
+              lobEnding: 0,
+              rispLobEnding: 0,
+              rispLobMid: 0,
+            };
+          }
+          const bRec = batterLobMap[batterId];
+          bRec.pa += 1;
+          bRec.rbi += rbi;
+          if (isRisp) {
+            bRec.paRisp += 1;
+            if (isAb) bRec.abRisp += 1;
+            if (isHit) bRec.hRisp += 1;
+          }
 
-          if (isThirdOut) {
-            bRec.lobEnding += runnersOn;
-            bRec.rispLobEnding += rispRunners;
-            totalLobEnding += runnersOn;
-            totalRispLobEnding += rispRunners;
-          } else if (rispRunners > 0) {
-            bRec.rispLobMid += rispRunners;
-            totalRispLobMid += rispRunners;
+          // Dejados en Base: si el turno terminó en out
+          const outsMade = (play.count?.outs ?? 0) - outsBefore;
+          if (outsMade > 0) {
+            const isThirdOut = play.count?.outs === 3;
+            let runnersOn = 0;
+            let rispRunners = 0;
+            if (on1b) runnersOn++;
+            if (on2b) { runnersOn++; rispRunners++; }
+            if (on3b) { runnersOn++; rispRunners++; }
+
+            if (isThirdOut) {
+              bRec.lobEnding += runnersOn;
+              bRec.rispLobEnding += rispRunners;
+              totalLobEnding += runnersOn;
+              totalRispLobEnding += rispRunners;
+            } else if (rispRunners > 0) {
+              bRec.rispLobMid += rispRunners;
+              totalRispLobMid += rispRunners;
+            }
           }
         }
+      } else {
+        // Pitcheo de Leones del Caracas
+        const inn = play.about?.inning || 1;
+        const outsBefore = play.count?.outs ?? 0;
+        const matchup = play.matchup || {};
+        const rivalBatterHand = matchup.batSide?.code || "R";
+        const isVsLhb = rivalBatterHand === "L";
+
+        const on1b = Boolean(matchup.postOnFirst);
+        const on2b = Boolean(matchup.postOnSecond);
+        const on3b = Boolean(matchup.postOnThird);
+        const isRisp = on2b || on3b;
+        const isLoaded = on1b && on2b && on3b;
+        const isBasesEmpty = !on1b && !on2b && !on3b;
+
+        const event = play.result?.event || "Out";
+        const rbi = play.result?.rbi || 0;
+        const outsMade = Math.max(0, (play.count?.outs ?? 0) - outsBefore);
+
+        recordPitchingPlayInBucket(pitchBuckets.total, event, outsMade, rbi);
+        if (isBasesEmpty) recordPitchingPlayInBucket(pitchBuckets.bases_limpias, event, outsMade, rbi);
+        else recordPitchingPlayInBucket(pitchBuckets.hombres_base, event, outsMade, rbi);
+
+        if (isRisp) {
+          recordPitchingPlayInBucket(pitchBuckets.risp, event, outsMade, rbi);
+          if (outsBefore === 2) recordPitchingPlayInBucket(pitchBuckets.risp_2outs, event, outsMade, rbi);
+        }
+        if (isLoaded) recordPitchingPlayInBucket(pitchBuckets.bases_llenas, event, outsMade, rbi);
+
+        if (isVsLhb) recordPitchingPlayInBucket(pitchBuckets.vs_lhb, event, outsMade, rbi);
+        else recordPitchingPlayInBucket(pitchBuckets.vs_rhb, event, outsMade, rbi);
+
+        if (inn <= 3) recordPitchingPlayInBucket(pitchBuckets.early, event, outsMade, rbi);
+        else if (inn <= 6) recordPitchingPlayInBucket(pitchBuckets.mid, event, outsMade, rbi);
+        else recordPitchingPlayInBucket(pitchBuckets.late, event, outsMade, rbi);
       }
     }
   }
@@ -486,6 +579,37 @@ export async function getDynamicSituationalData(season = 2026): Promise<Situatio
     createSplit("Entradas Tempranas (1-3)", "Apertura", buckets.early),
     createSplit("Entradas Medias (4-6)", "Desarrollo", buckets.mid),
     createSplit("Entradas Tardías / Clutch (7-9+)", "Definición", buckets.late),
+  ];
+
+  const createPitchSplit = (name: string, badge: string, b: PitchingBucket): PitchingSituationalSplit => {
+    return calculatePitchingSplit(
+      name,
+      badge,
+      b.pa,
+      b.ab,
+      b.h,
+      b.doubles,
+      b.triples,
+      b.hr,
+      b.bb,
+      b.so,
+      b.er,
+      b.outs
+    );
+  };
+
+  const pitchingSplits: PitchingSituationalSplit[] = [
+    createPitchSplit("Total General", "Baseline", pitchBuckets.total),
+    createPitchSplit("Bases Limpias", "Bases Vacías", pitchBuckets.bases_limpias),
+    createPitchSplit("Hombres en Base", "Tráfico", pitchBuckets.hombres_base),
+    createPitchSplit("Posición Anotadora (RISP)", "Oportunidad", pitchBuckets.risp),
+    createPitchSplit("RISP con 2 Outs (Clutch)", "Alta Presión", pitchBuckets.risp_2outs),
+    createPitchSplit("Bases Llenas", "Grand Slam Threat", pitchBuckets.bases_llenas),
+    createPitchSplit("vs Bateadores Derechos (RHB)", "Platoon RHB", pitchBuckets.vs_rhb),
+    createPitchSplit("vs Bateadores Zurdos (LHB)", "Platoon LHB", pitchBuckets.vs_lhb),
+    createPitchSplit("Entradas Tempranas (1-3)", "Apertura", pitchBuckets.early),
+    createPitchSplit("Entradas Medias (4-6)", "Desarrollo", pitchBuckets.mid),
+    createPitchSplit("Entradas Tardías / Clutch (7-9+)", "Definición", pitchBuckets.late),
   ];
 
   const lobSummary: LobSummary = {
@@ -539,6 +663,7 @@ export async function getDynamicSituationalData(season = 2026): Promise<Situatio
 
   return {
     splits,
+    pitchingSplits,
     lobSummary,
     lobBatterRanking,
     bvpRecords,

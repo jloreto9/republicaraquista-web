@@ -50,6 +50,12 @@ export function PlayerSplitsView({
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
+  // Sincronizar props entrantes si cambian por navegación externa
+  useEffect(() => {
+    if (initialType) setPlayerType(initialType);
+    if (initialPlayerId) setSelectedPlayerId(initialPlayerId);
+  }, [initialPlayerId, initialType]);
+
   // Cargar lista de jugadores al iniciar
   useEffect(() => {
     let isMounted = true;

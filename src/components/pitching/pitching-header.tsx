@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Download, Calendar, Shield, Zap, CheckCircle2, Loader2, Clock } from "lucide-react";
 import { PitcherProfile, PitcherGameLog, TimeMode } from "@/types/pitching";
 
@@ -76,6 +77,15 @@ export function PitchingHeader({
               </span>
               <span>•</span>
               <span className="font-mono text-slate-400 text-[11px]">MLB ID: #{pitcher.id}</span>
+              <span>•</span>
+              <Link
+                href={`/individuales?tab=splits&player=${pitcher.id}&type=pitcher`}
+                title={`Ver splits de ${pitcher.name}`}
+                className="text-[10px] px-2 py-0.5 rounded-full bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/30 font-bold hover:bg-[#FDB827]/20 transition-all flex items-center gap-1"
+              >
+                <Zap className="w-2.5 h-2.5 text-[#FDB827]" />
+                <span>Splits</span>
+              </Link>
             </div>
           </div>
         </div>

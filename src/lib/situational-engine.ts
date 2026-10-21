@@ -1,4 +1,4 @@
-import { SituationalSplit, LobSummary, BatterLobRecord, BvpRecord, SituationalData, SlashLine } from "@/types/situational";
+import { SituationalSplit, LobSummary, BatterLobRecord, BvpRecord, SituationalData, SlashLine, PitchingSituationalSplit } from "@/types/situational";
 
 export function formatRate(val: number): string {
   if (isNaN(val) || !isFinite(val)) return ".000";
@@ -45,6 +45,62 @@ export function calculateSlashLine(
     obpNum,
     slgNum,
     opsNum,
+  };
+}
+
+export function calculatePitchingSplit(
+  situacion: string,
+  badge: string,
+  pa: number,
+  ab: number,
+  h: number,
+  doubles: number,
+  triples: number,
+  hr: number,
+  bb: number,
+  so: number,
+  er: number,
+  outs: number
+): PitchingSituationalSplit {
+  const ipDecimal = outs > 0 ? outs / 3 : 0;
+  const ipFull = Math.floor(ipDecimal);
+  const ipRemainder = outs % 3;
+  const ipDisplay = `${ipFull}.${ipRemainder}`;
+
+  const baa = ab > 0 ? h / ab : 0;
+  const obp = ab + bb > 0 ? (h + bb) / (ab + bb) : 0;
+  const singles = h - (doubles + triples + hr);
+  const tb = singles + 2 * doubles + 3 * triples + 4 * hr;
+  const slg = ab > 0 ? tb / ab : 0;
+  const ops = obp + slg;
+
+  const eraNum = ipDecimal > 0 ? (er * 9) / ipDecimal : 0;
+  const whipNum = ipDecimal > 0 ? (bb + h) / ipDecimal : 0;
+  const k9Num = ipDecimal > 0 ? (so * 9) / ipDecimal : 0;
+  const bb9Num = ipDecimal > 0 ? (bb * 9) / ipDecimal : 0;
+
+  return {
+    situacion,
+    badge,
+    bf: pa,
+    ab,
+    h,
+    doubles,
+    triples,
+    hr,
+    bb,
+    so,
+    er,
+    ipDisplay,
+    ipDecimal,
+    era: eraNum.toFixed(2),
+    whip: whipNum.toFixed(2),
+    baa: formatRate(baa),
+    obp: formatRate(obp),
+    slg: formatRate(slg),
+    ops: formatRate(ops),
+    kPer9: k9Num.toFixed(1),
+    bbPer9: bb9Num.toFixed(1),
   };
 }
 
@@ -106,6 +162,19 @@ export const LEONES_SITUATIONAL_2026: SituationalData = {
       badge: "Definición",
       ...calculateSlashLine(11, 7, 0, 0, 0, 0, 4, 1, 0, 0, 0),
     },
+  ],
+  pitchingSplits: [
+    calculatePitchingSplit("Total General", "Baseline", 36, 31, 6, 2, 0, 1, 4, 8, 3, 27),
+    calculatePitchingSplit("Bases Limpias", "Bases Vacías", 20, 18, 3, 1, 0, 0, 2, 5, 1, 16),
+    calculatePitchingSplit("Hombres en Base", "Tráfico", 16, 13, 3, 1, 0, 1, 2, 3, 2, 11),
+    calculatePitchingSplit("Posición Anotadora (RISP)", "Oportunidad", 10, 8, 2, 1, 0, 0, 2, 2, 2, 7),
+    calculatePitchingSplit("RISP con 2 Outs (Clutch)", "Alta Presión", 5, 4, 1, 0, 0, 0, 1, 1, 1, 4),
+    calculatePitchingSplit("Bases Llenas", "Máximo Riesgo", 2, 2, 0, 0, 0, 0, 0, 1, 0, 2),
+    calculatePitchingSplit("vs Bateadores Derechos (RHB)", "Platoon RHB", 24, 21, 4, 1, 0, 1, 2, 6, 2, 18),
+    calculatePitchingSplit("vs Bateadores Zurdos (LHB)", "Platoon LHB", 12, 10, 2, 1, 0, 0, 2, 2, 1, 9),
+    calculatePitchingSplit("Entradas Tempranas (1-3)", "Apertura", 13, 11, 2, 1, 0, 0, 1, 3, 1, 9),
+    calculatePitchingSplit("Entradas Medias (4-6)", "Desarrollo", 12, 10, 2, 1, 0, 1, 1, 3, 1, 9),
+    calculatePitchingSplit("Entradas Tardías / Cierre (7-9+)", "Definición", 11, 10, 2, 0, 0, 0, 2, 2, 1, 9),
   ],
   lobSummary: {
     totalPa: 35,
@@ -334,6 +403,19 @@ export const LEONES_SITUATIONAL_2025: SituationalData = {
       badge: "Definición",
       ...calculateSlashLine(728, 617, 179, 34, 5, 17, 85, 137, 105, 11, 15),
     },
+  ],
+  pitchingSplits: [
+    calculatePitchingSplit("Total General", "Baseline", 2225, 1932, 524, 106, 12, 48, 198, 385, 252, 1482),
+    calculatePitchingSplit("Bases Limpias", "Bases Vacías", 1235, 1120, 278, 52, 6, 26, 92, 235, 95, 870),
+    calculatePitchingSplit("Hombres en Base", "Tráfico", 990, 812, 246, 54, 6, 22, 106, 150, 157, 612),
+    calculatePitchingSplit("Posición Anotadora (RISP)", "Oportunidad", 595, 470, 134, 32, 4, 14, 88, 92, 122, 345),
+    calculatePitchingSplit("RISP con 2 Outs (Clutch)", "Alta Presión", 248, 202, 52, 13, 2, 6, 42, 48, 48, 148),
+    calculatePitchingSplit("Bases Llenas", "Máximo Riesgo", 72, 54, 15, 4, 0, 3, 15, 12, 32, 39),
+    calculatePitchingSplit("vs Bateadores Derechos (RHB)", "Platoon RHB", 1420, 1240, 328, 68, 7, 30, 124, 255, 152, 948),
+    calculatePitchingSplit("vs Bateadores Zurdos (LHB)", "Platoon LHB", 805, 692, 196, 38, 5, 18, 74, 130, 100, 534),
+    calculatePitchingSplit("Entradas Tempranas (1-3)", "Apertura", 745, 642, 174, 34, 4, 16, 72, 128, 86, 492),
+    calculatePitchingSplit("Entradas Medias (4-6)", "Desarrollo", 740, 645, 178, 36, 4, 18, 68, 132, 85, 495),
+    calculatePitchingSplit("Entradas Tardías / Cierre (7-9+)", "Definición", 740, 645, 172, 36, 4, 14, 58, 125, 81, 495),
   ],
   lobSummary: {
     totalPa: 2182,

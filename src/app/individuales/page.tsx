@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Header } from "@/components/layout/header";
 import { IndividualesView } from "@/components/stats/individuales-view";
 import { getBattingStats, getPitchingStats, getTeamGamesMap } from "@/lib/supabase";
@@ -27,13 +28,21 @@ export default async function IndividualesPage() {
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
-        <IndividualesView
-          initialBattingStats={initialBattingStats}
-          initialPitchingStats={initialPitchingStats}
-          initialSeason={activeSeason}
-          initialTeamGamesMap={teamGamesMap}
-          initialMaxGames={maxGames}
-        />
+        <Suspense
+          fallback={
+            <div className="p-12 text-center text-slate-400 font-mono text-xs">
+              Cargando estadísticas individuales...
+            </div>
+          }
+        >
+          <IndividualesView
+            initialBattingStats={initialBattingStats}
+            initialPitchingStats={initialPitchingStats}
+            initialSeason={activeSeason}
+            initialTeamGamesMap={teamGamesMap}
+            initialMaxGames={maxGames}
+          />
+        </Suspense>
       </main>
     </div>
   );

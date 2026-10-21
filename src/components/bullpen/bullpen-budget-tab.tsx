@@ -512,6 +512,13 @@ export function BullpenBudgetTab({
                             >
                               {r.throws === "L" ? "Zurdo" : "Derecho"}
                             </span>
+                            <Link
+                              href={`/individuales?tab=splits&player=${r.pitcherId}&type=pitcher`}
+                              title={`Ver splits de ${r.pitcherName}`}
+                              className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/30 hover:bg-[#FDB827]/20 transition-colors inline-flex items-center gap-0.5"
+                            >
+                              <span>⚡ Splits</span>
+                            </Link>
                             <span>•</span>
                             <span>{r.seasonStats.games} JJ</span>
                             {r.seasonStats.gs > 0 && (
