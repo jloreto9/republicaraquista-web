@@ -202,7 +202,7 @@ export function compareBatters(
   }[] = [
     // ⚡ Sabermetría
     {
-      category: "⚡ Métricas Sabermétricas de Impacto",
+      category: "⚡ Métricas de Impacto",
       metric: "OPS (On-base Plus Slugging)",
       v1Str: p1.ops.toFixed(3).replace(/^0/, ""),
       v2Str: p2.ops.toFixed(3).replace(/^0/, ""),
@@ -210,7 +210,7 @@ export function compareBatters(
       isP2Win: p2.ops > p1.ops,
     },
     {
-      category: "⚡ Métricas Sabermétricas de Impacto",
+      category: "⚡ Métricas de Impacto",
       metric: "wOBA (Weighted On-Base Average)",
       v1Str: p1Woba.toFixed(3).replace(/^0/, ""),
       v2Str: p2Woba.toFixed(3).replace(/^0/, ""),
@@ -218,7 +218,7 @@ export function compareBatters(
       isP2Win: p2Woba > p1Woba,
     },
     {
-      category: "⚡ Métricas Sabermétricas de Impacto",
+      category: "⚡ Métricas de Impacto",
       metric: "wRC+ (Runs Created Plus)",
       v1Str: `${p1Wrc}`,
       v2Str: `${p2Wrc}`,
@@ -226,7 +226,7 @@ export function compareBatters(
       isP2Win: p2Wrc > p1Wrc,
     },
     {
-      category: "⚡ Métricas Sabermétricas de Impacto",
+      category: "⚡ Métricas de Impacto",
       metric: "ISO (Isolated Power)",
       v1Str: p1.iso.toFixed(3).replace(/^0/, ""),
       v2Str: p2.iso.toFixed(3).replace(/^0/, ""),
@@ -234,7 +234,7 @@ export function compareBatters(
       isP2Win: p2.iso > p1.iso,
     },
     {
-      category: "⚡ Métricas Sabermétricas de Impacto",
+      category: "⚡ Métricas de Impacto",
       metric: "BABIP (Bolas en Juego)",
       v1Str: p1.babip.toFixed(3).replace(/^0/, ""),
       v2Str: p2.babip.toFixed(3).replace(/^0/, ""),
@@ -392,11 +392,11 @@ export function compareBatters(
 
   let verdict = "";
   if (p1Wins > p2Wins) {
-    verdict = `🏆 Veredicto Sabermétrico: ${name1} se impone en el matchup ganando ${p1Wins} de las métricas evaluadas frente a ${p2Wins} de ${name2}. Destaca con una línea ofensiva de ${p1.avg.toFixed(3).replace(/^0/, "")}/${p1.obp.toFixed(3).replace(/^0/, "")}/${p1.slg.toFixed(3).replace(/^0/, "")} y un OPS de ${p1.ops.toFixed(3).replace(/^0/, "")}.`;
+    verdict = `🏆 Veredicto: ${name1} se impone en el matchup ganando ${p1Wins} de las métricas evaluadas frente a ${p2Wins} de ${name2}. Destaca con una línea ofensiva de ${p1.avg.toFixed(3).replace(/^0/, "")}/${p1.obp.toFixed(3).replace(/^0/, "")}/${p1.slg.toFixed(3).replace(/^0/, "")} y un OPS de ${p1.ops.toFixed(3).replace(/^0/, "")}.`;
   } else if (p2Wins > p1Wins) {
-    verdict = `🏆 Veredicto Sabermétrico: ${name2} domina el duelo individual al superar a ${name1} en ${p2Wins} de las métricas ofensivas analizadas. Destaca con una línea ofensiva de ${p2.avg.toFixed(3).replace(/^0/, "")}/${p2.obp.toFixed(3).replace(/^0/, "")}/${p2.slg.toFixed(3).replace(/^0/, "")} y un OPS de ${p2.ops.toFixed(3).replace(/^0/, "")}.`;
+    verdict = `🏆 Veredicto: ${name2} domina el duelo individual al superar a ${name1} en ${p2Wins} de las métricas ofensivas analizadas. Destaca con una línea ofensiva de ${p2.avg.toFixed(3).replace(/^0/, "")}/${p2.obp.toFixed(3).replace(/^0/, "")}/${p2.slg.toFixed(3).replace(/^0/, "")} y un OPS de ${p2.ops.toFixed(3).replace(/^0/, "")}.`;
   } else {
-    verdict = `⚖️ Veredicto Sabermétrico: Duelo sumamente parejo entre ${name1} y ${name2} (${p1Wins} victorias cada uno con ${ties} empates). Ambos toleteros presentan un impacto ofensivo de alto nivel.`;
+    verdict = `⚖️ Veredicto: Duelo sumamente parejo entre ${name1} y ${name2} (${p1Wins} victorias cada uno con ${ties} empates). Ambos toleteros presentan un impacto ofensivo de alto nivel.`;
   }
 
   const card1: PlayerProfileCardData = {
@@ -760,11 +760,11 @@ export function comparePitchers(
 
   let verdict = "";
   if (p1Wins > p2Wins) {
-    verdict = `🏆 Veredicto Sabermétrico: ${name1} domina el montículo ganando ${p1Wins} de las métricas evaluadas frente a ${p2Wins} de ${name2}. Aventaja con efectividad de ${p1.era.toFixed(2)} ERA y WHIP de ${p1.whip.toFixed(2)} frente a ${name2} (${p2.era.toFixed(2)} ERA, ${p2.whip.toFixed(2)} WHIP).`;
+    verdict = `🏆 Veredicto: ${name1} domina el montículo ganando ${p1Wins} de las métricas evaluadas frente a ${p2Wins} de ${name2}. Aventaja con efectividad de ${p1.era.toFixed(2)} ERA y WHIP de ${p1.whip.toFixed(2)} frente a ${name2} (${p2.era.toFixed(2)} ERA, ${p2.whip.toFixed(2)} WHIP).`;
   } else if (p2Wins > p1Wins) {
-    verdict = `🏆 Veredicto Sabermétrico: ${name2} domina el montículo ganando ${p2Wins} de las métricas evaluadas frente a ${p1Wins} de ${name1}. Aventaja con efectividad de ${p2.era.toFixed(2)} ERA y WHIP de ${p2.whip.toFixed(2)} frente a ${name1} (${p1.era.toFixed(2)} ERA, ${p1.whip.toFixed(2)} WHIP).`;
+    verdict = `🏆 Veredicto: ${name2} domina el montículo ganando ${p2Wins} de las métricas evaluadas frente a ${p1Wins} de ${name1}. Aventaja con efectividad de ${p2.era.toFixed(2)} ERA y WHIP de ${p2.whip.toFixed(2)} frente a ${name1} (${p1.era.toFixed(2)} ERA, ${p1.whip.toFixed(2)} WHIP).`;
   } else {
-    verdict = `⚖️ Veredicto Sabermétrico: Duelo de brazos sumamente equilibrado entre ${name1} y ${name2} (${p1Wins} victorias cada uno con ${ties} empates). Ambos lanzadores exhiben solidez monticular destacada.`;
+    verdict = `⚖️ Veredicto: Duelo de brazos sumamente equilibrado entre ${name1} y ${name2} (${p1Wins} victorias cada uno con ${ties} empates). Ambos lanzadores exhiben solidez monticular destacada.`;
   }
 
   const card1: PlayerProfileCardData = {

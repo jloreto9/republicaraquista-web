@@ -28,7 +28,7 @@ export function TopPicksBanner({ picks, mispricedAlerts, oddsFormat, totalGames 
               Líneas de Mercado Pendientes de Apertura
             </span>
             <p className="text-slate-400 text-[11px] mt-0.5">
-              Las casas de apuestas (JEL, BCR, STP, ROY) aún no han publicado sus líneas oficiales para esta jornada. Consulta las <strong>Cuotas Justas del Modelo Sabermétrico</strong> en cada partido o introduce tus cuotas en la tabla para comparar el valor (+EV).
+              Las casas de apuestas (JEL, BCR, STP, ROY) aún no han publicado sus líneas oficiales para esta jornada. Consulta las <strong>Cuotas Justas del Modelo</strong> en cada partido o introduce tus cuotas en la tabla para comparar el valor (+EV).
             </p>
           </div>
         </div>
@@ -47,7 +47,7 @@ export function TopPicksBanner({ picks, mispricedAlerts, oddsFormat, totalGames 
             </span>
             <div>
               <h3 className="text-sm font-bold text-amber-200 uppercase tracking-wider flex items-center gap-1.5">
-                <span>Alerta de Ineficiencia Sabermétrica</span>
+                <span>Alerta de Cuota Desfasada</span>
                 <span className="px-2 py-0.5 rounded text-[10px] bg-amber-500 text-[#070B19] font-black">
                   {mispricedAlerts.length} Cuota{mispricedAlerts.length > 1 ? "s" : ""} Mal Puesta{mispricedAlerts.length > 1 ? "s" : ""}
                 </span>
@@ -116,7 +116,7 @@ export function TopPicksBanner({ picks, mispricedAlerts, oddsFormat, totalGames 
         <div className="flex items-center justify-between mb-2 px-1">
           <div className="flex items-center space-x-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
             <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <span>Picks de Mayor Valor Sabermétrico (+EV)</span>
+            <span>Picks de Mayor Valor Esperado (+EV)</span>
           </div>
           <span className="text-[11px] text-slate-400">
             Filtro de ventaja matemática real

@@ -15,7 +15,7 @@ interface ShareButtonProps {
 export function ShareButton({
   url,
   title = "REPUBLICARAQUISTAPP • Analítica & Segunda Pantalla de Leones del Caracas",
-  text = "¡Sigue a los Leones del Caracas en vivo con estadísticas sabermétricas y jugada a jugada en REPUBLICARAQUISTAPP! 🦁⚾",
+  text = "¡Sigue a los Leones del Caracas en vivo con estadísticas avanzadas y jugada a jugada en REPUBLICARAQUISTAPP! 🦁⚾",
   compact = false,
   className = "",
 }: ShareButtonProps) {

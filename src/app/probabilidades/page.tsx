@@ -5,7 +5,7 @@ import { ProbabilidadesView } from "@/components/probabilidades/probabilidades-v
 import { getActiveSeason } from "@/lib/constants";
 
 export const metadata: Metadata = {
-  title: "Líneas & Probabilidades Sabermétricas | REPUBLICARAQUISTAPP",
+  title: "Líneas & Probabilidades | REPUBLICARAQUISTAPP",
   description:
     "Proyecciones multi-factor de partidos LVBP, Cuotas Justas (Fair Odds), comparador de casas de apuestas (JuegaEnLínea, Betcris, SellaTuParley, Apuestas Royal), detección de cuotas desfasadas (+EV) y Criterio de Kelly.",
 };
@@ -19,7 +19,7 @@ export default async function ProbabilidadesPage() {
     <div className="flex-1 flex flex-col min-h-screen">
       <Header
         title="Líneas & Probabilidades"
-        subtitle="Proyecciones Sabermétricas • Cuotas de Mercado • Detección +EV"
+        subtitle="Proyecciones • Cuotas de Mercado • Detección +EV"
         season={activeSeason}
       />
 
@@ -29,7 +29,7 @@ export default async function ProbabilidadesPage() {
             <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center space-y-3">
               <div className="w-8 h-8 border-2 border-[#FDB827] border-t-transparent rounded-full animate-spin" />
               <span className="text-xs uppercase tracking-wider font-bold">
-                Sincronizando Calendario y Líneas Sabermétricas...
+                Sincronizando Calendario y Líneas de Juego...
               </span>
             </div>
           }

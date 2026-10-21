@@ -116,7 +116,7 @@ export async function generateProbabilidadesCardBlob(
   // Título Principal
   ctx.fillStyle = "#FFFFFF";
   ctx.font = `900 ${isSquare ? 56 : 30}px 'Inter', sans-serif`;
-  ctx.fillText("LÍNEAS & PROBABILIDADES SABERMÉTRICAS", textStartX, headerY + (isSquare ? 85 : 48));
+  ctx.fillText("LÍNEAS & PROBABILIDADES", textStartX, headerY + (isSquare ? 85 : 48));
 
   // Subtítulo con fecha y liga
   ctx.fillStyle = "#94A3B8";
@@ -336,7 +336,7 @@ export async function generateProbabilidadesCardBlob(
   ctx.font = `italic ${isSquare ? 18 : 10}px 'Inter', sans-serif`;
   ctx.textAlign = "center";
   ctx.fillText(
-    "Fines estrictamente informativos y de modelado sabermétrico • Cuotas de referencia • Juego Responsable (+18)",
+    "Fines estrictamente informativos y de modelado estadístico • Cuotas de referencia • Juego Responsable (+18)",
     width / 2,
     footerY2
   );

@@ -433,7 +433,7 @@ export function SprayView({
           <span>Metodología de Contacto BIS vs Statcast</span>
         </div>
         <p>
-          En la Liga Venezolana de Béisbol Profesional (LVBP) <strong>no existe infraestructura Hawkeye/Statcast</strong> (cámaras de tracking óptico y radar Doppler). Por tanto, esta plataforma utiliza de manera estricta el modelo sabermétrico de <strong>Baseball Info Solutions (BIS)</strong> basado en eventos reales, distancia en pies y trayectoria de contacto para clasificar la dureza (Hard, Medium, Soft), evitando cualquier extrapolación artificial. La emulación de estadios ("HR en X/8") se basa en las dimensiones geométricas y curvatura radial real de las bardas de los parques de la LVBP.
+          En la Liga Venezolana de Béisbol Profesional (LVBP) <strong>no existe infraestructura Hawkeye/Statcast</strong> (cámaras de tracking óptico y radar Doppler). Por tanto, esta aplicación utiliza de manera estricta el modelo de <strong>Baseball Info Solutions (BIS)</strong> basado en eventos reales, distancia en pies y trayectoria de contacto para clasificar la dureza (Hard, Medium, Soft), evitando cualquier extrapolación artificial. La emulación de estadios ("HR en X/8") se basa en las dimensiones geométricas y curvatura radial real de las bardas de los parques de la LVBP.
         </p>
       </div>
     </div>

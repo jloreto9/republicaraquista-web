@@ -65,7 +65,7 @@ export function Footer() {
             Política de Privacidad
           </Link>
         </div>
-        <span className="text-[#FDB827]/80">Econ. & Data Scientist • Sabermetría LVBP</span>
+        <span className="text-[#FDB827]/80">Econ. & Data Scientist • Béisbol LVBP</span>
       </div>
     </footer>
   );

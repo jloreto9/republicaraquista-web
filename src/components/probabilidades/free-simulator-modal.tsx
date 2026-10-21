@@ -266,7 +266,7 @@ export function FreeSimulatorModal({ isOpen, onClose, oddsFormat }: FreeSimulato
           </div>
         </div>
 
-        {/* ── Resultados de la Proyección Sabermétrica ── */}
+        {/* ── Resultados de la Proyección ── */}
         <div className="mt-4 p-4 rounded-xl bg-[#070B19] border border-[#1E2B4D] space-y-3">
           <div className="flex items-center justify-between text-xs font-bold text-slate-300">
             <span>Resultados Proyectados del Modelo</span>

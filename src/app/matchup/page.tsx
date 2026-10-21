@@ -7,7 +7,7 @@ import { getActiveSeason } from "@/lib/constants";
 export const metadata: Metadata = {
   title: "Matchup 360 (H2H) — República Caraquista",
   description:
-    "Comparador sabermétrico Head-to-Head entre dos jugadores de la LVBP con radar polar multidimensional y veredicto automatizado.",
+    "Comparador Head-to-Head entre dos jugadores de la LVBP con radar multidimensional y veredicto automatizado.",
 };
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export default async function MatchupPage() {
     <div className="flex-1 flex flex-col min-h-screen">
       <Header
         title="Matchup 360 (H2H)"
-        subtitle="Comparador Sabermétrico Cara a Cara • Radar Polar 8D • LVBP"
+        subtitle="Comparador Cara a Cara • Radar 8D • LVBP"
         season={activeSeason}
       />
 

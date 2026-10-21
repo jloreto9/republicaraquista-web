@@ -74,7 +74,7 @@ export function StandingsView({
                 <strong className="text-slate-200">xPCT:</strong> Expectativa Pitagórica = CA^1.83 / (CA^1.83 + CP^1.83)
               </span>
               <span className="text-[#FDB827]">
-                Tango Sabermetrics Standard
+                Fórmula Pitagórica (Exponente 1.83)
               </span>
             </div>
           </div>

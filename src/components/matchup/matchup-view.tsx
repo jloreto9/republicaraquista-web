@@ -143,7 +143,7 @@ export function MatchupView({
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Comparador multidimensional sabermétrico con radar polar y veredicto automatizado.
+                Comparador multidimensional cara a cara con radar polar y veredicto de rendimiento.
               </p>
             </div>
           </div>
@@ -568,7 +568,7 @@ export function MatchupView({
             </div>
           </div>
 
-          {/* ── Veredicto Sabermétrico Oficial ── */}
+          {/* ── Veredicto del Enfrentamiento ── */}
           <div className="bg-gradient-to-r from-[#0D152B] via-[#070B19] to-[#0D152B] border border-[#FDB827]/40 rounded-xl p-5 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#FDB827]/5 rounded-full blur-3xl pointer-events-none" />
             <div className="flex items-start space-x-3.5 relative z-10">
@@ -577,7 +577,7 @@ export function MatchupView({
               </div>
               <div className="space-y-1">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-[#FDB827]">
-                  Veredicto Sabermétrico del Enfrentamiento
+                  Veredicto del Enfrentamiento
                 </h4>
                 <p className="text-sm text-slate-200 font-medium leading-relaxed">
                   {comparison.verdict}
@@ -597,7 +597,7 @@ export function MatchupView({
       <div className="bg-[#0D152B]/60 border border-[#1E2B4D] rounded-xl p-4 text-xs text-slate-400 space-y-2">
         <div className="flex items-center space-x-2 text-slate-300 font-bold">
           <Info className="w-4 h-4 text-[#FDB827]" />
-          <span>Metodología de Radar Sabermétrico 360°</span>
+          <span>Metodología del Radar 360°</span>
         </div>
         <p>
           Los percentiles de cada eje (P0 a P100) se calculan en base a la distribución de todos los jugadores calificados en la LVBP.

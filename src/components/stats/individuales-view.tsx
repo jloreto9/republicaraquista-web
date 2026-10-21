@@ -191,8 +191,7 @@ export function IndividualesView({
             }`}
           >
             <Flame className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">Bateo Sabermétrico</span>
-            <span className="sm:hidden">Bateo</span>
+            <span>Bateo</span>
           </button>
 
           <button
@@ -204,8 +203,7 @@ export function IndividualesView({
             }`}
           >
             <Target className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">Pitcheo & Efectividad</span>
-            <span className="sm:hidden">Pitcheo</span>
+            <span>Pitcheo</span>
           </button>
 
           <button
@@ -217,8 +215,7 @@ export function IndividualesView({
             }`}
           >
             <Zap className="w-3.5 h-3.5 shrink-0 text-[#FDB827]" />
-            <span className="hidden sm:inline">Splits Situacionales</span>
-            <span className="sm:hidden">Splits</span>
+            <span>Splits</span>
           </button>
 
           <button
@@ -230,8 +227,7 @@ export function IndividualesView({
             }`}
           >
             <Shield className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">Fildeo & Defensa</span>
-            <span className="sm:hidden">Fildeo</span>
+            <span>Fildeo</span>
           </button>
         </div>
 

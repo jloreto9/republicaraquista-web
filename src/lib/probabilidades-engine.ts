@@ -405,7 +405,7 @@ export function generateMispricingExplanation(
     return `${sportsbookName} desestima el parque de lanzadores de ${park.city} (Factor de Carreras ${park.runFactor.toFixed(2)}). La línea está sobrevalorando la racha de bateo reciente frente a condiciones que deprimen el contacto, ofreciendo un retorno inflado para ${teamAbbr} con +${evPercent}% EV.`;
   }
 
-  return `Línea colgada en ${sportsbookName}. El mercado pondera en exceso la localía o historial directo, castigando a ${teamAbbr} con cuota ${marketOdds.toFixed(2)} (${probImplied}% implícito) cuando los fundamentos sabermétricos le otorgan ${probModel}% (Cuota Justa ${fairOdds.toFixed(2)}). Valor positivo inmediato de +${evPercent}% EV.`;
+  return `Línea colgada en ${sportsbookName}. El mercado pondera en exceso la localía o historial directo, castigando a ${teamAbbr} con cuota ${marketOdds.toFixed(2)} (${probImplied}% implícito) cuando las proyecciones cuantitativas le otorgan ${probModel}% (Cuota Justa ${fairOdds.toFixed(2)}). Valor positivo inmediato de +${evPercent}% EV.`;
 }
 
 /**

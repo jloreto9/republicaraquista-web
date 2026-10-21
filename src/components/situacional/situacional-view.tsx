@@ -402,7 +402,7 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
       <div className="p-4 rounded-xl bg-[#0D152B]/60 border border-[#1E2B4D] text-xs text-slate-400 space-y-2">
         <div className="flex items-center gap-2 text-slate-200 font-semibold">
           <Info className="w-4 h-4 text-[#FDB827]" />
-          <span>Glosario Sabermétrico Situacional</span>
+          <span>Glosario de Términos Situacionales</span>
         </div>
         <p>
           • <strong>RISP:</strong> Corredores en Posición Anotadora (Segunda y/o Tercera base).

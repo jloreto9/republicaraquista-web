@@ -14,7 +14,7 @@ interface HeaderProps {
 
 export function Header({
   title,
-  subtitle = "Analítica Avanzada & Sabermetría LVBP",
+  subtitle = "Estadísticas y Seguimiento en Vivo • LVBP",
   season: initialSeason = ACTIVE_SEASON,
 }: HeaderProps) {
   const { season, setSeason, availableSeasons } = useSeason();

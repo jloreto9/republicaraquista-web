@@ -125,7 +125,7 @@ export function WouldItDongCard({ ball, onClose }: WouldItDongCardProps) {
         </div>
       </div>
 
-      {/* Explicación Sabermétrica */}
+      {/* Explicación y Veredicto */}
       <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 border border-blue-800/40 text-xs text-blue-200 flex items-start gap-2.5">
         <Sparkles className="w-4 h-4 text-[#FDB827] shrink-0 mt-0.5" />
         <p className="leading-relaxed">{explanation}</p>

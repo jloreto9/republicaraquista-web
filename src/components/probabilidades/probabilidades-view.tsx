@@ -344,14 +344,14 @@ export function ProbabilidadesView() {
         </div>
       )}
 
-      {/* ── 5. Descargo de Responsabilidad Legal & Sabermétrico (Disclaimer) ── */}
+      {/* ── 5. Descargo de Responsabilidad Legal (Disclaimer) ── */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[#0D152B]/70 border border-[#1E2B4D] text-xs space-y-2.5">
         <div className="flex items-center space-x-2 text-slate-300 font-bold uppercase tracking-wider text-[11px]">
           <span className="p-1 rounded bg-slate-800 text-[#FDB827]">⚖️</span>
           <span>Aviso Legal, Cuotas de Referencia & Juego Responsable</span>
         </div>
         <p className="text-slate-400 leading-relaxed text-[11px]">
-          <strong className="text-slate-300">1. Carácter Estadístico e Informativo:</strong> Las probabilidades, carreras esperadas ($xR$), líneas justas y métricas de valor (+EV) generadas por este módulo son proyecciones matemáticas teóricas basadas en modelos sabermétricos independientes (ELO dinámico, FIP monticular, rendimiento de bullpen, factores de parque de la LVBP y distribuciones bivariadas Poisson/Skellam). No constituyen pronósticos infalibles, asesoría financiera ni garantía alguna de resultados en eventos deportivos reales.
+          <strong className="text-slate-300">1. Carácter Estadístico e Informativo:</strong> Las probabilidades, carreras esperadas ($xR$), líneas justas y métricas de valor (+EV) generadas por este módulo son proyecciones matemáticas teóricas basadas en modelos cuantitativos independientes (ELO dinámico, FIP monticular, rendimiento de bullpen, factores de parque de la LVBP y distribuciones bivariadas Poisson/Skellam). No constituyen pronósticos infalibles, asesoría financiera ni garantía alguna de resultados en eventos deportivos reales.
         </p>
         <p className="text-slate-400 leading-relaxed text-[11px]">
           <strong className="text-slate-300">2. Cuotas de Referencia y Simulación:</strong> Las líneas presentadas bajo los nombres de <em>JuegaEnLínea</em>, <em>Betcris</em>, <em>SellaTuParley</em> y <em>Apuestas Royal</em> son valores de referencia simulados y calibrados según los márgenes tradicionales de mercado. No provienen de feeds o APIs oficiales en vivo de dichas casas de apuestas. La plataforma permite expresamente al usuario editar e ingresar sus propias cuotas en tiempo real para adaptar el modelo a sus líneas locales.

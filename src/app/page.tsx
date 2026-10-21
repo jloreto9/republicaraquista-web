@@ -46,7 +46,7 @@ export default async function DashboardPage() {
                 ¡Temporada 2026-2027 en Marcha!
               </h3>
               <p className="text-[11px] text-slate-400">
-                Seguimiento en vivo, métricas sabermétricas y boxscores oficiales de Leones del Caracas.
+                Seguimiento en vivo, estadísticas y boxscores oficiales de Leones del Caracas.
               </p>
             </div>
           </div>

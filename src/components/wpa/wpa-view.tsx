@@ -231,7 +231,7 @@ export function WpaView({
         </div>
       )}
 
-      {/* Cuadrantes de KPIs Sabermétricos */}
+      {/* Cuadrantes de KPIs de Impacto */}
       <div className="grid grid-cols-2 landscape:grid-cols-4 md:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-3 sm:p-4 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
           <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1.5 sm:mb-2">

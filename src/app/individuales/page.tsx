@@ -22,7 +22,7 @@ export default async function IndividualesPage() {
     <div className="flex-1 flex flex-col min-h-screen">
       <Header
         title="Líderes Individuales"
-        subtitle="Estadísticas Tradicionales & Sabermetría • LVBP"
+        subtitle="Líderes de Bateo, Pitcheo y Fildeo • LVBP"
         season={activeSeason}
       />
 

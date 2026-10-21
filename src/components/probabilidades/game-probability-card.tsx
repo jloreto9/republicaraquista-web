@@ -189,7 +189,7 @@ export function GameProbabilityCard({
           </div>
         </div>
 
-        {/* ── 3. Barra Visual de Probabilidad Sabermétrica (Fair Odds) ── */}
+        {/* ── 3. Barra Visual de Probabilidad (Fair Odds) ── */}
         <div className="mt-4 pt-3 border-t border-[#1E2B4D]">
           <div className="flex items-center justify-between text-xs font-bold mb-1.5">
             <div className="flex items-center space-x-1.5">

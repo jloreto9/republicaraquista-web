@@ -63,7 +63,7 @@ export default function PrivacidadPage() {
               <strong>República Caraquista</strong> (<span className="text-[#FDB827] font-mono">@RepubCaraquista</span>).
             </p>
             <p className="text-xs text-slate-400 leading-relaxed">
-              El objetivo de la plataforma es estrictamente estadístico, deportivo y de divulgación sabermétrica sobre los
+              El objetivo de la plataforma es estrictamente estadístico, deportivo y de análisis avanzado sobre los
               Leones del Caracas y la Liga Venezolana de Béisbol Profesional (LVBP).
             </p>
           </section>

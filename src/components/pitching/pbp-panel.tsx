@@ -101,7 +101,7 @@ export function PBPPanel({ data, pitcherName }: PBPPanelProps) {
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-[#FDB827]" />
             <h3 className="text-sm font-bold text-slate-100">
-              Desglose Sabermétrico de Destinos de Pitcheos (PBP)
+              Desglose de Destinos de Pitcheos (PBP)
             </h3>
           </div>
           <span className="text-[11px] text-slate-400 font-mono">

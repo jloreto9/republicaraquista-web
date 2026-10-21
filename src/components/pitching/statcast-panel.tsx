@@ -63,7 +63,7 @@ export function StatcastPanel({ data, pitcherName }: StatcastPanelProps) {
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-[#FDB827]" />
             <h3 className="text-sm font-bold text-slate-100">
-              Tabla Sabermétrica de Repertorio (Hawk-Eye / Statcast)
+              Tabla de Repertorio y Movimiento (Hawk-Eye / Statcast)
             </h3>
           </div>
           <span className="text-[11px] text-slate-400 font-mono">

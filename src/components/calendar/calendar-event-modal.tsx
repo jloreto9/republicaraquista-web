@@ -202,7 +202,7 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
             <Link
               href={`/probabilidades?date=${event.date}`}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#FDB827]/15 hover:bg-[#FDB827]/25 border border-[#FDB827]/40 text-[#FDB827] text-xs font-bold transition-all group shadow-sm"
-              title="Ver proyección sabermétrica y cuotas de este encuentro"
+              title="Ver proyección y cuotas de este encuentro"
             >
               <TrendingUp className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
               <span>Ver Líneas & Probabilidades</span>

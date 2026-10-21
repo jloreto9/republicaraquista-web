@@ -1006,7 +1006,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
       <div className="bg-[#0D152B]/60 border border-[#1E2B4D] rounded-xl p-4 text-xs text-slate-400 space-y-3">
         <div className="flex items-center space-x-2 text-slate-200 font-bold">
           <BookOpen className="w-4 h-4 text-[#FDB827]" />
-          <span>Metodología Sabermétrica: Bullpen y Optimización de Órdenes al Bate</span>
+          <span>Conceptos Clave: Bullpen y Órdenes al Bate</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="bg-white/[0.02] p-3 rounded-lg border border-white/5 space-y-1">

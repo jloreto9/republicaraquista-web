@@ -689,7 +689,7 @@ export function BullpenBudgetTab({
         </div>
       </div>
 
-      {/* ── 5. Metodología Sabermétrica y Criterios ── */}
+      {/* ── 5. Criterios y Metodología ── */}
       <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-5 shadow-lg space-y-3">
         <div className="flex items-center space-x-2 border-b border-[#1E2B4D] pb-3">
           <HelpCircle className="w-4 h-4 text-[#FDB827]" />

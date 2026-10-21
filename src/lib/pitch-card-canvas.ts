@@ -376,7 +376,7 @@ export async function generatePitchingCardBlob(
   ctx.textAlign = "center";
   const centerFooter = isSeason
     ? "Historial de Salidas Recientes (Últimos 10 Juegos) • Telemetría Oficial"
-    : "Play-by-Play Sabermétrico • Tango RE24 Leverage Index";
+    : "Play-by-Play • Tango RE24 Leverage Index";
   ctx.fillText(centerFooter, centerX, 2266);
 
   // Derecha: Atribución canónica
@@ -1326,7 +1326,7 @@ function drawLvbpSeasonHistoryTable(
   ctx.font = "bold 24px Inter, sans-serif";
   ctx.textAlign = "left";
   ctx.fillText(
-    "HISTORIAL DE SALIDAS (ÚLTIMOS 10 JUEGOS) • RENDIMIENTO Y CARGA SABERMÉTRICA",
+    "HISTORIAL DE SALIDAS (ÚLTIMOS 10 JUEGOS) • RENDIMIENTO Y CARGA",
     x,
     y - 18
   );
