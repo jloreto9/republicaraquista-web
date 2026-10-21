@@ -5,8 +5,6 @@ import Image from "next/image";
 import {
   PlayerSplitsProfile,
   PlayerSelectorItem,
-  PlayerSplitRow,
-  PitcherSplitRow,
 } from "@/types/player-splits";
 import { SplitTableGroup } from "./split-table-group";
 import {
@@ -22,6 +20,7 @@ import {
   Layers,
   MapPin,
   ShieldAlert,
+  SlidersHorizontal,
 } from "lucide-react";
 import { getMlbFallbackHeadshotUrl } from "@/lib/constants";
 
@@ -38,7 +37,7 @@ export function PlayerSplitsView({
 }: PlayerSplitsViewProps) {
   const [playerType, setPlayerType] = useState<"batter" | "pitcher">(initialType);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(
-    initialPlayerId || (initialType === "batter" ? 625506 : 682949) // Default Aldrem Corredor o Christian Suarez
+    initialPlayerId || (initialType === "batter" ? 691406 : 642547)
   );
 
   const [playersList, setPlayersList] = useState<PlayerSelectorItem[]>([]);
@@ -68,7 +67,6 @@ export function PlayerSplitsView({
           const json = await res.json();
           if (isMounted && json.players) {
             setPlayersList(json.players);
-            // Si no hay jugador seleccionado o no coincide el tipo
             if (!selectedPlayerId && json.players.length > 0) {
               const firstMatching = json.players.find(
                 (p: PlayerSelectorItem) => p.type === playerType
@@ -118,7 +116,7 @@ export function PlayerSplitsView({
     return () => {
       isMounted = false;
     };
-  }, [selectedPlayerId, playerType]);
+  }, [selectedPlayerId, playerType, season]);
 
   // Filtrar lista de jugadores según búsqueda y tipo
   const filteredPlayers = useMemo(() => {
@@ -144,9 +142,9 @@ export function PlayerSplitsView({
           <button
             onClick={() => {
               setPlayerType("batter");
-              // Seleccionar primer bateador disponible
               const firstBat = playersList.find((p) => p.type === "batter");
               if (firstBat) setSelectedPlayerId(firstBat.id);
+              setCategoryFilter("all");
             }}
             className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               playerType === "batter"
@@ -160,9 +158,9 @@ export function PlayerSplitsView({
           <button
             onClick={() => {
               setPlayerType("pitcher");
-              // Seleccionar primer pitcher disponible
               const firstPit = playersList.find((p) => p.type === "pitcher");
               if (firstPit) setSelectedPlayerId(firstPit.id);
+              setCategoryFilter("all");
             }}
             className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               playerType === "pitcher"
@@ -193,7 +191,13 @@ export function PlayerSplitsView({
                       className="object-cover"
                       unoptimized
                       onError={(e) => {
-                        e.currentTarget.src = selectedPlayerMeta.teamLogo;
+                        const target = e.currentTarget;
+                        const fallback = getMlbFallbackHeadshotUrl(selectedPlayerMeta.id);
+                        if (target.src !== fallback && !target.src.includes("mlbstatic.com")) {
+                          target.src = fallback;
+                        } else {
+                          target.src = selectedPlayerMeta.teamLogo;
+                        }
                       }}
                     />
                   </div>
@@ -218,7 +222,7 @@ export function PlayerSplitsView({
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Buscar por nombre o equipo..."
+                  placeholder="Buscar jugador..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-[#070B19] border border-[#1E2B4D] rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#FDB827]"
@@ -258,7 +262,13 @@ export function PlayerSplitsView({
                               className="object-cover"
                               unoptimized
                               onError={(e) => {
-                                e.currentTarget.src = p.teamLogo;
+                                const target = e.currentTarget;
+                                const fallback = getMlbFallbackHeadshotUrl(p.id);
+                                if (target.src !== fallback && !target.src.includes("mlbstatic.com")) {
+                                  target.src = fallback;
+                                } else {
+                                  target.src = p.teamLogo;
+                                }
                               }}
                             />
                           </div>
@@ -286,7 +296,7 @@ export function PlayerSplitsView({
         <div className="p-16 flex flex-col items-center justify-center space-y-3 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
           <Loader2 className="w-7 h-7 text-[#FDB827] animate-spin" />
           <span className="text-xs font-mono text-slate-400">
-            Calculando splits exhaustivos en Supabase...
+            Cargando splits del jugador...
           </span>
         </div>
       ) : !profile ? (
@@ -416,67 +426,108 @@ export function PlayerSplitsView({
             </div>
           )}
 
-          {/* Filtros de Categorías de Splits */}
+          {/* Pills de Filtrado por Categoría de Splits */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
             <button
               onClick={() => setCategoryFilter("all")}
-              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 ${
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "all"
-                  ? "bg-[#FDB827] text-[#070B19]"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
                   : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
               }`}
             >
-              Todos los Splits
-            </button>
-            <button
-              onClick={() => setCategoryFilter("context")}
-              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 ${
-                categoryFilter === "context"
-                  ? "bg-[#FDB827] text-[#070B19]"
-                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
-              }`}
-            >
-              Contexto & Localía
-            </button>
-            <button
-              onClick={() => setCategoryFilter("situational")}
-              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 ${
-                categoryFilter === "situational"
-                  ? "bg-[#FDB827] text-[#070B19]"
-                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
-              }`}
-            >
-              Situacionales PBP (RISP)
+              <SlidersHorizontal className="w-3 h-3" />
+              <span>Todos los Splits</span>
             </button>
             <button
               onClick={() => setCategoryFilter("platoon")}
-              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 ${
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "platoon"
-                  ? "bg-[#FDB827] text-[#070B19]"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
                   : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
               }`}
             >
-              Platoon
+              <Flame className="w-3 h-3" />
+              <span>Platoon</span>
+            </button>
+            <button
+              onClick={() => setCategoryFilter("situational")}
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
+                categoryFilter === "situational"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
+                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+              }`}
+            >
+              <Layers className="w-3 h-3" />
+              <span>Bases & RISP</span>
+            </button>
+            <button
+              onClick={() => setCategoryFilter("count")}
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
+                categoryFilter === "count"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
+                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+              }`}
+            >
+              <Target className="w-3 h-3" />
+              <span>Conteos & Outs</span>
+            </button>
+            <button
+              onClick={() => setCategoryFilter("inning")}
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
+                categoryFilter === "inning"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
+                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              <span>Por Entrada</span>
+            </button>
+            {profile.type === "pitcher" && (
+              <button
+                onClick={() => setCategoryFilter("role")}
+                className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
+                  categoryFilter === "role"
+                    ? "bg-[#FDB827] text-[#070B19] font-bold"
+                    : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>Rol (SP / RP)</span>
+              </button>
+            )}
+            <button
+              onClick={() => setCategoryFilter("context")}
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
+                categoryFilter === "context"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
+                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+              }`}
+            >
+              <MapPin className="w-3 h-3" />
+              <span>Localía & Horario</span>
             </button>
             <button
               onClick={() => setCategoryFilter("opponent")}
-              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 ${
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "opponent"
-                  ? "bg-[#FDB827] text-[#070B19]"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
                   : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
               }`}
             >
-              Por Rival
+              <Users className="w-3 h-3" />
+              <span>Por Rival</span>
             </button>
             <button
               onClick={() => setCategoryFilter("calendar")}
-              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 ${
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "calendar"
-                  ? "bg-[#FDB827] text-[#070B19]"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
                   : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
               }`}
             >
-              Calendario & Meses
+              <Calendar className="w-3 h-3" />
+              <span>Calendario & Meses</span>
             </button>
           </div>
 
@@ -484,50 +535,40 @@ export function PlayerSplitsView({
           <div className="space-y-6">
             {profile.type === "batter" ? (
               <>
-                {/* 1. Contexto de Juego */}
-                {(categoryFilter === "all" || categoryFilter === "context") && (
-                  <SplitTableGroup
-                    title="Contexto de Juego & Localía"
-                    subtitle="Rendimiento en Casa, Carretera, Horario (Día/Noche) y Resultado del Partido"
-                    icon={<MapPin className="w-4 h-4" />}
-                    batterRows={profile.contextSplits}
-                    badgeCount={profile.contextSplits.length}
-                  />
-                )}
-
-                {/* 2. Situaciones en Base (PBP) */}
-                {(categoryFilter === "all" || categoryFilter === "situational") && (
-                  <SplitTableGroup
-                    title="Situaciones en Base (PBP)"
-                    subtitle="Desglose con Bases Limpias, Corredores en Base, RISP, RISP con 2 Outs y Bases Llenas"
-                    icon={<Layers className="w-4 h-4" />}
-                    batterRows={profile.situationalSplits}
-                    badgeCount={profile.situationalSplits.length}
-                  />
-                )}
-
-                {/* 3. Platoon */}
+                {/* 1. Platoon (Lateralidad) */}
                 {(categoryFilter === "all" || categoryFilter === "platoon") && (
                   <SplitTableGroup
-                    title="Platoon (Lateralidad de Lanzadores)"
-                    subtitle="Línea de bateo contra lanzadores derechos (RHP) y lanzadores zurdos (LHP)"
+                    title="Lateralidad (Platoon)"
+                    subtitle="Línea de bateo contra lanzadores derechos (RHP) y zurdos (LHP)"
                     icon={<Flame className="w-4 h-4" />}
                     batterRows={profile.platoonSplits}
                     badgeCount={profile.platoonSplits.length}
                   />
                 )}
 
-                {/* 4. Segmentos de Entradas & Outs */}
+                {/* 2. Situaciones en Base & RISP */}
                 {(categoryFilter === "all" || categoryFilter === "situational") && (
-                  <>
-                    <SplitTableGroup
-                      title="Segmentos de Inning"
-                      subtitle="Apertura (Innings 1 al 3), Desarrollo (4 al 6) y Definición / Clutch (7 al 9+)"
-                      icon={<Clock className="w-4 h-4" />}
-                      batterRows={profile.inningSplits}
-                      badgeCount={profile.inningSplits.length}
-                    />
+                  <SplitTableGroup
+                    title="Situación de Juego y Corredores"
+                    subtitle="Desglose con Bases Limpias, Corredores en Base, RISP, RISP con 2 Outs, Bases Llenas y Leadoff"
+                    icon={<Layers className="w-4 h-4" />}
+                    batterRows={profile.situationalSplits}
+                    badgeCount={profile.situationalSplits.length}
+                  />
+                )}
 
+                {/* 3. Conteos Clave & Outs */}
+                {(categoryFilter === "all" || categoryFilter === "count") && (
+                  <>
+                    {profile.countSplits && profile.countSplits.length > 0 && (
+                      <SplitTableGroup
+                        title="Conteos Clave"
+                        subtitle="Primer Pitcheo (0-0), Con 2 Strikes y Cuenta Completa (3-2)"
+                        icon={<Target className="w-4 h-4" />}
+                        batterRows={profile.countSplits}
+                        badgeCount={profile.countSplits.length}
+                      />
+                    )}
                     <SplitTableGroup
                       title="Por Conteo de Outs"
                       subtitle="Rendimiento según el número de outs al consumir el turno"
@@ -538,22 +579,44 @@ export function PlayerSplitsView({
                   </>
                 )}
 
-                {/* 5. Por Rival */}
+                {/* 4. Por Entradas */}
+                {(categoryFilter === "all" || categoryFilter === "inning") && (
+                  <SplitTableGroup
+                    title="Por Entradas"
+                    subtitle="Desglose de producción según el inning del juego"
+                    icon={<Clock className="w-4 h-4" />}
+                    batterRows={profile.inningSplits}
+                    badgeCount={profile.inningSplits.length}
+                  />
+                )}
+
+                {/* 5. Contexto & Localía */}
+                {(categoryFilter === "all" || categoryFilter === "context") && (
+                  <SplitTableGroup
+                    title="Localía y Horario"
+                    subtitle="Rendimiento en Casa, Carretera, Horario (Día/Noche) y Resultado del Partido"
+                    icon={<MapPin className="w-4 h-4" />}
+                    batterRows={profile.contextSplits}
+                    badgeCount={profile.contextSplits.length}
+                  />
+                )}
+
+                {/* 6. Por Rival */}
                 {(categoryFilter === "all" || categoryFilter === "opponent") && (
                   <SplitTableGroup
-                    title="Rendimiento Frente a Cada Rival LVBP"
-                    subtitle="Desglose cara a cara contra las franquicias oponentes de la liga"
+                    title="Por Equipo Rival"
+                    subtitle="Desglose cara a cara contra las franquicias oponentes"
                     icon={<Users className="w-4 h-4" />}
                     batterRows={profile.opponentSplits}
                     badgeCount={profile.opponentSplits.length}
                   />
                 )}
 
-                {/* 6. Calendario */}
+                {/* 7. Calendario */}
                 {(categoryFilter === "all" || categoryFilter === "calendar") && (
                   <SplitTableGroup
-                    title="Calendario (Meses & Días de la Semana)"
-                    subtitle="Consistencia y evolución temporal a lo largo de la zafra de campeonato"
+                    title="Calendario y Días de la Semana"
+                    subtitle="Consistencia y evolución temporal a lo largo de los meses y días de juego"
                     icon={<Calendar className="w-4 h-4" />}
                     batterRows={profile.calendarSplits}
                     badgeCount={profile.calendarSplits.length}
@@ -563,14 +626,115 @@ export function PlayerSplitsView({
             ) : (
               /* LANZADORES */
               <>
-                <SplitTableGroup
-                  title="Splits de Efectividad & Contexto del Lanzador"
-                  subtitle="Desglose completo de ERA, WHIP, BAA, K/9 y BB/9 según localía, horario, rivales y platoon"
-                  icon={<Target className="w-4 h-4" />}
-                  pitcherRows={profile.pitcherSplits}
-                  isPitcher={true}
-                  badgeCount={profile.pitcherSplits?.length}
-                />
+                {/* 1. Platoon (Lateralidad) */}
+                {(categoryFilter === "all" || categoryFilter === "platoon") && (
+                  <SplitTableGroup
+                    title="Lateralidad (Platoon)"
+                    subtitle="Efectividad y dominio contra bateadores derechos (RHB) y zurdos (LHB)"
+                    icon={<Flame className="w-4 h-4" />}
+                    pitcherRows={profile.pitcherPlatoonSplits}
+                    isPitcher={true}
+                    badgeCount={profile.pitcherPlatoonSplits?.length}
+                  />
+                )}
+
+                {/* 2. Situación de Juego y Corredores */}
+                {(categoryFilter === "all" || categoryFilter === "situational") && (
+                  <SplitTableGroup
+                    title="Situación de Juego y Corredores"
+                    subtitle="Desglose con Bases Limpias, Corredores en Base, RISP, RISP con 2 Outs, Bases Llenas y Leadoff"
+                    icon={<Layers className="w-4 h-4" />}
+                    pitcherRows={profile.pitcherSituationalSplits}
+                    isPitcher={true}
+                    badgeCount={profile.pitcherSituationalSplits?.length}
+                  />
+                )}
+
+                {/* 3. Conteos Clave & Outs */}
+                {(categoryFilter === "all" || categoryFilter === "count") && (
+                  <>
+                    {profile.pitcherCountSplits && profile.pitcherCountSplits.length > 0 && (
+                      <SplitTableGroup
+                        title="Conteos Clave"
+                        subtitle="Primer Pitcheo (0-0), Con 2 Strikes y Cuenta Completa (3-2)"
+                        icon={<Target className="w-4 h-4" />}
+                        pitcherRows={profile.pitcherCountSplits}
+                        isPitcher={true}
+                        badgeCount={profile.pitcherCountSplits.length}
+                      />
+                    )}
+                    {profile.pitcherOutsSplits && profile.pitcherOutsSplits.length > 0 && (
+                      <SplitTableGroup
+                        title="Por Conteo de Outs"
+                        subtitle="Dominio monticular con 0 Outs, 1 Out y 2 Outs"
+                        icon={<Target className="w-4 h-4" />}
+                        pitcherRows={profile.pitcherOutsSplits}
+                        isPitcher={true}
+                        badgeCount={profile.pitcherOutsSplits.length}
+                      />
+                    )}
+                  </>
+                )}
+
+                {/* 4. Por Entradas */}
+                {(categoryFilter === "all" || categoryFilter === "inning") && (
+                  <SplitTableGroup
+                    title="Por Entradas"
+                    subtitle="Rendimiento y resistencia monticular según el inning del juego"
+                    icon={<Clock className="w-4 h-4" />}
+                    pitcherRows={profile.pitcherInningSplits}
+                    isPitcher={true}
+                    badgeCount={profile.pitcherInningSplits?.length}
+                  />
+                )}
+
+                {/* 5. Rol (Abridor vs Relevista) */}
+                {(categoryFilter === "all" || categoryFilter === "role") && profile.pitcherRoleSplits && profile.pitcherRoleSplits.length > 0 && (
+                  <SplitTableGroup
+                    title="Rol de Pitcheo"
+                    subtitle="Desempeño según rol asignado: Como Abridor (SP) vs Como Relevista (RP)"
+                    icon={<Sparkles className="w-4 h-4" />}
+                    pitcherRows={profile.pitcherRoleSplits}
+                    isPitcher={true}
+                    badgeCount={profile.pitcherRoleSplits.length}
+                  />
+                )}
+
+                {/* 6. Contexto & Localía */}
+                {(categoryFilter === "all" || categoryFilter === "context") && (
+                  <SplitTableGroup
+                    title="Localía y Horario"
+                    subtitle="Rendimiento en Casa, Carretera, Horario (Día/Noche) y Resultado del Partido"
+                    icon={<MapPin className="w-4 h-4" />}
+                    pitcherRows={profile.pitcherContextSplits}
+                    isPitcher={true}
+                    badgeCount={profile.pitcherContextSplits?.length}
+                  />
+                )}
+
+                {/* 7. Por Rival */}
+                {(categoryFilter === "all" || categoryFilter === "opponent") && (
+                  <SplitTableGroup
+                    title="Por Equipo Rival"
+                    subtitle="Desglose monticular cara a cara contra las franquicias oponentes"
+                    icon={<Users className="w-4 h-4" />}
+                    pitcherRows={profile.pitcherOpponentSplits}
+                    isPitcher={true}
+                    badgeCount={profile.pitcherOpponentSplits?.length}
+                  />
+                )}
+
+                {/* 8. Calendario */}
+                {(categoryFilter === "all" || categoryFilter === "calendar") && (
+                  <SplitTableGroup
+                    title="Calendario y Días de la Semana"
+                    subtitle="Consistencia y evolución temporal a lo largo de los meses y días de juego"
+                    icon={<Calendar className="w-4 h-4" />}
+                    pitcherRows={profile.pitcherCalendarSplits}
+                    isPitcher={true}
+                    badgeCount={profile.pitcherCalendarSplits?.length}
+                  />
+                )}
               </>
             )}
           </div>

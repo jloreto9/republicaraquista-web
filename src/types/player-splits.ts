@@ -2,6 +2,8 @@ export type SplitCategory =
   | "context"
   | "situational"
   | "platoon"
+  | "count"
+  | "role"
   | "opponent"
   | "calendar"
   | "inning"
@@ -29,6 +31,10 @@ export interface PlayerSplitRow {
   obp: string;
   slg: string;
   ops: string;
+  iso: string;
+  babip: string;
+  bbPct: string;
+  kPct: string;
   avgNum: number;
   obpNum: number;
   slgNum: number;
@@ -43,6 +49,7 @@ export interface PitcherSplitRow {
   starts: number;
   ip: number;
   ipDisplay: string;
+  bf?: number;
   h: number;
   r: number;
   er: number;
@@ -51,9 +58,17 @@ export interface PitcherSplitRow {
   hr: number;
   era: string;
   whip: string;
+  baa: string;
+  oppObp?: string;
+  oppSlg?: string;
+  oppOps?: string;
   kPer9: string;
   bbPer9: string;
-  baa: string;
+  kPerBb?: string;
+  kPct?: string;
+  bbPct?: string;
+  babip?: string;
+  hrPer9?: string;
   eraNum: number;
   whipNum: number;
 }
@@ -81,9 +96,19 @@ export interface PlayerSplitsProfile {
   calendarSplits: PlayerSplitRow[];
   situationalSplits: PlayerSplitRow[];
   platoonSplits: PlayerSplitRow[];
+  countSplits?: PlayerSplitRow[];
   inningSplits: PlayerSplitRow[];
   outsSplits: PlayerSplitRow[];
   pitcherSplits?: PitcherSplitRow[];
+  pitcherPlatoonSplits?: PitcherSplitRow[];
+  pitcherSituationalSplits?: PitcherSplitRow[];
+  pitcherCountSplits?: PitcherSplitRow[];
+  pitcherInningSplits?: PitcherSplitRow[];
+  pitcherOutsSplits?: PitcherSplitRow[];
+  pitcherRoleSplits?: PitcherSplitRow[];
+  pitcherContextSplits?: PitcherSplitRow[];
+  pitcherOpponentSplits?: PitcherSplitRow[];
+  pitcherCalendarSplits?: PitcherSplitRow[];
   lobStats?: {
     lobEnding: number;
     rispLobEnding: number;
