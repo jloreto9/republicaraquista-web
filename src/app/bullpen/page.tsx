@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { Header } from "@/components/layout/header";
 import { getBullpenAndLineups } from "@/lib/bullpen";
 import { getDynamicBullpenAndLineups } from "@/lib/game-feed-service";
+import { getBullpenBudget } from "@/lib/bullpen-budget";
 import { BullpenView } from "@/components/bullpen/bullpen-view";
 import { getActiveSeason } from "@/lib/constants";
 
@@ -15,10 +16,17 @@ export const metadata: Metadata = {
 
 export default async function BullpenPage() {
   const activeSeason = await getActiveSeason();
-  const data =
+  const [baseData, bullpenBudget] = await Promise.all([
     activeSeason >= 2026
-      ? await getDynamicBullpenAndLineups(activeSeason)
-      : getBullpenAndLineups(activeSeason, 695);
+      ? getDynamicBullpenAndLineups(activeSeason)
+      : Promise.resolve(getBullpenAndLineups(activeSeason, 695)),
+    getBullpenBudget(activeSeason, 695),
+  ]);
+
+  const data = {
+    ...baseData,
+    bullpenBudget,
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">

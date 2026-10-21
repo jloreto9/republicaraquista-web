@@ -64,6 +64,80 @@ export interface PlayerLineupImpact {
   breakdown: PlayerSlotBreakdown[];
 }
 
+export interface RelieverDayUsage {
+  date: string;
+  dayLabel: string;
+  dayOfWeek: string;
+  gamePk: number;
+  opponent: string;
+  pitched: boolean;
+  pitches: number;
+  strikes: number;
+  ip: string;
+  ipDecimal: number;
+  er: number;
+  so: number;
+  bb: number;
+  h: number;
+  decision?: "W" | "L" | "SV" | "HLD" | "";
+  loadLevel: "rest" | "low" | "medium" | "high";
+}
+
+export interface RelieverBudgetItem {
+  pitcherId: number;
+  pitcherName: string;
+  headshot: string;
+  role: "Closer" | "Setup" | "High Leverage" | "Middle Relief" | "Long Relief";
+  roleAbbr: "CL" | "SU" | "HL" | "MR" | "LR";
+  throws: "R" | "L";
+  seasonStats: {
+    games: number;
+    era: string;
+    whip: string;
+    sv: number;
+    holds: number;
+    so: number;
+    totalIp: string;
+  };
+  dailyUsage: RelieverDayUsage[];
+  summary: {
+    pitchesLast3Days: number;
+    pitchesLast5Days: number;
+    totalPitchesWeek: number;
+    totalInningsWeek: string;
+    totalOutsWeek: number;
+    consecutiveDaysPitched: number;
+    daysSinceLastPitched: number;
+    availabilityStatus: "available" | "caution" | "unavailable";
+    availabilityLabel: "Disponible" | "Precaución" | "Fatiga / Descanso";
+  };
+}
+
+export interface BullpenBudgetData {
+  teamId: number;
+  teamName: string;
+  teamLogo?: string;
+  season: number;
+  dates: {
+    date: string;
+    dayLabel: string;
+    dayOfWeek: string;
+    opponent: string;
+    gamePk: number;
+  }[];
+  relievers: RelieverBudgetItem[];
+  kpis: {
+    availableArms: number;
+    cautionArms: number;
+    unavailableArms: number;
+    totalRelievers: number;
+    teamPitchesLast3Days: number;
+    teamPitchesLast5Days: number;
+    mostWorkedReliever: string;
+    mostWorkedPitches: number;
+  };
+}
+
 export interface BullpenAndLineupsData {
   bullpen: {
     kpis: {
@@ -76,6 +150,7 @@ export interface BullpenAndLineupsData {
     relievers: RelieverInheritedStat[];
     logs: InheritedLog[];
   };
+  bullpenBudget?: BullpenBudgetData;
   lineups: {
     kpis: {
       totalGames: number;

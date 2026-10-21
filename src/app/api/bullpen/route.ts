@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBullpenAndLineups } from "@/lib/bullpen";
 import { getDynamicBullpenAndLineups } from "@/lib/game-feed-service";
+import { getBullpenBudget } from "@/lib/bullpen-budget";
 import { getActiveSeason } from "@/lib/season-service";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +15,17 @@ export async function GET(request: NextRequest) {
   const teamId = parseInt(searchParams.get("teamId") || "695", 10);
 
   try {
-    const data =
+    const [baseData, bullpenBudget] = await Promise.all([
       season >= activeSeason
-        ? await getDynamicBullpenAndLineups(season)
-        : getBullpenAndLineups(season, teamId);
+        ? getDynamicBullpenAndLineups(season)
+        : Promise.resolve(getBullpenAndLineups(season, teamId)),
+      getBullpenBudget(season, teamId),
+    ]);
+
+    const data = {
+      ...baseData,
+      bullpenBudget,
+    };
 
     return NextResponse.json({
       success: true,

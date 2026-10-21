@@ -13,11 +13,13 @@ import {
   Calendar,
   BookOpen,
   BarChart2,
+  Activity,
 } from "lucide-react";
 import {
   BullpenAndLineupsData,
   GameLineup,
 } from "@/types/bullpen";
+import { BullpenBudgetTab } from "./bullpen-budget-tab";
 import { cn } from "@/lib/utils";
 import { LVBP_TEAMS, LVBP_TEAM_IDS } from "@/lib/constants";
 import { useSeason } from "@/context/season-context";
@@ -45,7 +47,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
   const [currentSeason, setCurrentSeason] = useState<number>(globalSeason || season);
   const [currentTeamId, setCurrentTeamId] = useState<number>(695);
   const [loading, setLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"bullpen" | "lineups">("bullpen");
+  const [activeTab, setActiveTab] = useState<"bullpen" | "budget" | "lineups">("bullpen");
   const [lineupSubtab, setLineupSubtab] = useState<
     "card" | "frequent" | "heatmap" | "player"
   >("card");
@@ -152,7 +154,11 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
             )}
           </div>
           <p className="text-xs text-slate-400">
-            Contención de corredores heredados (IR/IRS) y optimización de alineaciones 1 al 9.
+            {activeTab === "budget"
+              ? "Monitoreo rolling de carga, fatiga y disponibilidad de relevistas (FanGraphs Depth Chart)."
+              : activeTab === "lineups"
+              ? "Optimización y análisis de alineaciones titulares 1 al 9."
+              : "Contención de corredores heredados (IR/IRS) y efectividad de relevistas."}
           </p>
         </div>
 
@@ -193,7 +199,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
             </select>
           </div>
 
-          {/* Switcher de Pestañas Bullpen vs Lineups */}
+          {/* Switcher de Pestañas Bullpen vs Budget vs Lineups */}
           <div className="flex items-center space-x-1 bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D]">
             <button
               onClick={() => setActiveTab("bullpen")}
@@ -206,6 +212,18 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
             >
               <Shield className="w-3.5 h-3.5" />
               <span>Relevistas (IR/IRS)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("budget")}
+              className={cn(
+                "flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all",
+                activeTab === "budget"
+                  ? "bg-[#FDB827] text-slate-950 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Bullpen Budget (Carga 7D)</span>
             </button>
             <button
               onClick={() => setActiveTab("lineups")}
@@ -473,7 +491,16 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
         </div>
       )}
 
-      {/* ── 2. VISTA DEL TRACKER DE ALINEACIONES 1-9 ── */}
+      {/* ── 2. VISTA BULLPEN BUDGET (CARGA 7D / FANGRAPHS DEPTH CHART) ── */}
+      {activeTab === "budget" && (
+        <BullpenBudgetTab
+          budgetData={data.bullpenBudget}
+          teamName={activeTeam.name}
+          season={currentSeason}
+        />
+      )}
+
+      {/* ── 3. VISTA DEL TRACKER DE ALINEACIONES 1-9 ── */}
       {activeTab === "lineups" && (
         <div className="space-y-6">
           {/* 4 KPIs de Lineups */}
