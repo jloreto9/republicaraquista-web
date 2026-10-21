@@ -30,7 +30,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "REPUBLICARAQUISTAPP • Plataforma Sabermétrica LVBP",
+  title: "REPUBLICARAQUISTAPP • Leones del Caracas & LVBP",
   description:
     "Analítica deportiva moderna, sabermetría avanzada y seguimiento oficial de Leones del Caracas en la LVBP.",
   authors: [

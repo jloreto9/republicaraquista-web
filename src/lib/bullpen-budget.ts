@@ -378,7 +378,7 @@ export async function getBullpenBudget(
       }
     }
 
-    // 5. Construir ítems de cada lanzador y clasificar rol FanGraphs
+    // 5. Construir ítems de cada lanzador y clasificar roles tácticos
     const relieversList: RelieverBudgetItem[] = Array.from(pitcherMap.values()).map((p) => {
       // Matriz de uso diaria para todos los días del calendario (incluyendo Días Libres)
       const dailyUsage: RelieverDayUsage[] = calendarDates.map((dStr) => {
@@ -472,7 +472,7 @@ export async function getBullpenBudget(
         }
       }
 
-      // Clasificación de Rol FanGraphs Depth Chart
+      // Clasificación de Rol Táctico (SP, CL, SU, HL, MR, LR)
       const isStarterStaff = p.startsCount > 0 && p.startsCount >= p.gamesCount * 0.5;
       let role: "Starter" | "Closer" | "Setup" | "High Leverage" | "Middle Relief" | "Long Relief" =
         "Middle Relief";
@@ -578,7 +578,7 @@ export async function getBullpenBudget(
       };
     });
 
-    // Ordenar por Jerarquía FanGraphs: SP -> CL -> SU -> HL -> MR -> LR
+    // Ordenar por Jerarquía de Lanzadores: SP -> CL -> SU -> HL -> MR -> LR
     const roleWeight: Record<string, number> = {
       SP: 1,
       CL: 2,

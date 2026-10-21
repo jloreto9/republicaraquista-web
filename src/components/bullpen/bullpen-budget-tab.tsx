@@ -232,7 +232,7 @@ export function BullpenBudgetTab({
         </div>
       </div>
 
-      {/* ── 2. Barra de Leyenda Estilo FanGraphs RosterResource ── */}
+      {/* ── 2. Barra de Leyenda de Carga ── */}
       <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
         {/* Niveles de Carga */}
         <div className="flex flex-wrap items-center gap-3">
@@ -336,13 +336,13 @@ export function BullpenBudgetTab({
         </div>
       </div>
 
-      {/* ── 4. FanGraphs RosterResource Closer Depth Chart Grid ── */}
+      {/* ── 4. Cuadrícula de Trabajo Rolling ── */}
       <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl shadow-xl overflow-hidden">
         <div className="p-4 border-b border-[#1E2B4D] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center space-x-2">
             <Shield className="w-4 h-4 text-[#FDB827]" />
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-              Jerarquía de Lanzadores y Carga Rolling (FanGraphs Depth Chart)
+              Jerarquía de Lanzadores y Carga de Trabajo Rolling
             </h3>
           </div>
           <div className="text-[11px] text-slate-400 font-mono">
@@ -358,7 +358,7 @@ export function BullpenBudgetTab({
                 <th
                   onClick={() => toggleSort("role")}
                   className="py-3 px-3 text-center cursor-pointer hover:text-slate-200 transition-colors w-16"
-                  title="Jerarquía de asignación de entradas (FanGraphs Closer Depth Chart)"
+                  title="Jerarquía de asignación de entradas y roles de lanzamiento"
                 >
                   <div className="inline-flex items-center gap-1">
                     <span>ROL</span>
@@ -712,7 +712,7 @@ export function BullpenBudgetTab({
           </div>
           <div className="space-y-1">
             <span className="font-bold text-slate-200">
-              2. Jerarquía FanGraphs Closer Depth Chart:
+              2. Jerarquía y Asignación de Roles:
             </span>
             <p className="leading-relaxed">
               Los lanzadores se organizan por rol táctico:{" "}

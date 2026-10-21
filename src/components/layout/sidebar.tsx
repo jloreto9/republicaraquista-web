@@ -71,7 +71,7 @@ export function Sidebar() {
             República <span className="text-[#FDB827]">Caraquista</span>
           </span>
           <span className="text-[10px] text-slate-400 font-mono tracking-widest uppercase">
-            Plataforma Sabermétrica
+            Leones del Caracas & LVBP
           </span>
         </div>
       </div>

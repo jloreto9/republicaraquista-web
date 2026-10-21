@@ -155,7 +155,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
           </div>
           <p className="text-xs text-slate-400">
             {activeTab === "budget"
-              ? "Monitoreo rolling de carga, fatiga y disponibilidad de relevistas (FanGraphs Depth Chart)."
+              ? "Monitoreo rolling de carga, fatiga y disponibilidad de lanzadores."
               : activeTab === "lineups"
               ? "Optimización y análisis de alineaciones titulares 1 al 9."
               : "Contención de corredores heredados (IR/IRS) y efectividad de relevistas."}
@@ -491,7 +491,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
         </div>
       )}
 
-      {/* ── 2. VISTA BULLPEN BUDGET (CARGA 7D / FANGRAPHS DEPTH CHART) ── */}
+      {/* ── 2. VISTA BULLPEN BUDGET (CARGA DE TRABAJO 7D) ── */}
       {activeTab === "budget" && (
         <BullpenBudgetTab
           budgetData={data.bullpenBudget}

@@ -58,7 +58,7 @@ export default function PrivacidadPage() {
               <h2>1. Identificación del Responsable</h2>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              <strong>REPUBLICARAQUISTAPP</strong> es una plataforma analítica y sabermétrica desarrollada y mantenida por{" "}
+              <strong>REPUBLICARAQUISTAPP</strong> es una aplicación analítica desarrollada y mantenida por{" "}
               <strong>Jorge Leonardo Loreto</strong> (Economista y AI Data Scientist) bajo la marca y comunidad deportiva{" "}
               <strong>República Caraquista</strong> (<span className="text-[#FDB827] font-mono">@RepubCaraquista</span>).
             </p>
