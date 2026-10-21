@@ -95,10 +95,20 @@ export interface CollectiveKPICardData {
   iconName: string;
 }
 
+export interface CollectiveLeagueSummary<T> {
+  total: T;
+  perGame: Record<string, string>;
+  perTeamGame: Record<string, string>;
+  uniqueGames: number;
+}
+
 export interface CollectiveStatsResult {
   batting: CollectiveBattingTeam[];
   pitching: CollectivePitchingTeam[];
   fielding: CollectiveFieldingTeam[];
+  battingSummary?: CollectiveLeagueSummary<CollectiveBattingTeam>;
+  pitchingSummary?: CollectiveLeagueSummary<CollectivePitchingTeam>;
+  fieldingSummary?: CollectiveLeagueSummary<CollectiveFieldingTeam>;
   battingKpis: {
     avgVal: string;
     avgTeam: string;

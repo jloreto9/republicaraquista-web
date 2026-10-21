@@ -49,6 +49,7 @@ export function ColectivasView({
   const [currentSeason, setCurrentSeason] = useState<number>(globalSeason || season);
   const [phase, setPhase] = useState<string>(initialPhase);
   const [activeTab, setActiveTab] = useState<"bateo" | "pitcheo" | "fildeo">("bateo");
+  const [viewMode, setViewMode] = useState<"totals" | "per_game">("totals");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Métrica seleccionada para el comparador de barras
@@ -123,6 +124,34 @@ export function ColectivasView({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Selector de Modo: Totales vs Por Juego */}
+          <div className="flex items-center space-x-1 bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D]">
+            <button
+              type="button"
+              onClick={() => setViewMode("totals")}
+              className={cn(
+                "px-2.5 py-1 rounded text-[11px] font-bold transition-all",
+                viewMode === "totals"
+                  ? "bg-[#FDB827] text-slate-950 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              📊 Totales
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("per_game")}
+              className={cn(
+                "px-2.5 py-1 rounded text-[11px] font-bold transition-all",
+                viewMode === "per_game"
+                  ? "bg-[#FDB827] text-slate-950 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              ⚡ Por Juego (/JJ)
+            </button>
           </div>
 
           {isLoading && (
@@ -211,7 +240,9 @@ export function ColectivasView({
                 <span>Tabla Comparativa de Bateo Colectivo (8 Equipos)</span>
               </h3>
               <span className="text-[10px] text-slate-400 font-mono">
-                Ordenado por OPS Descendente
+                {viewMode === "totals"
+                  ? "Totales Acumulados • Ordenado por OPS Descendente"
+                  : "Promedios por Equipo por Juego (Stats / JJ) • Ordenado por OPS"}
               </span>
             </div>
 
@@ -277,17 +308,39 @@ export function ColectivasView({
                         </div>
                       </td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{t.games}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.pa}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{t.ab}</td>
-                      <td className="py-2.5 px-2 text-center font-bold text-slate-100">{t.r}</td>
-                      <td className="py-2.5 px-2 text-center font-bold text-slate-100">{t.h}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.doubles}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.triples}</td>
-                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{t.hr}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{t.rbi}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.bb}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.so}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.sb}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.pa / (t.games || 1)).toFixed(1) : t.pa}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">
+                        {viewMode === "per_game" ? (t.ab / (t.games || 1)).toFixed(1) : t.ab}
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-bold text-slate-100">
+                        {viewMode === "per_game" ? (t.r / (t.games || 1)).toFixed(1) : t.r}
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-bold text-slate-100">
+                        {viewMode === "per_game" ? (t.h / (t.games || 1)).toFixed(1) : t.h}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.doubles / (t.games || 1)).toFixed(1) : t.doubles}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.triples / (t.games || 1)).toFixed(2) : t.triples}
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">
+                        {viewMode === "per_game" ? (t.hr / (t.games || 1)).toFixed(1) : t.hr}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">
+                        {viewMode === "per_game" ? (t.rbi / (t.games || 1)).toFixed(1) : t.rbi}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.bb / (t.games || 1)).toFixed(1) : t.bb}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.so / (t.games || 1)).toFixed(1) : t.so}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.sb / (t.games || 1)).toFixed(1) : t.sb}
+                      </td>
                       <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{t.avgStr}</td>
                       <td className="py-2.5 px-2 text-center text-slate-300">{t.obpStr}</td>
                       <td className="py-2.5 px-2 text-center text-slate-300">{t.slgStr}</td>
@@ -296,11 +349,103 @@ export function ColectivasView({
                           {t.opsStr}
                         </span>
                       </td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.lob}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.lob / (t.games || 1)).toFixed(1) : t.lob}
+                      </td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{t.babipStr}</td>
                     </tr>
                   ))}
                 </tbody>
+                {data.battingSummary && (
+                  <tfoot className="border-t-2 border-[#FDB827]/40 bg-[#070B19]/95 text-xs font-mono">
+                    {/* Fila 1: Total Liga */}
+                    <tr className="border-b border-[#1E2B4D]/70 hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="relative w-6 h-6 rounded bg-[#FDB827]/15 p-0.5 shrink-0 flex items-center justify-center border border-[#FDB827]/40 shadow-sm">
+                            <Trophy className="w-3.5 h-3.5 text-[#FDB827]" />
+                          </div>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-bold text-[#FDB827] tracking-wider uppercase text-[11px]">
+                              TOTAL LIGA
+                            </span>
+                            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-[#FDB827]/20 text-[#FDB827] border border-[#FDB827]/30">
+                              LVBP
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-center text-[#FDB827] font-bold">{data.battingSummary.total.games}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.pa.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-200">{data.battingSummary.total.ab.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center font-bold text-slate-100">{data.battingSummary.total.r.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center font-bold text-slate-100">{data.battingSummary.total.h.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.doubles.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.triples.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center font-bold text-[#FDB827]">{data.battingSummary.total.hr.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-200">{data.battingSummary.total.rbi.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.bb.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.so.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.sb.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center font-bold text-[#FDB827]">{data.battingSummary.total.avgStr}</td>
+                      <td className="py-3 px-2 text-center text-slate-300">{data.battingSummary.total.obpStr}</td>
+                      <td className="py-3 px-2 text-center text-slate-300">{data.battingSummary.total.slgStr}</td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-[#FDB827] font-bold border border-amber-500/30">
+                          {data.battingSummary.total.opsStr}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.lob.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.babipStr}</td>
+                    </tr>
+
+                    {/* Fila 2: Promedio por Juego (Partido Completo) */}
+                    <tr className="bg-cyan-500/[0.04] hover:bg-cyan-500/[0.07] transition-colors border-t border-cyan-500/20">
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="relative w-6 h-6 rounded bg-cyan-500/15 p-0.5 shrink-0 flex items-center justify-center border border-cyan-500/30">
+                            <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center space-x-1.5">
+                              <span className="font-bold text-cyan-400 tracking-wider uppercase text-[11px]">
+                                PROM. POR JUEGO
+                              </span>
+                              <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                9 INN
+                              </span>
+                            </div>
+                            <span className="text-[9px] text-slate-400">
+                              Partido Completo
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-cyan-400 font-bold">1 PJ</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.pa}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">{data.battingSummary.perGame.ab}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-cyan-300">{data.battingSummary.perGame.r}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-cyan-300">{data.battingSummary.perGame.h}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.doubles}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.triples}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{data.battingSummary.perGame.hr}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">{data.battingSummary.perGame.rbi}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.bb}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.so}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.sb}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{data.battingSummary.perGame.avgStr}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-300">{data.battingSummary.perGame.obpStr}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-300">{data.battingSummary.perGame.slgStr}</td>
+                      <td className="py-2.5 px-2 text-center">
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 font-bold border border-cyan-500/30">
+                          {data.battingSummary.perGame.opsStr}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.lob}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.babipStr}</td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>
@@ -395,7 +540,9 @@ export function ColectivasView({
                 Staff Monticular y Efectividad Colectiva (8 Equipos)
               </h3>
               <span className="text-[10px] text-slate-400 font-mono">
-                Ordenado por ERA Ascendente
+                {viewMode === "totals"
+                  ? "Totales Acumulados • Ordenado por ERA Ascendente"
+                  : "Promedios por Equipo por Juego (Stats / JJ) • Ordenado por ERA"}
               </span>
             </div>
 
@@ -463,10 +610,10 @@ export function ColectivasView({
                       </td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{t.games}</td>
                       <td className="py-2.5 px-2 text-center font-bold text-emerald-400">
-                        {t.wins}
+                        {viewMode === "per_game" ? (t.wins / (t.games || 1)).toFixed(2) : t.wins}
                       </td>
                       <td className="py-2.5 px-2 text-center font-bold text-rose-400">
-                        {t.losses}
+                        {viewMode === "per_game" ? (t.losses / (t.games || 1)).toFixed(2) : t.losses}
                       </td>
                       <td className="py-2.5 px-2 text-center">
                         <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[#FDB827] font-bold border border-amber-500/20">
@@ -476,16 +623,36 @@ export function ColectivasView({
                       <td className="py-2.5 px-2 text-center font-bold text-slate-100">
                         {t.whipStr}
                       </td>
-                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{t.sv}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.holds}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.blownSaves}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{t.ipStr}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.h}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.r}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.er}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.bb}</td>
-                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{t.so}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.hr}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">
+                        {viewMode === "per_game" ? (t.sv / (t.games || 1)).toFixed(2) : t.sv}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.holds / (t.games || 1)).toFixed(2) : t.holds}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.blownSaves / (t.games || 1)).toFixed(2) : t.blownSaves}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">
+                        {viewMode === "per_game" ? (t.ip / (t.games || 1)).toFixed(1) : t.ipStr}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.h / (t.games || 1)).toFixed(1) : t.h}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.r / (t.games || 1)).toFixed(1) : t.r}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.er / (t.games || 1)).toFixed(1) : t.er}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.bb / (t.games || 1)).toFixed(1) : t.bb}
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">
+                        {viewMode === "per_game" ? (t.so / (t.games || 1)).toFixed(1) : t.so}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.hr / (t.games || 1)).toFixed(1) : t.hr}
+                      </td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{t.k9Str}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{t.bb9Str}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{t.kbbStr}</td>
@@ -493,6 +660,98 @@ export function ColectivasView({
                     </tr>
                   ))}
                 </tbody>
+                {data.pitchingSummary && (
+                  <tfoot className="border-t-2 border-[#FDB827]/40 bg-[#070B19]/95 text-xs font-mono">
+                    {/* Fila 1: Total Liga */}
+                    <tr className="border-b border-[#1E2B4D]/70 hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="relative w-6 h-6 rounded bg-[#FDB827]/15 p-0.5 shrink-0 flex items-center justify-center border border-[#FDB827]/40 shadow-sm">
+                            <Trophy className="w-3.5 h-3.5 text-[#FDB827]" />
+                          </div>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-bold text-[#FDB827] tracking-wider uppercase text-[11px]">
+                              TOTAL LIGA
+                            </span>
+                            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-[#FDB827]/20 text-[#FDB827] border border-[#FDB827]/30">
+                              LVBP
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-center text-[#FDB827] font-bold">{data.pitchingSummary.total.games}</td>
+                      <td className="py-3 px-2 text-center font-bold text-emerald-400">{data.pitchingSummary.total.wins}</td>
+                      <td className="py-3 px-2 text-center font-bold text-rose-400">{data.pitchingSummary.total.losses}</td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-[#FDB827] font-bold border border-amber-500/30">
+                          {data.pitchingSummary.total.eraStr}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center font-bold text-slate-100">{data.pitchingSummary.total.whipStr}</td>
+                      <td className="py-3 px-2 text-center font-bold text-[#FDB827]">{data.pitchingSummary.total.sv}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.holds}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.blownSaves}</td>
+                      <td className="py-3 px-2 text-center text-slate-200">{data.pitchingSummary.total.ipStr}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.h.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.r.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.er.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.bb.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center font-bold text-[#FDB827]">{data.pitchingSummary.total.so.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.hr.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.k9Str}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.bb9Str}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.kbbStr}</td>
+                      <td className="py-3 px-2 text-center text-slate-300">{data.pitchingSummary.total.baaStr}</td>
+                    </tr>
+
+                    {/* Fila 2: Promedio por Juego (Partido Completo) */}
+                    <tr className="bg-cyan-500/[0.04] hover:bg-cyan-500/[0.07] transition-colors border-t border-cyan-500/20">
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="relative w-6 h-6 rounded bg-cyan-500/15 p-0.5 shrink-0 flex items-center justify-center border border-cyan-500/30">
+                            <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center space-x-1.5">
+                              <span className="font-bold text-cyan-400 tracking-wider uppercase text-[11px]">
+                                PROM. POR JUEGO
+                              </span>
+                              <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                9 INN
+                              </span>
+                            </div>
+                            <span className="text-[9px] text-slate-400">
+                              Partido Completo
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-cyan-400 font-bold">1 PJ</td>
+                      <td className="py-2.5 px-2 text-center text-emerald-400/80">{data.pitchingSummary.perGame.wins}</td>
+                      <td className="py-2.5 px-2 text-center text-rose-400/80">{data.pitchingSummary.perGame.losses}</td>
+                      <td className="py-2.5 px-2 text-center">
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 font-bold border border-cyan-500/30">
+                          {data.pitchingSummary.perGame.eraStr}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-bold text-cyan-300">{data.pitchingSummary.perGame.whipStr}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-300">{data.pitchingSummary.perGame.sv}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.pitchingSummary.perGame.holds}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.pitchingSummary.perGame.blownSaves}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-300">{data.pitchingSummary.perGame.ipStr}</td>
+                      <td className="py-2.5 px-2 text-center text-cyan-300 font-bold">{data.pitchingSummary.perGame.h}</td>
+                      <td className="py-2.5 px-2 text-center text-cyan-300 font-bold">{data.pitchingSummary.perGame.r}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-300">{data.pitchingSummary.perGame.er}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-300">{data.pitchingSummary.perGame.bb}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{data.pitchingSummary.perGame.so}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.pitchingSummary.perGame.hr}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.pitchingSummary.perGame.k9Str}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.pitchingSummary.perGame.bb9Str}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.pitchingSummary.perGame.kbbStr}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-300">{data.pitchingSummary.perGame.baaStr}</td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>
@@ -586,7 +845,9 @@ export function ColectivasView({
                 Solidez Defensiva y Fildeo Colectivo (8 Equipos)
               </h3>
               <span className="text-[10px] text-slate-400 font-mono">
-                Ordenado por % de Fildeo (FPCT)
+                {viewMode === "totals"
+                  ? "Totales Acumulados • Ordenado por % de Fildeo (FPCT)"
+                  : "Promedios por Equipo por Juego (Stats / JJ) • Ordenado por FPCT"}
               </span>
             </div>
 
@@ -648,21 +909,41 @@ export function ColectivasView({
                         </div>
                       </td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{t.games}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.innings}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{t.po}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{t.a}</td>
-                      <td className="py-2.5 px-2 text-center font-bold text-rose-400">{t.e}</td>
-                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{t.tc}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (parseFloat(t.innings) / (t.games || 1)).toFixed(1) : t.innings}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">
+                        {viewMode === "per_game" ? (t.po / (t.games || 1)).toFixed(1) : t.po}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">
+                        {viewMode === "per_game" ? (t.a / (t.games || 1)).toFixed(1) : t.a}
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-bold text-rose-400">
+                        {viewMode === "per_game" ? (t.e / (t.games || 1)).toFixed(1) : t.e}
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">
+                        {viewMode === "per_game" ? (t.tc / (t.games || 1)).toFixed(1) : t.tc}
+                      </td>
                       <td className="py-2.5 px-2 text-center">
                         <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
                           {t.fpctStr}
                         </span>
                       </td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{t.dp}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.tp}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.pb}</td>
-                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{t.cs}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">{t.sb}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">
+                        {viewMode === "per_game" ? (t.dp / (t.games || 1)).toFixed(1) : t.dp}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.tp / (t.games || 1)).toFixed(2) : t.tp}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.pb / (t.games || 1)).toFixed(2) : t.pb}
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">
+                        {viewMode === "per_game" ? (t.cs / (t.games || 1)).toFixed(2) : t.cs}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.sb / (t.games || 1)).toFixed(1) : t.sb}
+                      </td>
                       <td className="py-2.5 px-2 text-center">
                         <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[#FDB827] font-bold border border-amber-500/20">
                           {t.csPctStr}
@@ -672,6 +953,96 @@ export function ColectivasView({
                     </tr>
                   ))}
                 </tbody>
+                {data.fieldingSummary && (
+                  <tfoot className="border-t-2 border-[#FDB827]/40 bg-[#070B19]/95 text-xs font-mono">
+                    {/* Fila 1: Total Liga */}
+                    <tr className="border-b border-[#1E2B4D]/70 hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="relative w-6 h-6 rounded bg-[#FDB827]/15 p-0.5 shrink-0 flex items-center justify-center border border-[#FDB827]/40 shadow-sm">
+                            <Trophy className="w-3.5 h-3.5 text-[#FDB827]" />
+                          </div>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-bold text-[#FDB827] tracking-wider uppercase text-[11px]">
+                              TOTAL LIGA
+                            </span>
+                            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-[#FDB827]/20 text-[#FDB827] border border-[#FDB827]/30">
+                              LVBP
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-center text-[#FDB827] font-bold">{data.fieldingSummary.total.games}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.fieldingSummary.total.innings}</td>
+                      <td className="py-3 px-2 text-center text-slate-200">{data.fieldingSummary.total.po.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-200">{data.fieldingSummary.total.a.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center font-bold text-rose-400">{data.fieldingSummary.total.e.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center font-bold text-[#FDB827]">{data.fieldingSummary.total.tc.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                          {data.fieldingSummary.total.fpctStr}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center text-slate-200">{data.fieldingSummary.total.dp.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.fieldingSummary.total.tp}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.fieldingSummary.total.pb}</td>
+                      <td className="py-3 px-2 text-center font-bold text-[#FDB827]">{data.fieldingSummary.total.cs}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.fieldingSummary.total.sb}</td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-[#FDB827] font-bold border border-amber-500/30">
+                          {data.fieldingSummary.total.csPctStr}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.fieldingSummary.total.rf9Str}</td>
+                    </tr>
+
+                    {/* Fila 2: Promedio por Juego (Partido Completo) */}
+                    <tr className="bg-cyan-500/[0.04] hover:bg-cyan-500/[0.07] transition-colors border-t border-cyan-500/20">
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="relative w-6 h-6 rounded bg-cyan-500/15 p-0.5 shrink-0 flex items-center justify-center border border-cyan-500/30">
+                            <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center space-x-1.5">
+                              <span className="font-bold text-cyan-400 tracking-wider uppercase text-[11px]">
+                                PROM. POR JUEGO
+                              </span>
+                              <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                9 INN
+                              </span>
+                            </div>
+                            <span className="text-[9px] text-slate-400">
+                              Partido Completo
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-cyan-400 font-bold">1 PJ</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.fieldingSummary.perGame.innings}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">{data.fieldingSummary.perGame.po}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">{data.fieldingSummary.perGame.a}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-rose-400/90">{data.fieldingSummary.perGame.e}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-cyan-300">{data.fieldingSummary.perGame.tc}</td>
+                      <td className="py-2.5 px-2 text-center">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
+                          {data.fieldingSummary.perGame.fpctStr}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-200">{data.fieldingSummary.perGame.dp}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.fieldingSummary.perGame.tp}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.fieldingSummary.perGame.pb}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{data.fieldingSummary.perGame.cs}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.fieldingSummary.perGame.sb}</td>
+                      <td className="py-2.5 px-2 text-center">
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20">
+                          {data.fieldingSummary.perGame.csPctStr}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">{data.fieldingSummary.perGame.rf9Str}</td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>
