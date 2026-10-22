@@ -213,7 +213,7 @@ export function ColectivasView({
             )}
           >
             <Search className="w-3.5 h-3.5" />
-            <span>🔍 Stathead</span>
+            <span>🔍 Buscador</span>
           </button>
         </div>
       </div>

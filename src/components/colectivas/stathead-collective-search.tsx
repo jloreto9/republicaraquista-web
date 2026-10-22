@@ -433,10 +433,10 @@ export function StatheadCollectiveSearch({
           <div>
             <div className="flex items-center space-x-2">
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30 uppercase tracking-wider">
-                Stathead LVBP
+                Buscador LVBP
               </span>
               <span className="text-xs text-slate-400 font-medium">
-                Buscador Colectivo Interanual
+                Comparativa por Rango de Fechas
               </span>
             </div>
             <h2 className="text-lg sm:text-xl font-black text-slate-100 tracking-tight mt-1 flex items-center gap-2">
