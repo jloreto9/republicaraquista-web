@@ -32,6 +32,8 @@ export function getVapidPublicKey(): string {
 
 /**
  * Guarda o actualiza una suscripción Push en Supabase
+ * Utiliza estrategia resiliente de inserción con fallback a actualización
+ * para evitar bloqueos de RLS con cláusulas ON CONFLICT de PostgREST.
  */
 export async function saveSubscription(payload: PushSubscriptionPayload): Promise<{ success: boolean; error?: string }> {
   if (!supabaseAdmin) {
@@ -46,30 +48,58 @@ export async function saveSubscription(payload: PushSubscriptionPayload): Promis
     ? payload.topics 
     : ['game_status', 'news_roster'];
 
-  const { error } = await supabaseAdmin.from('push_subscriptions').upsert(
-    {
-      endpoint: payload.endpoint,
-      p256dh: payload.keys.p256dh,
-      auth: payload.keys.auth,
-      user_agent: payload.userAgent || null,
-      topics,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'endpoint' }
-  );
+  const record = {
+    endpoint: payload.endpoint,
+    p256dh: payload.keys.p256dh,
+    auth: payload.keys.auth,
+    user_agent: payload.userAgent || null,
+    topics,
+    updated_at: new Date().toISOString(),
+  };
 
-  if (error) {
-    console.error('Error al guardar suscripción push en Supabase:', error);
-    if (error.code === 'PGRST205' || error.message?.includes('push_subscriptions')) {
-      return {
-        success: false,
-        error: 'La tabla push_subscriptions aún no existe en Supabase. Corre la migración SQL en Supabase.',
-      };
-    }
-    return { success: false, error: error.message };
+  // 1. Intentar inserción directa
+  const { error: insertError } = await supabaseAdmin
+    .from('push_subscriptions')
+    .insert(record);
+
+  if (!insertError) {
+    return { success: true };
   }
 
-  return { success: true };
+  // 2. Si el endpoint ya existe (conflicto de clave única 23505), actualizar el registro
+  if (
+    insertError.code === '23505' ||
+    insertError.message?.includes('duplicate key') ||
+    insertError.message?.includes('already exists')
+  ) {
+    const { error: updateError } = await supabaseAdmin
+      .from('push_subscriptions')
+      .update({
+        p256dh: record.p256dh,
+        auth: record.auth,
+        topics: record.topics,
+        user_agent: record.user_agent,
+        updated_at: record.updated_at,
+      })
+      .eq('endpoint', payload.endpoint);
+
+    if (!updateError) {
+      return { success: true };
+    }
+
+    console.error('Error al actualizar suscripción existente en Supabase:', updateError);
+    return { success: false, error: updateError.message };
+  }
+
+  if (insertError.code === 'PGRST205' || insertError.message?.includes('Could not find the table')) {
+    return {
+      success: false,
+      error: 'La tabla push_subscriptions no existe en Supabase.',
+    };
+  }
+
+  console.error('Error al guardar suscripción push en Supabase:', insertError);
+  return { success: false, error: insertError.message };
 }
 
 /**

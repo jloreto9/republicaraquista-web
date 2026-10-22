@@ -22,23 +22,30 @@ CREATE INDEX IF NOT EXISTS idx_push_subs_updated_at ON public.push_subscriptions
 -- Habilitar Row Level Security (RLS)
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
 
--- Políticas de RLS
+-- Limpieza idempotente de políticas
+DROP POLICY IF EXISTS "Permitir lectura de push_subscriptions" ON public.push_subscriptions;
 DROP POLICY IF EXISTS "Permitir insercion y actualizacion publica de suscripciones" ON public.push_subscriptions;
+DROP POLICY IF EXISTS "Permitir actualizacion publica de suscripciones" ON public.push_subscriptions;
+DROP POLICY IF EXISTS "Permitir insercion de push_subscriptions" ON public.push_subscriptions;
 DROP POLICY IF EXISTS "Permitir lectura y gestion con Service Role" ON public.push_subscriptions;
 
--- Inserción/Upsert de suscripciones desde clientes anónimos
-CREATE POLICY "Permitir insercion y actualizacion publica de suscripciones" 
+-- Políticas de RLS
+CREATE POLICY "Permitir lectura de push_subscriptions" 
+ON public.push_subscriptions 
+FOR SELECT 
+USING (true);
+
+CREATE POLICY "Permitir insercion de push_subscriptions" 
 ON public.push_subscriptions 
 FOR INSERT 
 WITH CHECK (true);
 
-CREATE POLICY "Permitir actualizacion publica de suscripciones" 
+CREATE POLICY "Permitir actualizacion de push_subscriptions" 
 ON public.push_subscriptions 
 FOR UPDATE 
 USING (true)
 WITH CHECK (true);
 
--- Acceso total para backend Serverless (Service Role)
 CREATE POLICY "Permitir lectura y gestion con Service Role" 
 ON public.push_subscriptions 
 FOR ALL 
