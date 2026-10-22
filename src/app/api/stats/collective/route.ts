@@ -11,13 +11,17 @@ export async function GET(request: NextRequest) {
     ? parseInt(searchParams.get("season")!, 10)
     : activeSeason;
   const phase = searchParams.get("phase") || "R";
+  const startDate = searchParams.get("startDate") || undefined;
+  const endDate = searchParams.get("endDate") || undefined;
 
   try {
-    const stats = await getCollectiveStats(season, phase);
+    const stats = await getCollectiveStats(season, phase, startDate, endDate);
     return NextResponse.json({
       success: true,
       season,
       phase,
+      startDate,
+      endDate,
       data: stats,
     });
   } catch (error) {

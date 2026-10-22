@@ -140,3 +140,33 @@ export interface CollectiveStatsResult {
     csPctTeam: string;
   };
 }
+
+export interface StatheadDateRange {
+  startDate: string;
+  endDate: string;
+  label?: string;
+}
+
+export interface StatheadDeltaValue {
+  value: number;
+  formatted: string;
+  positiveIsGood: boolean;
+}
+
+export interface StatheadTeamComparison<T> {
+  teamId: number;
+  teamName: string;
+  teamAbbr: string;
+  logo: string;
+  isLeones: boolean;
+  current: T;
+  previous?: T | null;
+  deltas: Record<string, StatheadDeltaValue>;
+}
+
+export interface StatheadComparisonResult<T> {
+  teams: StatheadTeamComparison<T>[];
+  currentSummary?: CollectiveLeagueSummary<T>;
+  previousSummary?: CollectiveLeagueSummary<T>;
+  summaryDeltas?: Record<string, StatheadDeltaValue>;
+}
