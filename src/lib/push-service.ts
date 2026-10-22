@@ -7,9 +7,12 @@ import type {
   PushSubscriptionRecord,
 } from '@/types/push-notifications';
 
-const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
-const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:contacto@republicaraquista.com';
+const DEFAULT_VAPID_PUBLIC_KEY = 'BOVrzoz9H0kQioJd9IfN6oL2Oh4NmBSzHD-yWOvQrHH4pmoKO_2YVmhpl-m0P9CTyy41UPzjnIjeC-fAZ59aLw0';
+const DEFAULT_VAPID_PRIVATE_KEY = 'VfA2hwoqvHOWCKh3EjIqFh5_jKCsqPTokz86wMSc-Xk';
+
+const vapidPublicKey = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY).trim();
+const vapidPrivateKey = (process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE_KEY).trim();
+const vapidSubject = (process.env.VAPID_SUBJECT || 'mailto:contacto@republicaraquista.com').trim();
 
 let vapidConfigured = false;
 
@@ -57,6 +60,12 @@ export async function saveSubscription(payload: PushSubscriptionPayload): Promis
 
   if (error) {
     console.error('Error al guardar suscripción push en Supabase:', error);
+    if (error.code === 'PGRST205' || error.message?.includes('push_subscriptions')) {
+      return {
+        success: false,
+        error: 'La tabla push_subscriptions aún no existe en Supabase. Corre la migración SQL en Supabase.',
+      };
+    }
     return { success: false, error: error.message };
   }
 
