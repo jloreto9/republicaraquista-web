@@ -16,6 +16,7 @@ import {
   BookOpen,
   ChevronDown,
   Trophy,
+  Search,
 } from "lucide-react";
 import {
   CollectiveStatsResult,
@@ -25,6 +26,7 @@ import {
 } from "@/types/collective";
 import { cn } from "@/lib/utils";
 import { useSeason } from "@/context/season-context";
+import { StatheadCollectiveSearch } from "./stathead-collective-search";
 
 interface ColectivasViewProps {
   initialData: CollectiveStatsResult;
@@ -48,7 +50,9 @@ export function ColectivasView({
   const [data, setData] = useState<CollectiveStatsResult>(initialData);
   const [currentSeason, setCurrentSeason] = useState<number>(globalSeason || season);
   const [phase, setPhase] = useState<string>(initialPhase);
-  const [activeTab, setActiveTab] = useState<"bateo" | "pitcheo" | "fildeo">("bateo");
+  const [activeTab, setActiveTab] = useState<
+    "bateo" | "pitcheo" | "fildeo" | "stathead"
+  >("bateo");
   const [viewMode, setViewMode] = useState<"totals" | "per_game">("totals");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -198,6 +202,18 @@ export function ColectivasView({
           >
             <Shield className="w-3.5 h-3.5" />
             <span>🧤 Fildeo</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("stathead")}
+            className={cn(
+              "flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all",
+              activeTab === "stathead"
+                ? "bg-[#FDB827] text-slate-950 shadow-sm"
+                : "text-slate-400 hover:text-slate-200"
+            )}
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>🔍 Buscador</span>
           </button>
         </div>
       </div>
@@ -1091,6 +1107,11 @@ export function ColectivasView({
             ]}
           />
         </div>
+      )}
+
+      {/* ── CONTENIDO: BUSCADOR STATHEAD CON RANGO DE FECHAS ── */}
+      {activeTab === "stathead" && (
+        <StatheadCollectiveSearch initialSeason={currentSeason} />
       )}
     </div>
   );

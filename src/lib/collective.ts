@@ -25,14 +25,24 @@ function toPctStr(val: number): string {
 async function fetchStatsGroup(
   season: number,
   phase: string,
-  group: "hitting" | "pitching" | "fielding"
+  group: "hitting" | "pitching" | "fielding",
+  startDate?: string,
+  endDate?: string
 ): Promise<MlbSplit[]> {
-  const gameTypeParam = phase && phase !== "all" ? `&gameType=${phase}` : "";
-  const url = `https://statsapi.mlb.com/api/v1/teams/stats?season=${season}&sportIds=17&leagueIds=135&group=${group}&stats=season${gameTypeParam}`;
+  const isDateRange = Boolean(startDate && endDate);
+  const statsParam = isDateRange
+    ? `stats=byDateRange&startDate=${startDate}&endDate=${endDate}`
+    : `stats=season${phase && phase !== "all" ? `&gameType=${phase}` : ""}`;
+  const url = `https://statsapi.mlb.com/api/v1/teams/stats?season=${season}&sportIds=17&leagueIds=135&group=${group}&${statsParam}`;
+
+  const isPast = Boolean(
+    endDate && new Date(endDate).getTime() < Date.now() - 86400000
+  );
+  const revalidate = isPast ? 86400 : 300;
 
   try {
     const res = await fetch(url, {
-      next: { revalidate: 300 }, // 5 min cache
+      next: { revalidate },
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) RepublicaCaraquista/1.0",
       },
@@ -55,12 +65,14 @@ async function fetchStatsGroup(
 
 export async function getCollectiveStats(
   season = 2025,
-  phase = "R"
+  phase = "R",
+  startDate?: string,
+  endDate?: string
 ): Promise<CollectiveStatsResult> {
   const [hittingSplits, pitchingSplits, fieldingSplits] = await Promise.all([
-    fetchStatsGroup(season, phase, "hitting"),
-    fetchStatsGroup(season, phase, "pitching"),
-    fetchStatsGroup(season, phase, "fielding"),
+    fetchStatsGroup(season, phase, "hitting", startDate, endDate),
+    fetchStatsGroup(season, phase, "pitching", startDate, endDate),
+    fetchStatsGroup(season, phase, "fielding", startDate, endDate),
   ]);
 
   // 1. Parse Bateo Colectivo
