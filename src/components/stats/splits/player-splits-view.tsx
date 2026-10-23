@@ -37,7 +37,7 @@ export function PlayerSplitsView({
 }: PlayerSplitsViewProps) {
   const [playerType, setPlayerType] = useState<"batter" | "pitcher">(initialType);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(
-    initialPlayerId || (initialType === "batter" ? 691406 : 642547)
+    initialPlayerId || (initialType === "batter" ? 605612 : 660508)
   );
 
   const [playersList, setPlayersList] = useState<PlayerSelectorItem[]>([]);
@@ -143,7 +143,7 @@ export function PlayerSplitsView({
             onClick={() => {
               setPlayerType("batter");
               const firstBat = playersList.find((p) => p.type === "batter");
-              if (firstBat) setSelectedPlayerId(firstBat.id);
+              setSelectedPlayerId(firstBat ? firstBat.id : 605612);
               setCategoryFilter("all");
             }}
             className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
@@ -159,7 +159,7 @@ export function PlayerSplitsView({
             onClick={() => {
               setPlayerType("pitcher");
               const firstPit = playersList.find((p) => p.type === "pitcher");
-              if (firstPit) setSelectedPlayerId(firstPit.id);
+              setSelectedPlayerId(firstPit ? firstPit.id : 660508);
               setCategoryFilter("all");
             }}
             className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${

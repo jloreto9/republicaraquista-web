@@ -729,6 +729,20 @@ export async function getPlayerSplitsProfile(
           .eq("games.season", season);
 
         if (!error && data) rawRows = data;
+
+        // Si no hay registros en la temporada solicitada y es 2026, buscar en 2025 como respaldo defensivo
+        if (rawRows.length === 0 && season >= 2026) {
+          const { data: prevData, error: prevErr } = await supabase
+            .from("batting_stats")
+            .select(`
+              player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh,
+              players ( full_name ),
+              games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
+            `)
+            .eq("player_id", playerId)
+            .eq("games.season", 2025);
+          if (!prevErr && prevData && prevData.length > 0) rawRows = prevData;
+        }
       }
 
       const validRows: RawGameBattingRow[] = [];
@@ -1008,7 +1022,7 @@ export async function getPlayerSplitsProfile(
         const { data, error } = await supabase
           .from("pitching_stats")
           .select(`
-            player_id, team_id, ip_decimal, h, r, er, bb, so, hr, games_started,
+            player_id, team_id, ip_decimal, h, r, er, bb, so, hr,
             players ( full_name ),
             games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
           `)
@@ -1016,6 +1030,20 @@ export async function getPlayerSplitsProfile(
           .eq("games.season", season);
 
         if (!error && data) rawRows = data;
+
+        // Si no hay registros en la temporada solicitada y es 2026, buscar en 2025 como respaldo defensivo
+        if (rawRows.length === 0 && season >= 2026) {
+          const { data: prevData, error: prevErr } = await supabase
+            .from("pitching_stats")
+            .select(`
+              player_id, team_id, ip_decimal, h, r, er, bb, so, hr,
+              players ( full_name ),
+              games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
+            `)
+            .eq("player_id", playerId)
+            .eq("games.season", 2025);
+          if (!prevErr && prevData && prevData.length > 0) rawRows = prevData;
+        }
       }
 
       const validRows: RawGamePitchingRow[] = [];
@@ -1318,27 +1346,17 @@ export async function getAllAvailablePlayersForSplits(
   const items: PlayerSelectorItem[] = [];
   const seen = new Set<string>();
 
-  // Jugadores destacados directos (incluyendo referencias FanGraphs como Peralta y Caminero)
+  // Jugadores insignia de Leones del Caracas (LVBP)
   const featuredStars: PlayerSelectorItem[] = [
     {
-      id: 691406,
-      name: "Junior Caminero",
-      avatarUrl: getPlayerHeadshotUrl(691406),
+      id: 605612,
+      name: "Harold Castro",
+      avatarUrl: getPlayerHeadshotUrl(605612),
       teamId: 695,
       teamAbbr: "CAR",
       teamLogo: getTeam(695).logoUrl,
       type: "batter",
-      subtitle: "CAR / MLB • .276 AVG • 42 HR • .800+ OPS",
-    },
-    {
-      id: 642547,
-      name: "Freddy Peralta",
-      avatarUrl: getPlayerHeadshotUrl(642547),
-      teamId: 695,
-      teamAbbr: "CAR",
-      teamLogo: getTeam(695).logoUrl,
-      type: "pitcher",
-      subtitle: "CAR / MLB • 169.0 IP • 156 K • 4.42 ERA",
+      subtitle: "CAR • .312 AVG • 5 HR • .820 OPS",
     },
     {
       id: 672580,
@@ -1351,14 +1369,14 @@ export async function getAllAvailablePlayersForSplits(
       subtitle: "CAR • .295 AVG • 7 HR • .840 OPS",
     },
     {
-      id: 605612,
-      name: "Harold Castro",
-      avatarUrl: getPlayerHeadshotUrl(605612),
+      id: 602922,
+      name: "José Rondón",
+      avatarUrl: getPlayerHeadshotUrl(602922),
       teamId: 695,
       teamAbbr: "CAR",
       teamLogo: getTeam(695).logoUrl,
       type: "batter",
-      subtitle: "CAR • .312 AVG • 5 HR • .820 OPS",
+      subtitle: "CAR • .280 AVG • 8 HR • .850 OPS",
     },
     {
       id: 682674,
@@ -1378,17 +1396,37 @@ export async function getAllAvailablePlayersForSplits(
       teamAbbr: "CAR",
       teamLogo: getTeam(695).logoUrl,
       type: "pitcher",
-      subtitle: "CAR • 25.0 IP • 24 K • 3.24 ERA",
+      subtitle: "CAR • 47.4 IP • 54 K • 3.80 ERA",
     },
     {
-      id: 663778,
-      name: "Sam Bordner",
-      avatarUrl: getPlayerHeadshotUrl(663778),
+      id: 612797,
+      name: "Erick Leal",
+      avatarUrl: getPlayerHeadshotUrl(612797),
       teamId: 695,
       teamAbbr: "CAR",
       teamLogo: getTeam(695).logoUrl,
       type: "pitcher",
-      subtitle: "CAR • 20.0 IP • 22 K • 2.70 ERA",
+      subtitle: "CAR • Abridor • 4.0 ERA",
+    },
+    {
+      id: 682845,
+      name: "Rito Lugo",
+      avatarUrl: getPlayerHeadshotUrl(682845),
+      teamId: 695,
+      teamAbbr: "CAR",
+      teamLogo: getTeam(695).logoUrl,
+      type: "pitcher",
+      subtitle: "CAR • Lanzador Zurdo",
+    },
+    {
+      id: 687849,
+      name: "Zak Kent",
+      avatarUrl: getPlayerHeadshotUrl(687849),
+      teamId: 695,
+      teamAbbr: "CAR",
+      teamLogo: getTeam(695).logoUrl,
+      type: "pitcher",
+      subtitle: "CAR • 9.2 IP • 8 K",
     },
   ];
 
@@ -1399,20 +1437,20 @@ export async function getAllAvailablePlayersForSplits(
 
   if (supabase) {
     try {
-      const minAb = season === 2026 ? 1 : 10;
-      const minIp = season === 2026 ? 0.1 : 5.0;
+      const minAb = 1;
+      const minIp = 0.1;
 
       const [batRes, pitRes] = await Promise.all([
         supabase
           .from("batting_stats")
           .select("player_id, team_id, ab, h, hr, rbi, avg, ops, players(full_name), games!inner(season)")
           .eq("games.season", season)
-          .limit(300),
+          .limit(5000),
         supabase
           .from("pitching_stats")
           .select("player_id, team_id, ip_decimal, so, era, whip, players(full_name), games!inner(season)")
           .eq("games.season", season)
-          .limit(200),
+          .limit(5000),
       ]);
 
       if (batRes.data && batRes.data.length > 0) {
