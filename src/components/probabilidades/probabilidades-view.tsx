@@ -29,10 +29,13 @@ export function ProbabilidadesView() {
   const searchParams = useSearchParams();
   const urlDate = searchParams ? searchParams.get("date") : null;
 
-  // Obtener la fecha inicial de la temporada regular (Juego Inaugural: 12 de Octubre de 2026)
+  // Obtener la fecha inicial de la jornada respetando el huso horario oficial de Venezuela (VET: UTC-4)
   const defaultInitialDate = useMemo(() => {
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      // Desplazamiento explícito a hora de Venezuela (UTC-4) para evitar saltos prematuros de fecha en juegos nocturnos
+      const vetDate = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+      const today = vetDate.toISOString().split("T")[0];
       return getNextScheduledLeagueDate(today);
     } catch {
       return SEASON_START_DATE || "2026-10-12";

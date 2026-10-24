@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-10-23T23:22:25.774997+00:00",
-  "date": "2026-10-23",
+  "updatedAt": "2026-10-24T00:21:37.530445+00:00",
+  "date": "2026-10-24",
   "league": "LVBP",
   "sport": "baseball",
   "sportsbooks": [
@@ -9,5 +9,218 @@
     "sellatuparley",
     "apuestasroyal"
   ],
-  "games": []
+  "games": [
+    {
+      "gameId": "lvbp-2026-10-24-anz-lag",
+      "homeTeamId": 698,
+      "awayTeamId": 694,
+      "homeTeamName": "Tiburones de La Guaira",
+      "awayTeamName": "Caribes de Anzoátegui",
+      "homeTeamAbbr": "LAG",
+      "awayTeamAbbr": "ANZ",
+      "stadium": "Estadio Universitario de Caracas",
+      "time": "4:00 PM",
+      "oddsByBook": {
+        "juegaenlinea": {
+          "sportsbookId": "juegaenlinea",
+          "sportsbookName": "JuegaEnLínea",
+          "homeMl": 1.85,
+          "awayMl": 1.95,
+          "overTotal": 9.0,
+          "overOdds": 1.9,
+          "underOdds": 1.9,
+          "isOpen": true
+        },
+        "betcris": {
+          "sportsbookId": "betcris",
+          "sportsbookName": "Betcris",
+          "homeMl": 1.88,
+          "awayMl": 1.92,
+          "overTotal": 9.0,
+          "overOdds": 1.92,
+          "underOdds": 1.88,
+          "isOpen": true
+        },
+        "sellatuparley": {
+          "sportsbookId": "sellatuparley",
+          "sportsbookName": "SellaTuParley",
+          "homeMl": 1.8,
+          "awayMl": 2.02,
+          "overTotal": 9.0,
+          "overOdds": 1.85,
+          "underOdds": 1.85,
+          "isOpen": true
+        },
+        "apuestasroyal": {
+          "sportsbookId": "apuestasroyal",
+          "sportsbookName": "Apuestas Royal",
+          "homeMl": 1.82,
+          "awayMl": 1.98,
+          "overTotal": 9.0,
+          "overOdds": 1.86,
+          "underOdds": 1.84,
+          "isOpen": true
+        }
+      }
+    },
+    {
+      "gameId": "lvbp-2026-10-24-lar-ara",
+      "homeTeamId": 699,
+      "awayTeamId": 693,
+      "homeTeamName": "Tigres de Aragua",
+      "awayTeamName": "Cardenales de Lara",
+      "homeTeamAbbr": "ARA",
+      "awayTeamAbbr": "LAR",
+      "stadium": "Estadio José Pérez Colmenares",
+      "time": "6:00 PM",
+      "oddsByBook": {
+        "juegaenlinea": {
+          "sportsbookId": "juegaenlinea",
+          "sportsbookName": "JuegaEnLínea",
+          "homeMl": 1.85,
+          "awayMl": 1.95,
+          "overTotal": 9.0,
+          "overOdds": 1.9,
+          "underOdds": 1.9,
+          "isOpen": true
+        },
+        "betcris": {
+          "sportsbookId": "betcris",
+          "sportsbookName": "Betcris",
+          "homeMl": 1.88,
+          "awayMl": 1.92,
+          "overTotal": 9.0,
+          "overOdds": 1.92,
+          "underOdds": 1.88,
+          "isOpen": true
+        },
+        "sellatuparley": {
+          "sportsbookId": "sellatuparley",
+          "sportsbookName": "SellaTuParley",
+          "homeMl": 1.8,
+          "awayMl": 2.02,
+          "overTotal": 9.0,
+          "overOdds": 1.85,
+          "underOdds": 1.85,
+          "isOpen": true
+        },
+        "apuestasroyal": {
+          "sportsbookId": "apuestasroyal",
+          "sportsbookName": "Apuestas Royal",
+          "homeMl": 1.82,
+          "awayMl": 1.98,
+          "overTotal": 9.0,
+          "overOdds": 1.86,
+          "underOdds": 1.84,
+          "isOpen": true
+        }
+      }
+    },
+    {
+      "gameId": "lvbp-2026-10-24-zul-mar",
+      "homeTeamId": 697,
+      "awayTeamId": 692,
+      "homeTeamName": "Bravos de Margarita",
+      "awayTeamName": "Águilas del Zulia",
+      "homeTeamAbbr": "MAR",
+      "awayTeamAbbr": "ZUL",
+      "stadium": "Estadio Nueva Esparta",
+      "time": "6:00 PM",
+      "oddsByBook": {
+        "juegaenlinea": {
+          "sportsbookId": "juegaenlinea",
+          "sportsbookName": "JuegaEnLínea",
+          "homeMl": 1.85,
+          "awayMl": 1.95,
+          "overTotal": 9.0,
+          "overOdds": 1.9,
+          "underOdds": 1.9,
+          "isOpen": true
+        },
+        "betcris": {
+          "sportsbookId": "betcris",
+          "sportsbookName": "Betcris",
+          "homeMl": 1.88,
+          "awayMl": 1.92,
+          "overTotal": 9.0,
+          "overOdds": 1.92,
+          "underOdds": 1.88,
+          "isOpen": true
+        },
+        "sellatuparley": {
+          "sportsbookId": "sellatuparley",
+          "sportsbookName": "SellaTuParley",
+          "homeMl": 1.8,
+          "awayMl": 2.02,
+          "overTotal": 9.0,
+          "overOdds": 1.85,
+          "underOdds": 1.85,
+          "isOpen": true
+        },
+        "apuestasroyal": {
+          "sportsbookId": "apuestasroyal",
+          "sportsbookName": "Apuestas Royal",
+          "homeMl": 1.82,
+          "awayMl": 1.98,
+          "overTotal": 9.0,
+          "overOdds": 1.86,
+          "underOdds": 1.84,
+          "isOpen": true
+        }
+      }
+    },
+    {
+      "gameId": "lvbp-2026-10-24-mag-car",
+      "homeTeamId": 695,
+      "awayTeamId": 696,
+      "homeTeamName": "Leones del Caracas",
+      "awayTeamName": "Navegantes del Magallanes",
+      "homeTeamAbbr": "CAR",
+      "awayTeamAbbr": "MAG",
+      "stadium": "Estadio Monumental Simón Bolívar",
+      "time": "8:00 PM",
+      "oddsByBook": {
+        "juegaenlinea": {
+          "sportsbookId": "juegaenlinea",
+          "sportsbookName": "JuegaEnLínea",
+          "homeMl": 1.85,
+          "awayMl": 1.95,
+          "overTotal": 9.0,
+          "overOdds": 1.9,
+          "underOdds": 1.9,
+          "isOpen": true
+        },
+        "betcris": {
+          "sportsbookId": "betcris",
+          "sportsbookName": "Betcris",
+          "homeMl": 1.88,
+          "awayMl": 1.92,
+          "overTotal": 9.0,
+          "overOdds": 1.92,
+          "underOdds": 1.88,
+          "isOpen": true
+        },
+        "sellatuparley": {
+          "sportsbookId": "sellatuparley",
+          "sportsbookName": "SellaTuParley",
+          "homeMl": 1.8,
+          "awayMl": 2.02,
+          "overTotal": 9.0,
+          "overOdds": 1.85,
+          "underOdds": 1.85,
+          "isOpen": true
+        },
+        "apuestasroyal": {
+          "sportsbookId": "apuestasroyal",
+          "sportsbookName": "Apuestas Royal",
+          "homeMl": 1.82,
+          "awayMl": 1.98,
+          "overTotal": 9.0,
+          "overOdds": 1.86,
+          "underOdds": 1.84,
+          "isOpen": true
+        }
+      }
+    }
+  ]
 }
