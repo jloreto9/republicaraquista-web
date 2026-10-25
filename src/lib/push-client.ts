@@ -8,8 +8,8 @@ const PREFS_STORAGE_KEY = 'republica_push_preferences_v1';
 
 export const DEFAULT_PREFERENCES: UserNotificationPreferences = {
   game_status: true,
-  scoring_plays: false,
-  extra_innings: false,
+  scoring_plays: true,
+  extra_innings: true,
   news_roster: true,
 };
 
