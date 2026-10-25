@@ -35,3 +35,10 @@
 ### Fase 6: Validación, Compilación y Cierre
 - [x] **T015**: Ejecutar suite de pruebas de compilación (`tsc --noEmit` y `npm run build`) verificando cero errores y cero advertencias críticas.
 - [x] **T016**: Redactar `specs/011-web-push-notifications/implementation.md` con reporte de verificación de los 6 Criterios de Aceptación.
+
+### Fase 7: Centro de Notificaciones In-App (Feed en Vivo de Alertas y Novedades)
+- [x] **T017**: Expandir `src/types/push-notifications.ts` con la interfaz canónica `AppNotification`.
+- [x] **T018**: Implementar ruta API dinámica `src/app/api/notifications/route.ts` que agregue en tiempo real el último juego/resultado de Leones de MLB Stats API, notas de NotiCueva de Supabase, roster de 34 peloteros y transmisión de La Mega 107.3 FM.
+- [x] **T019**: Reestructurar `src/components/notifications/notification-modal.tsx` con arquitectura de doble pestaña: Pestaña 1 "Alertas y Novedades" (feed interactivo con enlaces directos y badges) y Pestaña 2 "Alertas Push (Móvil / PC)".
+- [x] **T020**: Actualizar `src/components/notifications/notification-bell.tsx` para consultar `/api/notifications` y mostrar badge numérico dinámico de alertas activas en header y menú móvil.
+- [x] **T021**: Validar tipado TypeScript con `npx tsc --noEmit` y registrar convergencia en `implementation.md`.

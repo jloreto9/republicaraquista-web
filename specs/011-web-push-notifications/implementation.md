@@ -49,7 +49,21 @@ Se implementó el sistema integral de **Notificaciones Web Push PWA** para Repú
 
 ---
 
-## 3. Verificación de Criterios de Aceptación
+## 3. Centro de Notificaciones In-App (Actualización de Octubre 2026)
+
+Se integró una experiencia unificada en el modal de notificaciones:
+- **`src/types/push-notifications.ts`**: Interfaz `AppNotification` con soporte para categorías (`game`, `news`, `roster`, `radio`), insignias con colores semánticos (`gold`, `emerald`, `crimson`, `blue`), marcas de tiempo relativas y URLs de navegación interna.
+- **`src/app/api/notifications/route.ts`**: Endpoint en tiempo real que consulta:
+  1. *MLB Stats API*: Último resultado final o juego en progreso de Leones del Caracas (ej. Leones 10 - 1 Navegantes del Magallanes) con enlace directo al Game Center (`/game-center`).
+  2. *Supabase*: Últimas crónicas y análisis de NotiCueva publicados por Gilberto Méndez (ej. *"¡El primero y el tercero!"*) con enlace directo al artículo.
+  3. *Roster*: Notificación de confirmación de roster oficial de 34 peloteros con enlace a `/roster`.
+  4. *Circuito Radial*: Transmisión en vivo por La Mega 107.3 FM con enlace a `/circuito-radial`.
+- **`src/components/notifications/notification-modal.tsx`**: Pestaña principal *"Alertas y Novedades"* (feed con diseño Glassmorphism Leones, badges de estado y botones de acción) + Pestaña *"Alertas Push (Móvil / PC)"* para configuración de permisos en el SO.
+- **`src/components/notifications/notification-bell.tsx`**: Campana con badge numérico dinámico (`4`, `9+`) que indica alertas disponibles y no leídas.
+
+---
+
+## 4. Verificación de Criterios de Aceptación
 
 | Criterio | Descripción | Estado | Evidencia |
 |---|---|:---:|---|
@@ -59,9 +73,10 @@ Se implementó el sistema integral de **Notificaciones Web Push PWA** para Repú
 | **CA04** | Panel de despacho manual en NotiCueva | ✅ Cumplido | Componente `PushBroadcastPanel` integrado y autenticado mediante clave de administración. |
 | **CA05** | Limpieza automática de tokens huérfanos | ✅ Cumplido | `sendPushToTopic` captura respuestas 404/410 de Google/Apple y elimina los registros en lote. |
 | **CA06** | Compilación limpia sin errores ni regresiones | ✅ Cumplido | `npx tsc --noEmit` completado con 0 errores de tipos. |
+| **CA07** | Feed In-App en vivo con alertas del club | ✅ Cumplido | Endpoint `/api/notifications` y pestaña "Alertas y Novedades" desplegando resultados, NotiCueva y roster. |
 
 ---
 
-## 4. Estado de Convergencia
+## 5. Estado de Convergencia
 
-Todas las 16 tareas atómicas de [tasks.md](file:///c:/Users/Administrator/Projets/republicaraquista-web/specs/011-web-push-notifications/tasks.md) han sido ejecutadas satisfactoriamente.
+Todas las 21 tareas atómicas de [tasks.md](file:///c:/Users/Administrator/Projets/republicaraquista-web/specs/011-web-push-notifications/tasks.md) han sido ejecutadas y verificadas satisfactoriamente.

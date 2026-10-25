@@ -80,12 +80,34 @@ El sistema organiza las alertas en 4 categorías:
   - Entrada $\ge 10$ → Notificación de extrainning.
   - Anotación o jonrón de Leones → Notificación de carrera/jonrón.
 
+### RF06: Centro de Notificaciones In-App (Feed de Alertas y Novedades)
+- **Doble Pestaña en Modal:**
+  - **Pestaña 1: "Alertas y Novedades" (Feed In-App):** Despliega el flujo cronológico de alertas reales del club (último resultado o juego en vivo con marcador vs rival, artículos recientes de NotiCueva desde Supabase, confirmación de roster oficial de 34 peloteros y transmisión radial por La Mega 107.3 FM).
+  - **Pestaña 2: "Alertas Push (Móvil / PC)":** Panel técnico de suscripción nativa al navegador/sistema operativo y test de notificación.
+- **Endpoint Agregador `/api/notifications`:** Compila en tiempo real las alertas de MLB Stats API y Supabase para el cliente web.
+- **Contador Dinámico en Campana (`NotificationBell`):** Muestra un badge numérico con la cantidad de alertas activas y no leídas en el header y barra móvil.
+
 ---
 
 ## 4. Contrato de Datos e Interfaces
 
 ```typescript
-// Categorías de notificación
+// Notificación de feed in-app
+export interface AppNotification {
+  id: string;
+  category: 'game' | 'news' | 'roster' | 'radio' | 'system';
+  badge: string;
+  badgeColor: 'gold' | 'emerald' | 'crimson' | 'blue' | 'slate';
+  title: string;
+  description: string;
+  timestamp: string;
+  relativeTime: string;
+  actionUrl: string;
+  actionLabel: string;
+  unread?: boolean;
+}
+
+// Categorías de notificación push
 export type NotificationTopic = 'game_status' | 'scoring_plays' | 'extra_innings' | 'news_roster';
 
 export interface UserNotificationPreferences {

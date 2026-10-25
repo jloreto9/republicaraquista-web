@@ -75,3 +75,17 @@ export const TOPIC_LABELS: Record<
     defaultEnabled: true,
   },
 };
+
+export interface AppNotification {
+  id: string;
+  category: 'game' | 'news' | 'roster' | 'radio' | 'system';
+  badge: string;
+  badgeColor: 'gold' | 'emerald' | 'crimson' | 'blue' | 'slate';
+  title: string;
+  description: string;
+  timestamp: string;
+  relativeTime: string;
+  actionUrl: string;
+  actionLabel: string;
+  unread?: boolean;
+}
