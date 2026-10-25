@@ -7,11 +7,9 @@ import type {
   PushSubscriptionRecord,
 } from '@/types/push-notifications';
 
-const DEFAULT_VAPID_PUBLIC_KEY = 'BOVrzoz9H0kQioJd9IfN6oL2Oh4NmBSzHD-yWOvQrHH4pmoKO_2YVmhpl-m0P9CTyy41UPzjnIjeC-fAZ59aLw0';
-const DEFAULT_VAPID_PRIVATE_KEY = 'VfA2hwoqvHOWCKh3EjIqFh5_jKCsqPTokz86wMSc-Xk';
-
-const vapidPublicKey = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY).trim();
-const vapidPrivateKey = (process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE_KEY).trim();
+// Las claves VAPID deben provenir exclusivamente de variables de entorno seguras
+const vapidPublicKey = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '').trim();
+const vapidPrivateKey = (process.env.VAPID_PRIVATE_KEY || '').trim();
 const vapidSubject = (process.env.VAPID_SUBJECT || 'mailto:contacto@republicaraquista.com').trim();
 
 let vapidConfigured = false;
@@ -19,9 +17,14 @@ let vapidConfigured = false;
 function ensureVapidConfig(): boolean {
   if (vapidConfigured) return true;
   if (vapidPublicKey && vapidPrivateKey) {
-    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
-    vapidConfigured = true;
-    return true;
+    try {
+      webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+      vapidConfigured = true;
+      return true;
+    } catch (err) {
+      console.error('Error al configurar VAPID en servidor:', err);
+      return false;
+    }
   }
   return false;
 }
