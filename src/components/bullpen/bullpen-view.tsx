@@ -612,7 +612,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
               )}
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Optimizador Tom Tango (The Book)</span>
+              <span>Optimizador Lineups (Tom Tango - The Book)</span>
             </button>
           </div>
 

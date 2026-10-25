@@ -111,7 +111,7 @@ export function TangoLineupOptimizerTab({
                 <Sparkles className="w-4 h-4" />
               </span>
               <h2 className="text-sm sm:text-base font-bold text-slate-100 tracking-tight">
-                Optimizador de Lineup Sabermétrico — Tom Tango (*The Book*)
+                Optimizador Lineups (Tom Tango - The Book)
               </h2>
             </div>
             <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
