@@ -14,12 +14,14 @@ import {
   BookOpen,
   BarChart2,
   Activity,
+  Sparkles,
 } from "lucide-react";
 import {
   BullpenAndLineupsData,
   GameLineup,
 } from "@/types/bullpen";
 import { BullpenBudgetTab } from "./bullpen-budget-tab";
+import { TangoLineupOptimizerTab } from "./tango-lineup-optimizer-tab";
 import { cn } from "@/lib/utils";
 import { LVBP_TEAMS, LVBP_TEAM_IDS } from "@/lib/constants";
 import { useSeason } from "@/context/season-context";
@@ -49,7 +51,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
   const [loading, setLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"bullpen" | "budget" | "lineups">("bullpen");
   const [lineupSubtab, setLineupSubtab] = useState<
-    "card" | "frequent" | "heatmap" | "player"
+    "card" | "frequent" | "heatmap" | "player" | "optimizer"
   >("card");
 
   // Dugout Scorecard Selector
@@ -600,6 +602,18 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
               <User className="w-3.5 h-3.5" />
               <span>Impacto por Jugador</span>
             </button>
+            <button
+              onClick={() => setLineupSubtab("optimizer")}
+              className={cn(
+                "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all",
+                lineupSubtab === "optimizer"
+                  ? "bg-[#FDB827] text-slate-950 shadow-sm font-bold"
+                  : "bg-[#070B19] text-slate-300 hover:text-slate-100 border border-[#1E2B4D]"
+              )}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Optimizador Tom Tango (The Book)</span>
+            </button>
           </div>
 
           {/* Subtab 1: Dugout Scorecard */}
@@ -998,6 +1012,15 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
                 </>
               )}
             </div>
+          )}
+
+          {/* Subtab 5: Optimizador de Lineup (Tom Tango) */}
+          {lineupSubtab === "optimizer" && (
+            <TangoLineupOptimizerTab
+              gameLineups={data.lineups.gameLineups}
+              teamName={activeTeam.name}
+              season={currentSeason}
+            />
           )}
         </div>
       )}
