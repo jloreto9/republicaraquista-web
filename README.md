@@ -11,6 +11,20 @@
 
 ---
 
+## 🦁 Acerca del Proyecto (About)
+
+**República Caraquista** nació con una misión clara: **elevar la experiencia del fanático de los Leones del Caracas y de la LVBP a los estándares analíticos y tecnológicos del béisbol moderno de Grandes Ligas.**
+
+Históricamente, el seguimiento de la pelota invernal venezolana ha dependido de portales lentos, saturados de publicidad invasiva o limitados a estadísticas tradicionales de la era del papel (AVG, ERA, W-L). **República Caraquista** rompe ese molde uniendo tres pilares fundamentales:
+
+1. **Pasión Caraquista Auténtica:** Diseñada desde la cueva para la fanaticada más exigente de Venezuela, con streaming persistente del circuito radial (*La Mega 107.3 FM*), crónicas exclusivas en *NotiCueva* por Gilberto Méndez y un Game Center en vivo pensado para vivir cada entrada.
+2. **Sabermetría de Grado Profesional:** Cálculos avanzados en tiempo real aplicados a la LVBP: matrices de expectativa de carreras (*Tango RE24 de 24 estados*), probabilidades de victoria (*Win Expectancy*), índices de apalancamiento (*Leverage Index*), *wOBA*, *FIP*, *BABIP*, dispersión de spray charts y tarjetas visuales de pitcheo inspiradas en *Thomas Nestico (TJStats)*.
+3. **Ingeniería de Software de Vanguardia:** Una Progressive Web App (PWA) instalable, ligera y ultrarrápida (Next.js 16 con Turbopack, React 19, Tailwind CSS v4 y Supabase), con notificaciones Web Push nativas para enterarte de cada play ball, batazo clave o resultado final sin depender de redes sociales.
+
+Un proyecto independiente, abierto y creado por y para la fanaticada caraquista.
+
+---
+
 ## 🌟 Visión Arquitectónica
 
 **REPUBLICARAQUISTAPP** implementa una arquitectura nativa de borde (Edge-first) con renderizado híbrido reactivo, garantizando tiempos de respuesta ultrarrápidos (TTFB < 50ms), sincronización relacional en tiempo real con Supabase y streaming continuo de datos desde la MLB Stats API.
