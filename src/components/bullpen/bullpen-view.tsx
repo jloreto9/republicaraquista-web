@@ -1018,6 +1018,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
           {lineupSubtab === "optimizer" && (
             <TangoLineupOptimizerTab
               gameLineups={data.lineups.gameLineups}
+              topFrequentLineups={data.lineups.topFrequentLineups}
               teamName={activeTeam.name}
               season={currentSeason}
             />

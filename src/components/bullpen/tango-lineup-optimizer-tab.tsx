@@ -1,28 +1,24 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import Image from "next/image";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Sparkles,
   TrendingUp,
   Award,
   BookOpen,
-  ArrowRight,
-  Shield,
-  HelpCircle,
-  Shuffle,
   ChevronDown,
   ChevronUp,
-  CheckCircle2,
+  Shuffle,
   Zap,
+  Calendar,
+  Layers,
 } from "lucide-react";
-import { GameLineup } from "@/types/bullpen";
+import { GameLineup, TopLineup, StarterSlot } from "@/types/bullpen";
 import {
   TangoPlayer,
   TangoOptimizationResult,
 } from "@/types/tango-lineup";
 import {
-  LEONES_BATTING_POOL,
   resolvePlayerStats,
   optimizeTangoLineup,
   LVBP_REGULAR_SEASON_GAMES,
@@ -31,40 +27,100 @@ import { cn } from "@/lib/utils";
 
 interface TangoLineupOptimizerTabProps {
   gameLineups?: GameLineup[];
+  topFrequentLineups?: TopLineup[];
   teamName?: string;
   season?: number;
 }
 
 export function TangoLineupOptimizerTab({
   gameLineups = [],
+  topFrequentLineups = [],
   teamName = "Leones del Caracas",
   season = 2026,
 }: TangoLineupOptimizerTabProps) {
-  const [selectedGameIdx, setSelectedGameIdx] = useState<number>(-1); // -1 = Standard Leones Lineup
+  // Determinar clave inicial por defecto: Priorizar la más frecuente de la temporada, o el último juego disputado
+  const defaultKey = useMemo(() => {
+    if (topFrequentLineups && topFrequentLineups.length > 0) {
+      return "top_0";
+    }
+    if (gameLineups && gameLineups.length > 0) {
+      return "game_0";
+    }
+    return "top_0";
+  }, [topFrequentLineups, gameLineups]);
+
+  const [selectedLineupKey, setSelectedLineupKey] = useState<string>(defaultKey);
   const [showTheoryGuide, setShowTheoryGuide] = useState<boolean>(false);
 
-  // Generar conjunto inicial de 9 jugadores
-  const initialPlayers: TangoPlayer[] = useMemo(() => {
-    if (selectedGameIdx >= 0 && gameLineups[selectedGameIdx]) {
-      const g = gameLineups[selectedGameIdx];
-      return g.starters.slice(0, 9).map((s, idx) => {
-        return resolvePlayerStats(s.playerName, s.position, idx + 1);
-      });
-    }
-    // Por defecto: los 9 titulares del pool canónico
-    return LEONES_BATTING_POOL.slice(0, 9);
-  }, [selectedGameIdx, gameLineups]);
+  // Sincronizar clave si cambian los datos de temporada
+  useEffect(() => {
+    setSelectedLineupKey(defaultKey);
+  }, [defaultKey]);
 
-  // Jugadores activos editables
+  // Generar conjunto inicial de 9 jugadores desde la alineación real seleccionada
+  const { initialPlayers, contextTitle, contextSubtitle } = useMemo(() => {
+    let starters: StarterSlot[] = [];
+    let title = "Alineación Real";
+    let subtitle = `Temporada ${season}`;
+
+    if (selectedLineupKey.startsWith("top_")) {
+      const idx = parseInt(selectedLineupKey.replace("top_", ""), 10);
+      const top = topFrequentLineups[idx] || topFrequentLineups[0];
+      if (top && top.starters && top.starters.length > 0) {
+        starters = top.starters.slice(0, 9);
+        title = `Alineación Más Frecuente #${top.rank || idx + 1}`;
+        subtitle = `${top.games} Juegos disputados • Récord: ${top.record} (PCT ${top.pct})`;
+      }
+    } else if (selectedLineupKey.startsWith("game_")) {
+      const idx = parseInt(selectedLineupKey.replace("game_", ""), 10);
+      const g = gameLineups[idx] || gameLineups[0];
+      if (g && g.starters && g.starters.length > 0) {
+        starters = g.starters.slice(0, 9);
+        title = `Juego vs ${g.opp} (${g.gameDate})`;
+        subtitle = `${g.won ? "Victoria" : "Derrota"} ${g.scoreStr} • ${g.isHome ? "Home Club" : "Visitante"}`;
+      }
+    }
+
+    // Fallback de contingencia si no hubiese starters en la clave exacta
+    if (starters.length === 0) {
+      if (topFrequentLineups.length > 0 && topFrequentLineups[0].starters.length > 0) {
+        starters = topFrequentLineups[0].starters.slice(0, 9);
+        title = `Alineación Más Frecuente #1`;
+        subtitle = `${topFrequentLineups[0].games} JJ • ${topFrequentLineups[0].record}`;
+      } else if (gameLineups.length > 0 && gameLineups[0].starters.length > 0) {
+        starters = gameLineups[0].starters.slice(0, 9);
+        title = `Juego vs ${gameLineups[0].opp} (${gameLineups[0].gameDate})`;
+        subtitle = `${gameLineups[0].won ? "Victoria" : "Derrota"} ${gameLineups[0].scoreStr}`;
+      }
+    }
+
+    const resolved: TangoPlayer[] = starters.map((s, idx) => {
+      return resolvePlayerStats(s.playerName, s.position, s.playerId, idx + 1);
+    });
+
+    return { initialPlayers: resolved, contextTitle: title, contextSubtitle: subtitle };
+  }, [selectedLineupKey, topFrequentLineups, gameLineups, season]);
+
+  // Jugadores activos editables (permiten simular cambios de orden manuales)
   const [activePlayers, setActivePlayers] = useState<TangoPlayer[]>(initialPlayers);
 
-  // Sincronizar si cambia el selector de juego
-  React.useEffect(() => {
+  // Sincronizar si cambia la selección en el dropdown
+  useEffect(() => {
     setActivePlayers(initialPlayers);
   }, [initialPlayers]);
 
   // Ejecutar optimización de Tom Tango
   const result: TangoOptimizationResult = useMemo(() => {
+    if (activePlayers.length < 9) {
+      return {
+        currentLineup: [],
+        optimizedLineup: [],
+        currentMetrics: { runsPerGame: 0, runsPerSeason: 0, teamWoba: 0, platoonBalanceScore: 0, contributions: [] },
+        optimizedMetrics: { runsPerGame: 0, runsPerSeason: 0, teamWoba: 0, platoonBalanceScore: 0, contributions: [] },
+        deltaRunsPerGame: 0,
+        deltaRunsPerSeason: 0,
+      };
+    }
     return optimizeTangoLineup(activePlayers);
   }, [activePlayers]);
 
@@ -100,6 +156,16 @@ export function TangoLineupOptimizerTab({
     }
   };
 
+  if (activePlayers.length < 9) {
+    return (
+      <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-2xl p-8 text-center text-slate-400 space-y-2">
+        <Sparkles className="w-8 h-8 text-[#FDB827] mx-auto opacity-60" />
+        <h3 className="text-base font-bold text-slate-200">Alineación no disponible</h3>
+        <p className="text-xs">No se encontraron los 9 peloteros titulares para el juego seleccionado.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* ── ENCABEZADO Y CONTROLES ── */}
@@ -115,7 +181,7 @@ export function TangoLineupOptimizerTab({
               </h2>
             </div>
             <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-              Distribución óptima de turnos al bate (1 al 9) calculada mediante simulación estocástica de situaciones base-out y BaseRuns ponderado para {teamName} en {season}.
+              Distribución óptima de turnos al bate (1 al 9) evaluando la alineación real empleada por el mánager para {teamName} en {season} según los axiomas estocásticos de BaseRuns de Tom Tango.
             </p>
           </div>
 
@@ -135,31 +201,59 @@ export function TangoLineupOptimizerTab({
           </div>
         </div>
 
-        {/* Selector de Alineación Fuente */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[#1E2B4D]">
-          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-            Alineación Base a Evaluar:
-          </span>
-          <select
-            value={selectedGameIdx}
-            onChange={(e) => setSelectedGameIdx(parseInt(e.target.value, 10))}
-            className="bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs rounded-xl px-3 py-1.5 font-medium focus:ring-1 focus:ring-[#FDB827] focus:outline-none"
-          >
-            <option value={-1}>🦁 Alineación Titular Canónica (Leones)</option>
-            {gameLineups.map((g, idx) => (
-              <option key={g.gamePk || idx} value={idx}>
-                Partida #{idx + 1}: {g.gameDate} vs {g.opp} ({g.won ? "Victoria" : "Derrota"} {g.scoreStr})
-              </option>
-            ))}
-          </select>
+        {/* Selector de Alineación Real de la Temporada */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#1E2B4D]">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-[#FDB827]" />
+              <span>Alineación Real a Evaluar:</span>
+            </span>
 
-          <button
-            onClick={() => setActivePlayers(initialPlayers)}
-            className="text-xs text-[#FDB827] hover:underline font-mono inline-flex items-center gap-1 ml-auto"
-          >
-            <Shuffle className="w-3 h-3" />
-            <span>Restablecer orden inicial</span>
-          </button>
+            <select
+              value={selectedLineupKey}
+              onChange={(e) => setSelectedLineupKey(e.target.value)}
+              className="bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs rounded-xl px-3 py-2 font-medium focus:ring-1 focus:ring-[#FDB827] focus:outline-none max-w-md"
+            >
+              {topFrequentLineups.length > 0 && (
+                <optgroup label="⭐ Alineaciones Titulares Más Frecuentes">
+                  {topFrequentLineups.map((top, idx) => (
+                    <option key={`top_${idx}`} value={`top_${idx}`}>
+                      #{top.rank || idx + 1} Más Usada ({top.games} JJ • {top.record})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {gameLineups.length > 0 && (
+                <optgroup label="📅 Juegos Disputados en la Temporada">
+                  {gameLineups.map((g, idx) => (
+                    <option key={g.gamePk || `game_${idx}`} value={`game_${idx}`}>
+                      {g.gameDate} vs {g.opp} ({g.won ? "G" : "P"} {g.scoreStr})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-right hidden sm:block">
+              <span className="text-xs font-bold text-[#FDB827] block">
+                {contextTitle}
+              </span>
+              <span className="text-[10px] text-slate-400">
+                {contextSubtitle}
+              </span>
+            </div>
+
+            <button
+              onClick={() => setActivePlayers(initialPlayers)}
+              className="text-xs text-[#FDB827] hover:underline font-mono inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#FDB827]/10 border border-[#FDB827]/20"
+              title="Restablece el orden al orden original empleado en el juego"
+            >
+              <Shuffle className="w-3 h-3" />
+              <span>Restablecer Orden Real</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -168,7 +262,7 @@ export function TangoLineupOptimizerTab({
         <div className="bg-[#070B19] border border-[#FDB827]/30 rounded-2xl p-5 shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 text-xs">
           <div className="flex items-center gap-2 text-[#FDB827] font-bold text-sm">
             <Award className="w-4 h-4" />
-            <span>Principios de Optimización del Orden al Bate (Tom Tango, Lichtman & Dolphin)</span>
+            <span>Principios de Optimización del Orden al Bate (Tom Tango, Mitchel Lichtman & Andrew Dolphin)</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-slate-300">
@@ -201,9 +295,9 @@ export function TangoLineupOptimizerTab({
             </div>
 
             <div className="p-3 rounded-xl bg-[#0D152B] border border-[#1E2B4D] space-y-1">
-              <span className="font-bold text-amber-300 block">5. El 'Segundo Leadoff' de 9no</span>
+              <span className="font-bold text-amber-300 block">5. El &apos;Segundo Leadoff&apos; de 9no</span>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                El peor bateador nunca debe ser el 9no: debe ser el 8vo. El 9no bateador debe tener buen OBP para estar en base cuando la rotación vuelve a los bates élite (1 y 2).
+                El peor bateador nunca debe ser el 9no: debe ser el 8vo. El 9no bateador debe tener buen OBP para estar en base cuando la rotación vuelve a los bates élite (#1 y #2).
               </p>
             </div>
 
@@ -221,7 +315,7 @@ export function TangoLineupOptimizerTab({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            ORDEN ACTUAL (PRODUCCIÓN)
+            ORDEN REAL EMPLEADO (MÁNAGER)
           </span>
           <div className="text-2xl font-black text-slate-200 font-mono">
             {result.currentMetrics.runsPerGame}{" "}
@@ -235,7 +329,7 @@ export function TangoLineupOptimizerTab({
         <div className="bg-[#0D152B] border border-[#FDB827]/40 rounded-xl p-4 shadow-md space-y-1 bg-gradient-to-b from-[#FDB827]/5 to-transparent">
           <span className="text-[10px] font-bold text-[#FDB827] uppercase tracking-wider flex items-center gap-1">
             <Sparkles className="w-3 h-3" />
-            <span>ORDEN ÓPTIMO TANGO</span>
+            <span>ORDEN ÓPTIMO TOM TANGO</span>
           </span>
           <div className="text-2xl font-black text-[#FDB827] font-mono">
             {result.optimizedMetrics.runsPerGame}{" "}
@@ -249,7 +343,7 @@ export function TangoLineupOptimizerTab({
         <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1">
           <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
             <TrendingUp className="w-3 h-3" />
-            <span>GANANCIA PROYECTADA</span>
+            <span>DIFERENCIAL DE CARRERAS</span>
           </span>
           <div
             className={cn(
@@ -262,8 +356,8 @@ export function TangoLineupOptimizerTab({
           </div>
           <div className="text-[11px] text-slate-400">
             {result.deltaRunsPerSeason > 0
-              ? `~+${(result.deltaRunsPerSeason / 10).toFixed(1)} victorias estimadas`
-              : "Orden ya optimizado"}
+              ? `~+${(result.deltaRunsPerSeason / 10).toFixed(1)} victorias estimadas (Pythag)`
+              : "Orden ya maximizado"}
           </div>
         </div>
 
@@ -278,17 +372,17 @@ export function TangoLineupOptimizerTab({
         </div>
       </div>
 
-      {/* ── COMPARATIVA PARALELA: ACTUAL VS TOM TANGO ── */}
+      {/* ── COMPARATIVA PARALELA: ORDEN REAL VS TOM TANGO ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* COLUMNA 1: ORDEN ACTUAL */}
+        {/* COLUMNA 1: ORDEN REAL EMPLEADO */}
         <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-2xl p-5 shadow-lg space-y-4">
           <div className="flex items-center justify-between border-b border-[#1E2B4D] pb-3">
             <div>
               <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                <span>Orden Actual / Seleccionado</span>
+                <span>Orden Real Empleado (Mánager)</span>
               </h3>
               <p className="text-[11px] text-slate-400">
-                Pase jugadores arriba o abajo para simular
+                {contextTitle} • {contextSubtitle}
               </p>
             </div>
             <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
@@ -366,10 +460,10 @@ export function TangoLineupOptimizerTab({
             <div>
               <h3 className="text-sm font-bold text-[#FDB827] flex items-center gap-2">
                 <Sparkles className="w-4 h-4" />
-                <span>Alineación Óptima (The Book)</span>
+                <span>Alineación Optimizada (The Book)</span>
               </h3>
               <p className="text-[11px] text-slate-400">
-                Orden reasignado por wOBA, OBP e ISO según apalancamiento
+                Reasignación matemática para maximizar carreras esperadas
               </p>
             </div>
             <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-[#FDB827]/20 text-[#FDB827] border border-[#FDB827]/30">
@@ -424,7 +518,7 @@ export function TangoLineupOptimizerTab({
                       </span>
                       <span className="text-[10px] text-slate-400 block font-sans">
                         {slotDiff === 0 ? (
-                          <span className="text-slate-400">Sin cambio</span>
+                          <span className="text-slate-400">Mismo slot</span>
                         ) : slotDiff > 0 ? (
                           <span className="text-emerald-400 font-bold">▲ Subió {slotDiff}</span>
                         ) : (
@@ -453,7 +547,7 @@ export function TangoLineupOptimizerTab({
             </p>
           </div>
           <span className="text-[10px] font-mono text-slate-400">
-            Base: 56 Partidos LVBP
+            Base: {LVBP_REGULAR_SEASON_GAMES} Partidos LVBP
           </span>
         </div>
 
