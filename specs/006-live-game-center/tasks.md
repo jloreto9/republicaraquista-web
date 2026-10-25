@@ -35,3 +35,7 @@
 - [x] **Tarea 9: Refinamiento Sabermétrico de Alineaciones (Exclusión de Pitchers y Preservación de PR/PH)**
   - Filtrar lanzadores netos (P) de la tabla de bateadores en `src/lib/game-center-service.ts` y `src/components/game-center/boxscore-lineups-tab.tsx`.
   - Preservar a todo jugador con rol ofensivo activo, incluyendo corredores emergentes (PR) y bateadores emergentes (PH) aunque tengan 0 turnos oficiales al bate (`VB / AB = 0`).
+
+- [x] **Tarea 10: Formato Oficial de Suplentes e Indentación en Boxscore**
+  - Ordenar bateadores por `battingOrder` numérico para que los suplentes queden inmediatamente adyacentes a su titular correspondiente.
+  - Implementar sangría visual (`pl-5 sm:pl-7`), notas oficiales de bateo (`a-`, `b-`, `1-`), omisión de número consecutivo en `#` para suplentes y fila de Totales del equipo al pie del boxscore.

@@ -531,72 +531,88 @@ export async function getGameCenterData(
     const rawBatters: number[] = boxTeam?.batters || [];
     const playersMap = boxTeam?.players || {};
 
-    // Filtrar lanzadores: en LVBP y béisbol con Bateador Designado (DH),
-    // los lanzadores que no participan en la ofensiva no forman parte de la alineación ofensiva.
-    // IMPORTANTE: Un jugador que entra como corredor emergente (PR) o bateador emergente (PH)
-    // puede tener 0 turnos al bate (VB / AB = 0) y DEBE permanecer en la alineación ofensiva.
-    // Solo se excluyen lanzadores netos (P) que no tuvieron ninguna actuación ofensiva.
-    return rawBatters
-      .filter((pId) => {
-        const p = playersMap[`ID${pId}`];
-        if (!p) return false;
-        const pos = p.position?.abbreviation;
-        const isPitcher =
-          pos === "P" ||
-          p.position?.type === "Pitcher" ||
-          p.position?.code === "1";
+    // 1. Filtrar lanzadores que solo lanzan, preservando todo jugador de posición
+    // y cualquier jugador con rol ofensivo (incluyendo corredores emergentes PR y bateadores emergentes PH sin VB).
+    const filteredBatterIds = rawBatters.filter((pId) => {
+      const p = playersMap[`ID${pId}`];
+      if (!p) return false;
+      const pos = p.position?.abbreviation;
+      const isPitcher =
+        pos === "P" ||
+        p.position?.type === "Pitcher" ||
+        p.position?.code === "1";
 
-        // Si no es lanzador (bateador titular, sustituto, bateador emergente PH, o corredor emergente PR),
-        // se conserva SIEMPRE en la alineación ofensiva, incluso si no tomó turnos al bate (VB = 0).
-        if (!isPitcher) return true;
+      if (!isPitcher) return true;
 
-        // Salvaguarda caso borde: Si en su perfil base figura como pitcher pero en este juego
-        // tuvo un rol ofensivo activo (corredor emergente PR, bateador emergente PH, o turno al bate)
-        const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
-        const hasOffensiveAction =
-          allPos.includes("PR") ||
-          allPos.includes("PH") ||
-          allPos.includes("DH") ||
-          Boolean(p.battingOrder) ||
-          Number(p.stats?.batting?.plateAppearances ?? 0) > 0 ||
-          Number(p.stats?.batting?.runs ?? 0) > 0 ||
-          Number(p.stats?.batting?.stolenBases ?? 0) > 0;
+      const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
+      const hasOffensiveAction =
+        allPos.includes("PR") ||
+        allPos.includes("PH") ||
+        allPos.includes("DH") ||
+        Boolean(p.battingOrder) ||
+        Number(p.stats?.batting?.plateAppearances ?? 0) > 0 ||
+        Number(p.stats?.batting?.runs ?? 0) > 0 ||
+        Number(p.stats?.batting?.stolenBases ?? 0) > 0;
 
-        return hasOffensiveAction;
-      })
-      .map((pId, idx) => {
-        const p = playersMap[`ID${pId}`] || {};
-        const stats = p.stats?.batting || {};
-        const season = p.seasonStats?.batting || {};
-        const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
+      return hasOffensiveAction;
+    });
 
-        // Si el jugador actuó como corredor emergente (PR) y no ocupó posición defensiva
-        let posDisplay = p.position?.abbreviation || "OF";
-        if (posDisplay === "P" && allPos.includes("PR")) {
-          posDisplay = "PR";
-        } else if (allPos.includes("PR") && Number(stats.atBats ?? 0) === 0 && !["1B", "2B", "3B", "SS", "LF", "CF", "RF", "C", "DH"].includes(posDisplay)) {
-          posDisplay = "PR";
-        }
+    // 2. Ordenar por battingOrder numérico (ej: 100, 200, ..., 500, 501, ..., 900, 901)
+    // para que los suplentes queden exactamente ubicados debajo del titular al que reemplazaron.
+    filteredBatterIds.sort((a, b) => {
+      const pA = playersMap[`ID${a}`] || {};
+      const pB = playersMap[`ID${b}`] || {};
+      const boA = pA.battingOrder ? parseInt(pA.battingOrder, 10) : 9999;
+      const boB = pB.battingOrder ? parseInt(pB.battingOrder, 10) : 9999;
+      return boA - boB;
+    });
 
-        return {
-          id: pId,
-          name: p.person?.fullName || "Pelotero",
-          jersey: p.jerseyNumber || "-",
-          position: posDisplay,
-          order: idx + 1,
-          ab: Number(stats.atBats ?? 0),
-          r: Number(stats.runs ?? 0),
-          h: Number(stats.hits ?? 0),
-          doubles: Number(stats.doubles ?? 0),
-          triples: Number(stats.triples ?? 0),
-          hr: Number(stats.homeRuns ?? 0),
-          rbi: Number(stats.rbi ?? 0),
-          bb: Number(stats.baseOnBalls ?? 0),
-          so: Number(stats.strikeOuts ?? 0),
-          avg: season.avg || ".000",
-          ops: season.ops || ".000",
-        };
-      });
+    let currentSlot = 1;
+    return filteredBatterIds.map((pId) => {
+      const p = playersMap[`ID${pId}`] || {};
+      const stats = p.stats?.batting || {};
+      const season = p.seasonStats?.batting || {};
+      const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
+
+      const bo = p.battingOrder ? parseInt(p.battingOrder, 10) : null;
+      let slot = bo ? Math.floor(bo / 100) : currentSlot;
+      const isSubstitute = bo ? (bo % 100 > 0) : false;
+      if (!isSubstitute && bo) {
+        currentSlot = slot;
+      }
+
+      const note = stats.note || ""; // ej: "a-", "1-", etc.
+
+      // Posición a mostrar
+      let posDisplay = p.position?.abbreviation || "OF";
+      if (posDisplay === "P" && allPos.includes("PR")) {
+        posDisplay = "PR";
+      } else if (allPos.includes("PR") && Number(stats.atBats ?? 0) === 0 && !["1B", "2B", "3B", "SS", "LF", "CF", "RF", "C", "DH"].includes(posDisplay)) {
+        posDisplay = "PR";
+      }
+
+      return {
+        id: pId,
+        name: p.person?.fullName || "Pelotero",
+        jersey: p.jerseyNumber || "-",
+        position: posDisplay,
+        order: slot,
+        slot,
+        isSubstitute,
+        note,
+        ab: Number(stats.atBats ?? 0),
+        r: Number(stats.runs ?? 0),
+        h: Number(stats.hits ?? 0),
+        doubles: Number(stats.doubles ?? 0),
+        triples: Number(stats.triples ?? 0),
+        hr: Number(stats.homeRuns ?? 0),
+        rbi: Number(stats.rbi ?? 0),
+        bb: Number(stats.baseOnBalls ?? 0),
+        so: Number(stats.strikeOuts ?? 0),
+        avg: season.avg || ".000",
+        ops: season.ops || ".000",
+      };
+    });
   };
 
   const formatPitchers = (boxTeam: any): GameCenterBoxscorePitcher[] => {

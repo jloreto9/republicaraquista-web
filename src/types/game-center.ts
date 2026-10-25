@@ -78,6 +78,9 @@ export interface GameCenterBoxscoreBatter {
   jersey: string;
   position: string;
   order: number;
+  slot?: number;
+  isSubstitute?: boolean;
+  note?: string;
   ab: number;
   r: number;
   h: number;

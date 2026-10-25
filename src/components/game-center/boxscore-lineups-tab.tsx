@@ -38,6 +38,30 @@ export function BoxscoreLineupsTab({
   const currentBatters = rawBatters.filter((b) => b.position !== "P");
   const currentPitchers = isHomeSelected ? homePitchers : awayPitchers;
 
+  // Totales colectivos del equipo
+  const teamTotals = currentBatters.reduce(
+    (acc, b) => ({
+      ab: acc.ab + b.ab,
+      r: acc.r + b.r,
+      h: acc.h + b.h,
+      doubles: acc.doubles + b.doubles,
+      triples: acc.triples + b.triples,
+      hr: acc.hr + b.hr,
+      rbi: acc.rbi + b.rbi,
+      bb: acc.bb + b.bb,
+      so: acc.so + b.so,
+    }),
+    { ab: 0, r: 0, h: 0, doubles: 0, triples: 0, hr: 0, rbi: 0, bb: 0, so: 0 }
+  );
+
+  const teamAvg =
+    teamTotals.ab > 0
+      ? (teamTotals.h / teamTotals.ab).toFixed(3).replace(/^0/, "")
+      : ".000";
+
+  const startersCount = currentBatters.filter((b) => !b.isSubstitute).length;
+  const subsCount = currentBatters.filter((b) => b.isSubstitute).length;
+
   return (
     <div className="space-y-6">
       {/* ── SELECTOR DE EQUIPO (TABS) ── */}
@@ -99,7 +123,7 @@ export function BoxscoreLineupsTab({
             </h3>
           </div>
           <span className="text-[10px] font-mono text-slate-400">
-            {currentBatters.length} Bateadores registrados
+            {currentBatters.length} Bateadores {subsCount > 0 ? `(${startersCount} titulares + ${subsCount} suplente${subsCount > 1 ? "s" : ""})` : "registrados"}
           </span>
         </div>
 
@@ -130,19 +154,30 @@ export function BoxscoreLineupsTab({
             <tbody className="divide-y divide-[#1E2B4D]/60 text-slate-200 text-center">
               {currentBatters.map((b) => (
                 <tr
-                  key={`batter-${b.id}-${b.order}`}
-                  className="hover:bg-[#131F3F]/50 transition-colors"
+                  key={`batter-${b.id}-${b.slot || b.order}-${b.isSubstitute ? "sub" : "main"}`}
+                  className={`hover:bg-[#131F3F]/50 transition-colors ${
+                    b.isSubstitute ? "bg-[#091024]/40" : ""
+                  }`}
                 >
                   <td className="py-2 px-3 text-left text-slate-400 font-bold">
-                    {b.order}
+                    {b.isSubstitute ? "" : (b.slot || b.order)}
                   </td>
                   <td className="py-2 px-3 text-left font-sans">
-                    <span className="font-bold text-slate-100">{b.name}</span>
-                    {b.jersey !== "-" && (
-                      <span className="text-[10px] text-slate-400 ml-1.5 font-mono">
-                        #{b.jersey}
+                    <div className={`flex items-center ${b.isSubstitute ? "pl-5 sm:pl-7" : ""}`}>
+                      {b.isSubstitute && b.note && (
+                        <span className="text-[11px] font-mono text-[#FDB827] mr-1.5 font-bold">
+                          {b.note}
+                        </span>
+                      )}
+                      <span className={`font-bold ${b.isSubstitute ? "text-slate-300 font-medium text-[11px] sm:text-xs" : "text-slate-100"}`}>
+                        {b.name}
                       </span>
-                    )}
+                      {b.jersey !== "-" && (
+                        <span className="text-[10px] text-slate-400 ml-1.5 font-mono">
+                          #{b.jersey}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2 px-2 font-bold text-slate-300">
                     {b.position}
@@ -161,6 +196,26 @@ export function BoxscoreLineupsTab({
                 </tr>
               ))}
             </tbody>
+            <tfoot className="border-t-2 border-[#1E2B4D] bg-[#070B19]/80 font-bold text-slate-100 text-center">
+              <tr>
+                <td className="py-2.5 px-3 text-left"></td>
+                <td className="py-2.5 px-3 text-left font-sans tracking-wider uppercase text-xs text-slate-200">
+                  Totales
+                </td>
+                <td className="py-2.5 px-2"></td>
+                <td className="py-2.5 px-2 text-slate-100">{teamTotals.ab}</td>
+                <td className="py-2.5 px-2 text-slate-100">{teamTotals.r}</td>
+                <td className="py-2.5 px-2 text-[#FDB827]">{teamTotals.h}</td>
+                <td className="py-2.5 px-2 text-slate-300">{teamTotals.doubles}</td>
+                <td className="py-2.5 px-2 text-slate-300">{teamTotals.triples}</td>
+                <td className="py-2.5 px-2 text-[#FDB827]">{teamTotals.hr}</td>
+                <td className="py-2.5 px-2 text-amber-400">{teamTotals.rbi}</td>
+                <td className="py-2.5 px-2 text-slate-300">{teamTotals.bb}</td>
+                <td className="py-2.5 px-2 text-slate-300">{teamTotals.so}</td>
+                <td className="py-2.5 px-3 text-slate-300">{teamAvg}</td>
+                <td className="py-2.5 px-3 text-slate-400">-</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
