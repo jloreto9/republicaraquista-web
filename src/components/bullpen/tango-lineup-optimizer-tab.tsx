@@ -540,7 +540,7 @@ export function TangoLineupOptimizerTab({
           <div className="space-y-0.5">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
               <Zap className="w-4 h-4 text-[#FDB827]" />
-              <span>Desglose Sabermétrico de los 9 Slots Óptimos</span>
+              <span>Desglose de los 9 Slots Óptimos</span>
             </h3>
             <p className="text-[11px] text-slate-400">
               Apalancamiento de carreras, apariciones al plato y rol estratégico según la investigación de Tom Tango
