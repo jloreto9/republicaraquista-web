@@ -4,8 +4,9 @@ import fs from "fs";
 import path from "path";
 
 export const NOTICUEVA_AUTHOR = "Gilberto Méndez";
+// La clave de administración se lee exclusivamente desde variables de entorno
 export const NOTICUEVA_ADMIN_PASSWORD =
-  process.env.NOTICUEVA_ADMIN_PASSWORD || "Leones21.RC#NotiCueva*1942";
+  (process.env.NOTICUEVA_ADMIN_PASSWORD || "").trim();
 
 // Notas iniciales vacías: únicamente Gilberto Méndez redacta las notas oficiales
 const DEFAULT_INITIAL_POSTS: NotiCuevaPost[] = [];
