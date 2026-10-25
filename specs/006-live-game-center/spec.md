@@ -24,6 +24,7 @@ Esta funcionalidad permite al aficionado seguir el juego en tiempo real con:
    - Filtros rápidos de jugadas: "Todas", "Batazos & Jonrones", "Carreras Anotadas", "Ponches / Outs".
 6. **Boxscore & Lineups Oficiales**:
    - Orden al bate 1 al 9 de ambos equipos con estadísticas del partido (AB, R, H, 2B, 3B, HR, RBI, BB, SO, AVG).
+   - **Regla de Alineación Ofensiva**: En LVBP y bajo Bateador Designado (DH), los lanzadores utilizados solo pertenecen al cuerpo de pitcheo y quedan excluidos de la alineación ofensiva. Todo jugador de posición, incluyendo **corredores emergentes (Pinch Runners - PR)** y **bateadores emergentes (Pinch Hitters - PH)**, permanece listado en la alineación ofensiva aun cuando no haya consumido turnos oficiales al bate (`VB / AB = 0`).
    - Registro de lanzadores utilizados (IP, H, R, ER, BB, SO, ERA).
 7. **Estadio & Transmisión**:
    - Detalles de la sede (Estadio Monumental Simón Bolívar, Universitario, etc.), capacidad, ciudad y opciones de sintonía en audio y video.

@@ -33,7 +33,9 @@ export function BoxscoreLineupsTab({
 
   const isHomeSelected = selectedTeamId === homeTeam.id;
   const currentTeam = isHomeSelected ? homeTeam : awayTeam;
-  const currentBatters = isHomeSelected ? homeBatters : awayBatters;
+  const rawBatters = isHomeSelected ? homeBatters : awayBatters;
+  // Salvaguarda defensiva: excluir lanzadores de la alineación ofensiva
+  const currentBatters = rawBatters.filter((b) => b.position !== "P");
   const currentPitchers = isHomeSelected ? homePitchers : awayPitchers;
 
   return (

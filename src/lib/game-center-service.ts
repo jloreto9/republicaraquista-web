@@ -530,29 +530,73 @@ export async function getGameCenterData(
   const formatBatters = (boxTeam: any): GameCenterBoxscoreBatter[] => {
     const rawBatters: number[] = boxTeam?.batters || [];
     const playersMap = boxTeam?.players || {};
-    return rawBatters.map((pId, idx) => {
-      const p = playersMap[`ID${pId}`] || {};
-      const stats = p.stats?.batting || {};
-      const season = p.seasonStats?.batting || {};
-      return {
-        id: pId,
-        name: p.person?.fullName || "Pelotero",
-        jersey: p.jerseyNumber || "-",
-        position: p.position?.abbreviation || "OF",
-        order: idx + 1,
-        ab: Number(stats.atBats ?? 0),
-        r: Number(stats.runs ?? 0),
-        h: Number(stats.hits ?? 0),
-        doubles: Number(stats.doubles ?? 0),
-        triples: Number(stats.triples ?? 0),
-        hr: Number(stats.homeRuns ?? 0),
-        rbi: Number(stats.rbi ?? 0),
-        bb: Number(stats.baseOnBalls ?? 0),
-        so: Number(stats.strikeOuts ?? 0),
-        avg: season.avg || ".000",
-        ops: season.ops || ".000",
-      };
-    });
+
+    // Filtrar lanzadores: en LVBP y béisbol con Bateador Designado (DH),
+    // los lanzadores que no participan en la ofensiva no forman parte de la alineación ofensiva.
+    // IMPORTANTE: Un jugador que entra como corredor emergente (PR) o bateador emergente (PH)
+    // puede tener 0 turnos al bate (VB / AB = 0) y DEBE permanecer en la alineación ofensiva.
+    // Solo se excluyen lanzadores netos (P) que no tuvieron ninguna actuación ofensiva.
+    return rawBatters
+      .filter((pId) => {
+        const p = playersMap[`ID${pId}`];
+        if (!p) return false;
+        const pos = p.position?.abbreviation;
+        const isPitcher =
+          pos === "P" ||
+          p.position?.type === "Pitcher" ||
+          p.position?.code === "1";
+
+        // Si no es lanzador (bateador titular, sustituto, bateador emergente PH, o corredor emergente PR),
+        // se conserva SIEMPRE en la alineación ofensiva, incluso si no tomó turnos al bate (VB = 0).
+        if (!isPitcher) return true;
+
+        // Salvaguarda caso borde: Si en su perfil base figura como pitcher pero en este juego
+        // tuvo un rol ofensivo activo (corredor emergente PR, bateador emergente PH, o turno al bate)
+        const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
+        const hasOffensiveAction =
+          allPos.includes("PR") ||
+          allPos.includes("PH") ||
+          allPos.includes("DH") ||
+          Boolean(p.battingOrder) ||
+          Number(p.stats?.batting?.plateAppearances ?? 0) > 0 ||
+          Number(p.stats?.batting?.runs ?? 0) > 0 ||
+          Number(p.stats?.batting?.stolenBases ?? 0) > 0;
+
+        return hasOffensiveAction;
+      })
+      .map((pId, idx) => {
+        const p = playersMap[`ID${pId}`] || {};
+        const stats = p.stats?.batting || {};
+        const season = p.seasonStats?.batting || {};
+        const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
+
+        // Si el jugador actuó como corredor emergente (PR) y no ocupó posición defensiva
+        let posDisplay = p.position?.abbreviation || "OF";
+        if (posDisplay === "P" && allPos.includes("PR")) {
+          posDisplay = "PR";
+        } else if (allPos.includes("PR") && Number(stats.atBats ?? 0) === 0 && !["1B", "2B", "3B", "SS", "LF", "CF", "RF", "C", "DH"].includes(posDisplay)) {
+          posDisplay = "PR";
+        }
+
+        return {
+          id: pId,
+          name: p.person?.fullName || "Pelotero",
+          jersey: p.jerseyNumber || "-",
+          position: posDisplay,
+          order: idx + 1,
+          ab: Number(stats.atBats ?? 0),
+          r: Number(stats.runs ?? 0),
+          h: Number(stats.hits ?? 0),
+          doubles: Number(stats.doubles ?? 0),
+          triples: Number(stats.triples ?? 0),
+          hr: Number(stats.homeRuns ?? 0),
+          rbi: Number(stats.rbi ?? 0),
+          bb: Number(stats.baseOnBalls ?? 0),
+          so: Number(stats.strikeOuts ?? 0),
+          avg: season.avg || ".000",
+          ops: season.ops || ".000",
+        };
+      });
   };
 
   const formatPitchers = (boxTeam: any): GameCenterBoxscorePitcher[] => {

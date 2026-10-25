@@ -31,3 +31,7 @@
 
 - [x] **Tarea 8: Entrega y Despliegue en Vercel**
   - Commit con mensaje semántico, merge a `main` y `git push origin main` para actualización en Edge de Vercel.
+
+- [x] **Tarea 9: Refinamiento Sabermétrico de Alineaciones (Exclusión de Pitchers y Preservación de PR/PH)**
+  - Filtrar lanzadores netos (P) de la tabla de bateadores en `src/lib/game-center-service.ts` y `src/components/game-center/boxscore-lineups-tab.tsx`.
+  - Preservar a todo jugador con rol ofensivo activo, incluyendo corredores emergentes (PR) y bateadores emergentes (PH) aunque tengan 0 turnos oficiales al bate (`VB / AB = 0`).
