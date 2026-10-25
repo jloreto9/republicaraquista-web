@@ -213,57 +213,71 @@ export function MobileNav() {
       </div>
 
       {/* ── Barra de Navegación Inferior (Bottom Bar Móvil) ── */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 landscape-compact-nav bg-[#070B19]/95 backdrop-blur-lg border-t border-[#1E2B4D] px-2 px-safe flex items-center justify-around z-30 pb-safe">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 landscape-compact-nav bg-[#070B19]/95 backdrop-blur-lg border-t border-[#1E2B4D] px-1 px-safe flex items-center justify-around z-30 pb-safe">
         <Link
           href="/"
           className={cn(
-            "flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition-colors",
+            "flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium transition-colors min-w-0 text-center",
             pathname === "/" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
           )}
         >
-          <LayoutDashboard className="w-5 h-5 mb-0.5" />
-          <span>Mando</span>
+          <LayoutDashboard className="w-5 h-5 mb-0.5 shrink-0" />
+          <span className="truncate w-full">Mando</span>
+        </Link>
+
+        <Link
+          href="/game-center"
+          className={cn(
+            "flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium transition-colors min-w-0 text-center",
+            pathname === "/game-center" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
+          )}
+        >
+          <div className="relative">
+            <Tv className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          </div>
+          <span className="truncate w-full">Game Center</span>
         </Link>
 
         <Link
           href="/standings"
           className={cn(
-            "flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition-colors",
+            "flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium transition-colors min-w-0 text-center",
             pathname === "/standings" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
           )}
         >
-          <Trophy className="w-5 h-5 mb-0.5" />
-          <span>Posiciones</span>
+          <Trophy className="w-5 h-5 mb-0.5 shrink-0" />
+          <span className="truncate w-full">Posiciones</span>
         </Link>
 
         <Link
           href="/calendario"
           className={cn(
-            "flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition-colors",
+            "flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium transition-colors min-w-0 text-center",
             pathname === "/calendario" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
           )}
         >
-          <Calendar className="w-5 h-5 mb-0.5" />
-          <span>Calendario</span>
+          <Calendar className="w-5 h-5 mb-0.5 shrink-0" />
+          <span className="truncate w-full">Calendario</span>
         </Link>
 
         <Link
           href="/individuales"
           className={cn(
-            "flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium transition-colors",
+            "flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium transition-colors min-w-0 text-center",
             pathname === "/individuales" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
           )}
         >
-          <Users className="w-5 h-5 mb-0.5" />
-          <span>Líderes</span>
+          <Users className="w-5 h-5 mb-0.5 shrink-0" />
+          <span className="truncate w-full">Líderes</span>
         </Link>
 
         <button
           onClick={() => setIsOpen(true)}
-          className="flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-medium text-slate-400 hover:text-[#FDB827] transition-colors"
+          className="flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium text-slate-400 hover:text-[#FDB827] transition-colors min-w-0 text-center"
         >
-          <Layers className="w-5 h-5 mb-0.5" />
-          <span>Más Vistas</span>
+          <Layers className="w-5 h-5 mb-0.5 shrink-0" />
+          <span className="truncate w-full">Más</span>
         </button>
       </div>
     </>
