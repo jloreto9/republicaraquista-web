@@ -8,6 +8,8 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_RLS-3ECF8E.svg?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 [![Web Push](https://img.shields.io/badge/PWA-Web_Push_VAPID-38BDF8.svg?style=for-the-badge&logo=pwa&logoColor=white)](#-notificaciones-web-push-pwa)
+[![License: MIT](https://img.shields.io/badge/Code_License-MIT-yellow.svg?style=for-the-badge)](./LICENSE)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/Content-CC_BY--NC_4.0-lightgrey.svg?style=for-the-badge)](./LICENSE)
 
 ---
 
@@ -220,3 +222,11 @@ El proyecto está configurado con integración continua en Vercel:
 - **Diseño de Tarjetas de Pitcheo:** Inspirado en Thomas Nestico ([@TJStats](https://x.com/TJStats))
 - **Datos Oficiales de Béisbol:** Consumidos en tiempo real desde MLB Stats API (`sportId=17`, `leagueId=135`)
 - **Transmisión Radial:** **La Mega 107.3 FM / Unión Radio**, Circuito Oficial de los Leones del Caracas
+
+---
+
+## 📄 Licencia
+
+Este proyecto opera bajo un esquema de **licencia dual**:
+- **Código Fuente del Software:** Licenciado bajo la **[Licencia MIT](./LICENSE)**. Libre para estudiar, clonar, bifurcar y usar con fines de portafolio y aprendizaje.
+- **Contenido Editorial, Crónicas y Marca:** Licenciado bajo **[Creative Commons Atribución-NoComercial 4.0 Internacional (CC BY-NC 4.0)](./LICENSE)**. Protege las notas de *NotiCueva*, crónicas y la identidad visual de explotación comercial sin consentimiento previo.
