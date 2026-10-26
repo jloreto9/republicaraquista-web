@@ -10,7 +10,8 @@ import { LinescoreTable } from "./linescore-table";
 import { PlayByPlayFeed } from "./play-by-play-feed";
 import { BoxscoreLineupsTab } from "./boxscore-lineups-tab";
 import { StadiumBroadcastTab } from "./stadium-broadcast-tab";
-import { LayoutGrid, Users, Radio, Bell, BellRing, Check, Volume2 } from "lucide-react";
+import { ScorecardTab } from "./scorecard-tab";
+import { LayoutGrid, Users, Radio, Bell, BellRing, Check, Volume2, ClipboardList } from "lucide-react";
 import {
   isPushNotificationSupported,
   subscribeToPush,
@@ -25,7 +26,7 @@ interface GameCenterViewProps {
 export function GameCenterView({ initialData }: GameCenterViewProps) {
   const [gameData, setGameData] = useState<GameCenterData>(initialData);
   const [selectedGamePk, setSelectedGamePk] = useState<number>(initialData.gamePk);
-  const [activeTab, setActiveTab] = useState<"gamecast" | "boxscore" | "stadium">("gamecast");
+  const [activeTab, setActiveTab] = useState<"gamecast" | "boxscore" | "scorecard" | "stadium">("gamecast");
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
   const [isSubscribing, setIsSubscribing] = useState<boolean>(false);
@@ -301,6 +302,18 @@ export function GameCenterView({ initialData }: GameCenterViewProps) {
         </button>
 
         <button
+          onClick={() => setActiveTab("scorecard")}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
+            activeTab === "scorecard"
+              ? "bg-[#1E2B4D] text-[#FDB827] border border-[#FDB827]/40 shadow-sm"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <ClipboardList className="w-4 h-4" />
+          <span>Hoja de Anotación</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab("stadium")}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
             activeTab === "stadium"
@@ -377,6 +390,14 @@ export function GameCenterView({ initialData }: GameCenterViewProps) {
           homeBatters={gameData.boxscore.homeBatters}
           awayPitchers={gameData.boxscore.awayPitchers}
           homePitchers={gameData.boxscore.homePitchers}
+        />
+      )}
+
+      {activeTab === "scorecard" && (
+        <ScorecardTab
+          scorecard={gameData.scorecard}
+          homeTeam={gameData.homeTeam}
+          awayTeam={gameData.awayTeam}
         />
       )}
 

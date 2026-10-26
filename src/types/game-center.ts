@@ -1,3 +1,5 @@
+import { GameCenterScorecard } from "./scorecard";
+
 export interface GameCenterTeam {
   id: number;
   name: string;
@@ -151,4 +153,5 @@ export interface GameCenterData {
     homePitchers: GameCenterBoxscorePitcher[];
   };
   availableGames: GameCenterAvailableGame[];
+  scorecard?: GameCenterScorecard;
 }

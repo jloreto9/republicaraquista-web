@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { getTeam, getPlayerHeadshotUrl } from "./constants";
+import { buildGameScorecard } from "./scorecard-engine";
 import {
   GameCenterData,
   GameCenterTeam,
@@ -647,6 +648,14 @@ export async function getGameCenterData(
     homePitchers: formatPitchers(boxscore.teams?.home),
   };
 
+  const scorecardData = buildGameScorecard(
+    allRawPlays,
+    boxscore,
+    homeTeam,
+    awayTeam,
+    maxInnings
+  );
+
   return {
     gamePk,
     season,
@@ -670,6 +679,7 @@ export async function getGameCenterData(
     linescore: linescoreData,
     plays: parsedPlays,
     boxscore: boxscoreData,
+    scorecard: scorecardData,
     availableGames: updatedAvailableGames,
   };
 }
