@@ -27,7 +27,7 @@ export default async function IndividualesPage() {
         season={activeSeason}
       />
 
-      <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 max-w-[1800px] w-full mx-auto">
         <Suspense
           fallback={
             <div className="p-12 text-center text-slate-400 font-mono text-xs">

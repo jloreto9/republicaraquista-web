@@ -36,7 +36,7 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
   const inningCols = Array.from({ length: maxInnings }, (_, i) => i + 1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-16">
       {/* ── SELECTOR DE EQUIPO (TOGGLE) ── */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-[#0D152B] border border-[#1E2B4D] shadow-xl">
         <div className="flex items-center space-x-2 w-full sm:w-auto">
@@ -196,12 +196,12 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
 
         {/* Contenedor de la Tabla con Scroll Horizontal Responsivo */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[950px]">
+          <table className="w-full text-left border-collapse min-w-[1200px]">
             {/* ENCABEZADOS DE COLUMNAS */}
             <thead>
               <tr className="bg-[#070B19]/90 border-b border-[#1E2B4D] text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
                 {/* Columna Sticky de Bateadores */}
-                <th className="sticky left-0 z-20 bg-[#070B19] px-4 py-3 min-w-[210px] w-[210px] border-r border-[#1E2B4D] shadow-[2px_0_5px_rgba(0,0,0,0.3)]">
+                <th className="sticky left-0 z-20 bg-[#070B19] px-4 py-3 min-w-[240px] w-[240px] border-r border-[#1E2B4D] shadow-[2px_0_5px_rgba(0,0,0,0.3)]">
                   Orden al Bate
                 </th>
 
@@ -209,7 +209,7 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
                 {inningCols.map((inn) => (
                   <th
                     key={inn}
-                    className="px-2 py-3 text-center min-w-[74px] w-[74px] border-r border-[#1E2B4D]/50 font-mono text-slate-300"
+                    className="px-2 py-3 text-center min-w-[84px] w-[84px] border-r border-[#1E2B4D]/50 font-mono text-slate-300"
                   >
                     {inn}
                   </th>

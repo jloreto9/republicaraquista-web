@@ -12,14 +12,14 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
 
   if (!cells || cells.length === 0) {
     return (
-      <div className="w-[74px] h-[74px] min-w-[74px] border-r border-b border-[#1E2B4D]/50 flex items-center justify-center bg-[#070B19]/30">
+      <div className="w-[84px] h-[84px] min-w-[84px] border-r border-b border-[#1E2B4D]/50 flex items-center justify-center bg-[#070B19]/30">
         <span className="text-slate-700 font-mono text-xs select-none">·</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center min-w-[74px] h-[74px] border-r border-b border-[#1E2B4D]/50 bg-[#070B19]/50 divide-x divide-[#1E2B4D]/30 relative">
+    <div className="flex items-center min-w-[84px] h-[84px] border-r border-b border-[#1E2B4D]/50 bg-[#070B19]/50 divide-x divide-[#1E2B4D]/30 relative">
       {cells.map((cell) => {
         const { diamond, eventCode, outNumber, rbi, countText, isHit, isScoringPlay } = cell;
 
@@ -47,7 +47,7 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
         return (
           <div
             key={cell.playId}
-            className="w-[74px] h-[74px] min-w-[74px] relative p-1 flex items-center justify-center hover:bg-[#1E2B4D]/40 transition-colors cursor-pointer group"
+            className="w-[84px] h-[84px] min-w-[84px] relative p-1 flex items-center justify-center hover:bg-[#1E2B4D]/40 transition-colors cursor-pointer group"
             onClick={() => setActiveTooltip(activeTooltip === cell ? null : cell)}
             onMouseEnter={() => setActiveTooltip(cell)}
             onMouseLeave={() => setActiveTooltip(null)}

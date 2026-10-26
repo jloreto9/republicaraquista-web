@@ -148,7 +148,7 @@ export function BullpenBudgetTab({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-16">
       {/* ── 1. 4 KPIs Ejecutivos de Salud y Fatiga ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* KPI 1: Disponibles */}

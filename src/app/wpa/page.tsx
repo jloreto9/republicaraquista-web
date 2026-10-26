@@ -31,7 +31,7 @@ export default async function WpaPage() {
         season={activeSeason}
       />
 
-      <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 max-w-[1800px] w-full mx-auto">
         <WpaView
           initialGameData={initialGameData}
           seasonLeaders={seasonLeaders}

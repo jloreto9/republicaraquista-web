@@ -138,7 +138,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
       {/* ── Switcher Principal del Módulo & Controles ── */}
       <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-lg flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -245,7 +245,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
 
       {/* ── 1. VISTA DE CORREDORES HEREDADOS DEL BULLPEN ── */}
       {activeTab === "bullpen" && (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-12">
           {/* 4 KPIs de Bullpen */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1">
@@ -504,7 +504,7 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
 
       {/* ── 3. VISTA DEL TRACKER DE ALINEACIONES 1-9 ── */}
       {activeTab === "lineups" && (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-12">
           {/* 4 KPIs de Lineups */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-md space-y-1">
