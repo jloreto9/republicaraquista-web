@@ -1,26 +1,17 @@
 {
   "meta": {
     "officialDate": "20/10/2026",
-    "pdfUrl": "/documents/Leones_20261020.pdf",
-    "remotePdfUrl": "https://sapven.com/download/Leones_20261020.pdf",
+    "pdfUrl": "/documents/Leones_20261020.pdf?expires=1793138132&signature=2973c7a1974c2ff7dae6b37e67daaf2110290abdbadad8ee085a81fcac282402",
+    "remotePdfUrl": "https://sapven.com/download/Leones_20261020.pdf?expires=1793138132&signature=2973c7a1974c2ff7dae6b37e67daaf2110290abdbadad8ee085a81fcac282402",
     "maxLimit": 34,
     "totalActive": 34,
     "weekNumber": 2,
     "dateRange": "20 Oct - 26 Oct 2026",
-    "updatedAt": "2026-10-20T21:38:15.713945+00:00",
+    "updatedAt": "2026-10-26T21:56:53.423052+00:00",
     "source": "Liga Venezolana de Béisbol Profesional (LVBP) · TuJonron.com",
     "movements": {
-      "entran": [
-        "Eduardo Figueroa",
-        "Leandro Cedeño",
-        "Victor Bericoto",
-        "Wikelman González"
-      ],
-      "salen": [
-        "Joan Gonzalez",
-        "Kenedy Corona",
-        "Touki Toussaint"
-      ]
+      "entran": [],
+      "salen": []
     }
   },
   "players": [
@@ -204,7 +195,7 @@
       "weight": "63 kg",
       "age": 23,
       "birthDate": "30-11-2002",
-      "birthPlace": "OCUMARE DEL TUY, EDO. MIRANDA",
+      "birthPlace": "OCUMARE DEL TUY, EDO.MIRANDA",
       "level": "OTRO",
       "origin": "criollo",
       "mlbId": 692350,
@@ -340,7 +331,7 @@
       "weight": "78 kg",
       "age": 36,
       "birthDate": "24-02-1990",
-      "birthPlace": "SANTA TERESA DEL TUY ,MIRANDA",
+      "birthPlace": "SANTA TERESA DEL TUY,MIRANDA",
       "level": "OTRO",
       "origin": "criollo",
       "mlbId": 542467,
@@ -409,7 +400,7 @@
       "age": 30,
       "birthDate": "27-10-1995",
       "birthPlace": "OCUMARE DEL TUY ,MIRANDA",
-      "level": "IND. LEAGUE",
+      "level": "IND.LEAGUE",
       "origin": "criollo",
       "mlbId": 625506,
       "isWeeklyActive": true,
