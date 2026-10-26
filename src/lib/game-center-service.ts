@@ -153,7 +153,7 @@ export async function getCaracasAvailableGames(season = 2026): Promise<GameCente
             games.push({
               id: g.gamePk,
               gamePk: g.gamePk,
-              date: dateObj.date,
+              date: g.officialDate || g.originalDate || dateObj.date,
               opponent: isHome ? `vs ${oppTeam.name}` : `@ ${oppTeam.name}`,
               opponentLogo: oppTeam.logoUrl,
               score: scoreStr,
@@ -313,7 +313,12 @@ export async function getGameCenterData(
   // Sede y Fecha
   const venue = gameData.venue?.name || "Estadio Monumental Simón Bolívar";
   const venueCity = gameData.venue?.location?.city || "Caracas";
-  const gameDate = gameData.datetime?.dateTime?.slice(0, 10) || gameData.datetime?.originalDate || "";
+  // Sede y Fecha: debe primar la fecha oficial de inicio del juego en Venezuela (officialDate u originalDate)
+  // para evitar que juegos nocturnos que terminan tras medianoche salten al día siguiente por UTC.
+  const gameDate =
+    gameData.datetime?.officialDate ||
+    gameData.datetime?.originalDate ||
+    (gameData.datetime?.dateTime ? gameData.datetime.dateTime.slice(0, 10) : "");
   const gameTime = gameData.datetime?.time ? `${gameData.datetime.time} ${gameData.datetime.ampm || ""}` : "7:00 PM";
 
   // Marcadores y Totales

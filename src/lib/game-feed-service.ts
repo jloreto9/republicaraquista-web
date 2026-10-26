@@ -179,7 +179,7 @@ export async function getDynamicBullpenAndLineups(season = 2026): Promise<Bullpe
 
   for (const feed of feeds) {
     const gamePk = feed?.gamePk || feed?.gameData?.game?.pk;
-    const gameDate = feed?.gameData?.datetime?.originalDate || "";
+    const gameDate = feed?.gameData?.datetime?.officialDate || feed?.gameData?.datetime?.originalDate || "";
     const isHome = feed?.gameData?.teams?.home?.id === LEONES_TEAM_ID;
     const oppTeamObj = isHome ? feed?.gameData?.teams?.away : feed?.gameData?.teams?.home;
     const oppTeamName = oppTeamObj?.name || "Rival";
@@ -701,7 +701,7 @@ export async function getDynamicSprayData(
 
   for (const feed of feeds) {
     const gamePk = feed?.gamePk || feed?.gameData?.game?.pk;
-    const gameDate = feed?.gameData?.datetime?.originalDate || "";
+    const gameDate = feed?.gameData?.datetime?.officialDate || feed?.gameData?.datetime?.originalDate || "";
     const isHome = feed?.gameData?.teams?.home?.id === LEONES_TEAM_ID;
     const plays = feed?.liveData?.plays?.allPlays || [];
 

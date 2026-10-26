@@ -98,7 +98,18 @@ export async function getBullpenBudget(
     let schedData = await schedRes.json();
     let allGames = (schedData.dates || [])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .flatMap((d: any) => d.games || [])
+      .flatMap((d: any) =>
+        (d.games || []).map((g: any) => ({
+          ...g,
+          // Primar la fecha oficial de inicio del juego en Venezuela (officialDate o date de la jornada)
+          // para evitar que juegos nocturnos (ej. 8:00 PM VET = 00:00 UTC) salten al día siguiente por UTC
+          officialGameDate:
+            g.officialDate ||
+            g.originalDate ||
+            d.date ||
+            (g.gameDate ? String(g.gameDate).slice(0, 10) : ""),
+        }))
+      )
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .filter((g: any) =>
         ["Final", "Completed", "Game Over", "Completed Early"].includes(
@@ -122,7 +133,16 @@ export async function getBullpenBudget(
         schedData = await schedRes.json();
         allGames = (schedData.dates || [])
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .flatMap((d: any) => d.games || [])
+          .flatMap((d: any) =>
+            (d.games || []).map((g: any) => ({
+              ...g,
+              officialGameDate:
+                g.officialDate ||
+                g.originalDate ||
+                d.date ||
+                (g.gameDate ? String(g.gameDate).slice(0, 10) : ""),
+            }))
+          )
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .filter((g: any) =>
             ["Final", "Completed", "Game Over", "Completed Early"].includes(
@@ -145,8 +165,16 @@ export async function getBullpenBudget(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recentGames.map(async (g: any) => {
         const gamePk = g.gamePk;
+        const targetDate = String(
+          g.officialGameDate || g.officialDate || g.originalDate || g.gameDate || ""
+        ).slice(0, 10);
+
         if (boxscoreCache.has(gamePk)) {
-          return boxscoreCache.get(gamePk);
+          const cached = boxscoreCache.get(gamePk);
+          if (cached && targetDate && cached.gameDate !== targetDate) {
+            cached.gameDate = targetDate;
+          }
+          return cached;
         }
 
         try {
@@ -166,7 +194,7 @@ export async function getBullpenBudget(
 
           const parsed = {
             gamePk,
-            gameDate: String(g.gameDate || "").slice(0, 10),
+            gameDate: targetDate,
             oppName: oppBox?.team?.name || "Rival",
             oppAbbr: oppBox?.team?.abbreviation || getTeam(oppBox?.team?.id).abbreviation || "RIV",
             isHome,
@@ -188,9 +216,17 @@ export async function getBullpenBudget(
 
     // 3. Generar secuencia continua de días calendario (incluyendo Días Libres / Descanso)
     const firstDateStr = validBoxes[0].gameDate;
-    const lastDateStr = validBoxes[validBoxes.length - 1].gameDate;
+    let lastDateStr = validBoxes[validBoxes.length - 1].gameDate;
 
-    const endMs = new Date(`${lastDateStr}T12:00:00Z`).getTime();
+    // Extender la ventana hasta la fecha de hoy en Venezuela (UTC-4) si hay juego programado o jornada activa
+    const nowVet = new Date(Date.now() - 4 * 3600 * 1000);
+    const todayVetStr = nowVet.toISOString().slice(0, 10);
+    let endMs = new Date(`${lastDateStr}T12:00:00Z`).getTime();
+    const todayMs = new Date(`${todayVetStr}T12:00:00Z`).getTime();
+    if (todayMs > endMs) {
+      endMs = todayMs;
+    }
+
     let startMs = new Date(`${firstDateStr}T12:00:00Z`).getTime();
 
     // Asegurar al menos 7 días de ventana rolling
@@ -216,20 +252,47 @@ export async function getBullpenBudget(
     const datesMeta = calendarDates.map((dStr) => {
       const { dayLabel, dayOfWeek } = formatDayLabel(dStr);
       const boxesOnDate = validBoxes.filter((b) => b.gameDate === dStr);
-      const isOffDay = boxesOnDate.length === 0;
 
-      const opponent = isOffDay
-        ? "Día Libre"
-        : boxesOnDate.length > 1
-        ? `${boxesOnDate[0].isHome ? "vs" : "@"} ${boxesOnDate[0].oppAbbr} (DH)`
-        : `${boxesOnDate[0].isHome ? "vs" : "@"} ${boxesOnDate[0].oppAbbr}`;
+      let isOffDay = boxesOnDate.length === 0;
+      let opponent = "Día Libre";
+      let gamePk = 0;
+
+      if (boxesOnDate.length > 0) {
+        isOffDay = false;
+        opponent =
+          boxesOnDate.length > 1
+            ? `${boxesOnDate[0].isHome ? "vs" : "@"} ${boxesOnDate[0].oppAbbr} (DH)`
+            : `${boxesOnDate[0].isHome ? "vs" : "@"} ${boxesOnDate[0].oppAbbr}`;
+        gamePk = boxesOnDate[0].gamePk;
+      } else {
+        // Si no hay boxscore completado en dStr, buscar si hay juego de Leones programado o en curso en el calendario
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const schedDateObj = (schedData.dates || []).find((d: any) => d.date === dStr);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const schedGame = schedDateObj?.games?.find((g: any) => {
+          const homeId = Number(g.teams?.home?.team?.id);
+          const awayId = Number(g.teams?.away?.team?.id);
+          return homeId === teamId || awayId === teamId;
+        });
+
+        if (schedGame) {
+          isOffDay = false;
+          const isHome = Number(schedGame.teams?.home?.team?.id) === teamId;
+          const oppTeamId = isHome
+            ? Number(schedGame.teams?.away?.team?.id)
+            : Number(schedGame.teams?.home?.team?.id);
+          const oppTeam = getTeam(oppTeamId);
+          opponent = isHome ? `vs ${oppTeam.abbreviation}` : `@ ${oppTeam.abbreviation}`;
+          gamePk = schedGame.gamePk;
+        }
+      }
 
       return {
         date: dStr,
         dayLabel,
         dayOfWeek,
         opponent,
-        gamePk: isOffDay ? 0 : boxesOnDate[0].gamePk,
+        gamePk,
         isOffDay,
       };
     });

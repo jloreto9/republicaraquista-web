@@ -191,7 +191,7 @@ export async function processGameWpa(gamePk: number): Promise<GameWpaData | null
     const leonesIsHome = homeId === LEONES_TEAM_ID;
     const homeTeam = homeTeamInfo.name || "Equipo Local";
     const awayTeam = awayTeamInfo.name || "Equipo Visitante";
-    const gameDate = feed?.gameData?.datetime?.originalDate || "";
+    const gameDate = feed?.gameData?.datetime?.officialDate || feed?.gameData?.datetime?.originalDate || "";
 
     const allPlays = feed?.liveData?.plays?.allPlays || [];
     if (!allPlays.length) return null;
