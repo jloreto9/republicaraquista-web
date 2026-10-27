@@ -347,7 +347,9 @@ def main():
         logger.warning("No se localizó enlace de PDF o fecha en la respuesta.")
         sys.exit(0)
 
-    pdf_filename = os.path.basename(pdf_url)
+    # Limpiar query string de URLs firmadas (ej: Leones_20261027.pdf?expires=... -> Leones_20261027.pdf)
+    clean_url = pdf_url.split("?")[0]
+    pdf_filename = os.path.basename(clean_url)
 
     # Descargar PDF siempre para garantizar su disponibilidad local si no existe
     target_pdf_path = os.path.join(DOCUMENTS_DIR, pdf_filename)

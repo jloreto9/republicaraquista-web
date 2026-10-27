@@ -1,37 +1,22 @@
 {
   "meta": {
-    "officialDate": "20/10/2026",
-    "pdfUrl": "/documents/Leones_20261020.pdf?expires=1793215048&signature=b0fd1bc4ba3ed81ee94d285e2f5ec03d554434440468996d46b55a838413c173",
-    "remotePdfUrl": "https://sapven.com/download/Leones_20261020.pdf?expires=1793215048&signature=b0fd1bc4ba3ed81ee94d285e2f5ec03d554434440468996d46b55a838413c173",
+    "officialDate": "27/10/2026",
+    "pdfUrl": "/documents/Leones_20261027.pdf",
+    "remotePdfUrl": "https://sapven.com/download/Leones_20261027.pdf?expires=1793228306&signature=9eeee9932eed784ef522fde42e22822a8689c75c2fae89371f30b362721e8dee",
     "maxLimit": 34,
     "totalActive": 34,
-    "weekNumber": 2,
-    "dateRange": "20 Oct - 26 Oct 2026",
-    "updatedAt": "2026-10-27T19:17:29.535826+00:00",
+    "weekNumber": 3,
+    "dateRange": "27 Oct - 02 Nov 2026",
+    "updatedAt": "2026-10-27T22:59:01.656984+00:00",
     "source": "Liga Venezolana de Béisbol Profesional (LVBP) · TuJonron.com",
     "movements": {
-      "entran": [],
+      "entran": [
+        "Leandro Cedeño"
+      ],
       "salen": []
     }
   },
   "players": [
-    {
-      "number": 59,
-      "name": "Carlos Romero",
-      "position": "P",
-      "positionCategory": "pitcher",
-      "batsThrows": "D/D",
-      "height": "1.98 m",
-      "weight": "82 kg",
-      "age": 27,
-      "birthDate": "15-07-1999",
-      "birthPlace": "SAN ANTONIO, MONAGAS",
-      "level": "OTRO",
-      "origin": "criollo",
-      "mlbId": 673395,
-      "isWeeklyActive": true,
-      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/673395.png"
-    },
     {
       "number": 48,
       "name": "Connor Van Scoyoc",
@@ -77,11 +62,11 @@
       "age": 37,
       "birthDate": "30-11-1988",
       "birthPlace": "BARQUISIMETO ,LARA",
-      "level": "NINGUNO",
+      "level": "OTRO",
       "origin": "criollo",
-      "mlbId": 543163,
+      "mlbId": 516148,
       "isWeeklyActive": true,
-      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/543163.png"
+      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/516148.png"
     },
     {
       "number": 33,
@@ -159,7 +144,7 @@
       "batsThrows": "D/D",
       "height": "1.85 m",
       "weight": "83 kg",
-      "age": 25,
+      "age": 26,
       "birthDate": "21-10-2000",
       "birthPlace": "HIGUEROTE, MIRANDA",
       "level": "A+",
@@ -186,21 +171,21 @@
       "photoUrl": "https://cdn.tujonron.net/public_photos/custom/672712.png"
     },
     {
-      "number": 63,
-      "name": "Mikell Manzano",
+      "number": 66,
+      "name": "Melvin Pineda",
       "position": "P",
       "positionCategory": "pitcher",
       "batsThrows": "D/D",
-      "height": "1.83 m",
-      "weight": "63 kg",
-      "age": 23,
-      "birthDate": "30-11-2002",
-      "birthPlace": "OCUMARE DEL TUY, EDO.MIRANDA",
-      "level": "OTRO",
+      "height": "1.80 m",
+      "weight": "80 kg",
+      "age": 22,
+      "birthDate": "04-05-2004",
+      "birthPlace": "SAN FELIPE, EDO. YARACUY",
+      "level": "NINGUNO",
       "origin": "criollo",
-      "mlbId": 692350,
+      "mlbId": 703941,
       "isWeeklyActive": true,
-      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/692350.png"
+      "photoUrl": "https://cdn.tujonron.net/public_photos/no_picture.png"
     },
     {
       "number": 90,
@@ -254,6 +239,23 @@
       "photoUrl": "https://cdn.tujonron.net/public_photos/photos/703148.png"
     },
     {
+      "number": 68,
+      "name": "Ricardo Rodríguez",
+      "position": "P",
+      "positionCategory": "pitcher",
+      "batsThrows": "D/D",
+      "height": "1.88 m",
+      "weight": "100 kg",
+      "age": 34,
+      "birthDate": "31-08-1992",
+      "birthPlace": "MARACAY ,ARAGUA",
+      "level": "NINGUNO",
+      "origin": "criollo",
+      "mlbId": 600965,
+      "isWeeklyActive": true,
+      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/600965.png"
+    },
+    {
       "number": 97,
       "name": "Sandy Gaston",
       "position": "P",
@@ -271,21 +273,21 @@
       "photoUrl": "https://cdn.tujonron.net/public_photos/photos/682624.png"
     },
     {
-      "number": 95,
-      "name": "Simon Leandro",
+      "number": 88,
+      "name": "Steven Pérez",
       "position": "P",
       "positionCategory": "pitcher",
-      "batsThrows": "D/D",
-      "height": "1.90 m",
-      "weight": "84 kg",
-      "age": 24,
-      "birthDate": "24-04-2002",
-      "birthPlace": "CARACAS, VENEZUELA",
-      "level": "OTRO",
+      "batsThrows": "Z/Z",
+      "height": "1.83 m",
+      "weight": "80 kg",
+      "age": 25,
+      "birthDate": "21-04-2001",
+      "birthPlace": "SAN FERNANDO DE APURE, VENEZUELA",
+      "level": "AAA",
       "origin": "criollo",
-      "mlbId": 814129,
+      "mlbId": 682897,
       "isWeeklyActive": true,
-      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/814129.png"
+      "photoUrl": "https://cdn.tujonron.net/public_photos/photos/682897.png"
     },
     {
       "number": 58,
@@ -298,11 +300,11 @@
       "age": 24,
       "birthDate": "25-03-2002",
       "birthPlace": "MARACAY, EDO ARAGUA",
-      "level": "NINGUNO",
+      "level": "MLB",
       "origin": "criollo",
-      "mlbId": 678824,
+      "mlbId": 682790,
       "isWeeklyActive": true,
-      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/678824.png"
+      "photoUrl": "https://cdn.tujonron.net/public_photos/no_picture.png"
     },
     {
       "number": 32,
@@ -331,7 +333,7 @@
       "weight": "78 kg",
       "age": 36,
       "birthDate": "24-02-1990",
-      "birthPlace": "SANTA TERESA DEL TUY,MIRANDA",
+      "birthPlace": "SANTA TERESA DEL TUY ,MIRANDA",
       "level": "OTRO",
       "origin": "criollo",
       "mlbId": 542467,
@@ -373,21 +375,21 @@
       "photoUrl": "https://cdn.tujonron.net/public_photos/photos/806957.png"
     },
     {
-      "number": 75,
-      "name": "Gabriel Lino",
+      "number": 89,
+      "name": "Jhonny Pereda",
       "position": "C",
       "positionCategory": "catcher",
       "batsThrows": "D/D",
-      "height": "1.91 m",
-      "weight": "91 kg",
-      "age": 33,
-      "birthDate": "17-05-1993",
-      "birthPlace": "MARACAY ,ARAGUA",
-      "level": "OTRO",
+      "height": "1.85 m",
+      "weight": "92 kg",
+      "age": 30,
+      "birthDate": "18-04-1996",
+      "birthPlace": "SAN JUAN DE LOS MORROS ,GUARICO",
+      "level": "NINGUNO",
       "origin": "criollo",
-      "mlbId": 593449,
+      "mlbId": 640902,
       "isWeeklyActive": true,
-      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/593449.png"
+      "photoUrl": "https://cdn.tujonron.net/public_photos/custom/640902.png"
     },
     {
       "number": 37,
@@ -397,10 +399,10 @@
       "batsThrows": "Z/Z",
       "height": "1.83 m",
       "weight": "92 kg",
-      "age": 30,
+      "age": 31,
       "birthDate": "27-10-1995",
       "birthPlace": "OCUMARE DEL TUY ,MIRANDA",
-      "level": "IND.LEAGUE",
+      "level": "IND. LEAGUE",
       "origin": "criollo",
       "mlbId": 625506,
       "isWeeklyActive": true,
@@ -463,7 +465,7 @@
       "position": "IF",
       "positionCategory": "infielder",
       "batsThrows": "D/D",
-      "height": "1.78 m",
+      "height": "0.78 m",
       "weight": "68 kg",
       "age": 21,
       "birthDate": "02-11-2004",
