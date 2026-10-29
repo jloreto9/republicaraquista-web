@@ -37,7 +37,7 @@ export interface LeonesAdvancedStats {
 
 export interface WeeklyRecord {
   weekNum: number;
-  semana: string;        // Ej: "Semana 1 (12/10 - 18/10)"
+  semana: string;        // Ej: "Semana 1 (12/10 - 19/10)"
   juegos: number;
   w: number;
   l: number;

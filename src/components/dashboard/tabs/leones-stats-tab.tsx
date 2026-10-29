@@ -353,7 +353,7 @@ export function LeonesStatsTab({
         </div>
       </div>
 
-      {/* ── TABLA INFERIOR: DESGLOSE SEMANA A SEMANA ISO ── */}
+      {/* ── TABLA INFERIOR: DESGLOSE SEMANA A SEMANA LVBP (MARTES A LUNES) ── */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[#0D152B]/80 border border-[#1E2B4D] shadow-lg space-y-3">
         <div className="flex items-center space-x-2 border-b border-[#1E2B4D] pb-3">
           <Calendar className="w-4 h-4 text-[#FDB827]" />

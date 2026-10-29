@@ -49,19 +49,19 @@ const CLEAN_ZERO_STATS: LeonesAdvancedStats = {
   },
 };
 
-// ── SEMANAS CANÓNICAS OFICIALES TEMPORADA 2026-2027 ──────────────────────────
+// ── SEMANAS CANÓNICAS OFICIALES LVBP TEMPORADA 2026-2027 (MARTES A LUNES) ────
 const WEEKS_2026_CONFIG = [
-  { weekNum: 1, semana: "Semana 1 (12/10 - 18/10)", startDate: "2026-10-12", endDate: "2026-10-18" },
-  { weekNum: 2, semana: "Semana 2 (19/10 - 25/10)", startDate: "2026-10-19", endDate: "2026-10-25" },
-  { weekNum: 3, semana: "Semana 3 (26/10 - 01/11)", startDate: "2026-10-26", endDate: "2026-11-01" },
-  { weekNum: 4, semana: "Semana 4 (02/11 - 08/11)", startDate: "2026-11-02", endDate: "2026-11-08" },
-  { weekNum: 5, semana: "Semana 5 (09/11 - 15/11)", startDate: "2026-11-09", endDate: "2026-11-15" },
-  { weekNum: 6, semana: "Semana 6 (16/11 - 22/11)", startDate: "2026-11-16", endDate: "2026-11-22" },
-  { weekNum: 7, semana: "Semana 7 (23/11 - 29/11)", startDate: "2026-11-23", endDate: "2026-11-29" },
-  { weekNum: 8, semana: "Semana 8 (30/11 - 06/12)", startDate: "2026-11-30", endDate: "2026-12-06" },
-  { weekNum: 9, semana: "Semana 9 (07/12 - 13/12)", startDate: "2026-12-07", endDate: "2026-12-13" },
-  { weekNum: 10, semana: "Semana 10 (14/12 - 20/12)", startDate: "2026-12-14", endDate: "2026-12-20" },
-  { weekNum: 11, semana: "Semana 11 (21/12 - 27/12)", startDate: "2026-12-21", endDate: "2026-12-27" },
+  { weekNum: 1, semana: "Semana 1 (12/10 - 19/10)", startDate: "2026-10-12", endDate: "2026-10-19" },
+  { weekNum: 2, semana: "Semana 2 (20/10 - 26/10)", startDate: "2026-10-20", endDate: "2026-10-26" },
+  { weekNum: 3, semana: "Semana 3 (27/10 - 02/11)", startDate: "2026-10-27", endDate: "2026-11-02" },
+  { weekNum: 4, semana: "Semana 4 (03/11 - 09/11)", startDate: "2026-11-03", endDate: "2026-11-09" },
+  { weekNum: 5, semana: "Semana 5 (10/11 - 16/11)", startDate: "2026-11-10", endDate: "2026-11-16" },
+  { weekNum: 6, semana: "Semana 6 (17/11 - 23/11)", startDate: "2026-11-17", endDate: "2026-11-23" },
+  { weekNum: 7, semana: "Semana 7 (24/11 - 30/11)", startDate: "2026-11-24", endDate: "2026-11-30" },
+  { weekNum: 8, semana: "Semana 8 (01/12 - 07/12)", startDate: "2026-12-01", endDate: "2026-12-07" },
+  { weekNum: 9, semana: "Semana 9 (08/12 - 14/12)", startDate: "2026-12-08", endDate: "2026-12-14" },
+  { weekNum: 10, semana: "Semana 10 (15/12 - 21/12)", startDate: "2026-12-15", endDate: "2026-12-21" },
+  { weekNum: 11, semana: "Semana 11 (22/12 - 28/12)", startDate: "2026-12-22", endDate: "2026-12-28" },
 ];
 
 // ── LÍNEA BASE AUDITADA TEMPORADA 2025 (LEONES DEL CARACAS) ─────────────────
@@ -98,17 +98,17 @@ const BASELINE_2025_STATS: LeonesAdvancedStats = {
 };
 
 const BASELINE_2025_WEEKS: WeeklyRecord[] = [
-  { weekNum: 1, semana: "Semana 1 (13/10 - 19/10)", juegos: 4, w: 3, l: 1, pct: ".750", cf: 29, cp: 23, dif: "+6", record: "3G-1P" },
-  { weekNum: 2, semana: "Semana 2 (20/10 - 26/10)", juegos: 4, w: 1, l: 3, pct: ".250", cf: 24, cp: 27, dif: "-3", record: "1G-3P" },
-  { weekNum: 3, semana: "Semana 3 (27/10 - 02/11)", juegos: 6, w: 2, l: 4, pct: ".333", cf: 31, cp: 39, dif: "-8", record: "2G-4P" },
-  { weekNum: 4, semana: "Semana 4 (03/11 - 09/11)", juegos: 6, w: 5, l: 1, pct: ".833", cf: 48, cp: 33, dif: "+15", record: "5G-1P" },
-  { weekNum: 5, semana: "Semana 5 (10/11 - 16/11)", juegos: 3, w: 0, l: 3, pct: ".000", cf: 10, cp: 22, dif: "-12", record: "0G-3P" },
-  { weekNum: 6, semana: "Semana 6 (17/11 - 23/11)", juegos: 7, w: 3, l: 4, pct: ".428", cf: 37, cp: 40, dif: "-3", record: "3G-4P" },
-  { weekNum: 7, semana: "Semana 7 (24/11 - 30/11)", juegos: 6, w: 2, l: 4, pct: ".333", cf: 41, cp: 44, dif: "-3", record: "2G-4P" },
-  { weekNum: 8, semana: "Semana 8 (01/12 - 07/12)", juegos: 6, w: 3, l: 3, pct: ".500", cf: 26, cp: 28, dif: "-2", record: "3G-3P" },
-  { weekNum: 9, semana: "Semana 9 (08/12 - 14/12)", juegos: 5, w: 2, l: 3, pct: ".400", cf: 22, cp: 33, dif: "-11", record: "2G-3P" },
-  { weekNum: 10, semana: "Semana 10 (15/12 - 21/12)", juegos: 6, w: 2, l: 4, pct: ".333", cf: 26, cp: 45, dif: "-19", record: "2G-4P" },
-  { weekNum: 11, semana: "Semana 11 (22/12 - 28/12)", juegos: 3, w: 1, l: 2, pct: ".333", cf: 25, cp: 22, dif: "+3", record: "1G-2P" },
+  { weekNum: 1, semana: "Semana 1 (14/10 - 20/10)", juegos: 4, w: 3, l: 1, pct: ".750", cf: 29, cp: 23, dif: "+6", record: "3G-1P" },
+  { weekNum: 2, semana: "Semana 2 (21/10 - 27/10)", juegos: 4, w: 1, l: 3, pct: ".250", cf: 24, cp: 27, dif: "-3", record: "1G-3P" },
+  { weekNum: 3, semana: "Semana 3 (28/10 - 03/11)", juegos: 6, w: 2, l: 4, pct: ".333", cf: 31, cp: 39, dif: "-8", record: "2G-4P" },
+  { weekNum: 4, semana: "Semana 4 (04/11 - 10/11)", juegos: 6, w: 5, l: 1, pct: ".833", cf: 48, cp: 33, dif: "+15", record: "5G-1P" },
+  { weekNum: 5, semana: "Semana 5 (11/11 - 17/11)", juegos: 3, w: 0, l: 3, pct: ".000", cf: 10, cp: 22, dif: "-12", record: "0G-3P" },
+  { weekNum: 6, semana: "Semana 6 (18/11 - 24/11)", juegos: 7, w: 3, l: 4, pct: ".429", cf: 37, cp: 40, dif: "-3", record: "3G-4P" },
+  { weekNum: 7, semana: "Semana 7 (25/11 - 01/12)", juegos: 6, w: 2, l: 4, pct: ".333", cf: 41, cp: 44, dif: "-3", record: "2G-4P" },
+  { weekNum: 8, semana: "Semana 8 (02/12 - 08/12)", juegos: 6, w: 3, l: 3, pct: ".500", cf: 26, cp: 28, dif: "-2", record: "3G-3P" },
+  { weekNum: 9, semana: "Semana 9 (09/12 - 15/12)", juegos: 6, w: 2, l: 4, pct: ".333", cf: 24, cp: 36, dif: "-12", record: "2G-4P" },
+  { weekNum: 10, semana: "Semana 10 (16/12 - 22/12)", juegos: 6, w: 3, l: 3, pct: ".500", cf: 32, cp: 44, dif: "-12", record: "3G-3P" },
+  { weekNum: 11, semana: "Semana 11 (23/12 - 29/12)", juegos: 2, w: 0, l: 2, pct: ".000", cf: 17, cp: 20, dif: "-3", record: "0G-2P" },
 ];
 
 const BASELINE_2025_TRENDS: TrendGameItem[] = [
@@ -400,7 +400,7 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
 }
 
 /**
- * Obtiene el desglose semana a semana ISO de campeonato.
+ * Obtiene el desglose semana a semana de campeonato (semanas oficiales LVBP: martes a lunes).
  */
 export async function getWeeklyRecords(season = ACTIVE_SEASON): Promise<WeeklyRecord[]> {
   if (season === 2025) {
