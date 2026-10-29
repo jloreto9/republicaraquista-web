@@ -12,7 +12,7 @@ import {
 import { ACTIVE_SEASON, getTeam, getPlayerHeadshotUrl } from "./constants";
 import { supabase, getBattingStats, getPitchingStats } from "./supabase";
 import { getSeasonWpaLeaders } from "./wpa-engine";
-import { isDayGame } from "./utils";
+import { isDayGame, getVenezuelanDate } from "./utils";
 import { fetchGameLiveFeed } from "./game-feed-service";
 import calendarData from "@/data/calendar_2026_27.json";
 
@@ -197,8 +197,16 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
 
     // Ordenar cronológicamente para racha y últimos 10 juegos
     const sortedGames = [...rawGames].sort((a, b) => {
-      const da = a.game_date ? new Date(a.game_date).getTime() : 0;
-      const db = b.game_date ? new Date(b.game_date).getTime() : 0;
+      const da = a.game_datetime
+        ? new Date(a.game_datetime).getTime()
+        : a.game_date
+        ? new Date(a.game_date).getTime()
+        : 0;
+      const db = b.game_datetime
+        ? new Date(b.game_datetime).getTime()
+        : b.game_date
+        ? new Date(b.game_date).getTime()
+        : 0;
       return da !== db ? da - db : Number(a.id) - Number(b.id);
     });
 
@@ -245,8 +253,9 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
         if (won) extraWins++; else extraLosses++;
       }
 
-      if (g.game_date) {
-        const d = new Date(g.game_date);
+      const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
+      if (effDate) {
+        const d = new Date(`${effDate}T12:00:00Z`);
         const wd = (d.getUTCDay() + 6) % 7; // Lunes=0, Domingo=6
         if (won) (daysCount as Record<number, { w: number; l: number }>)[wd].w++;
         else (daysCount as Record<number, { w: number; l: number }>)[wd].l++;
@@ -439,9 +448,9 @@ export async function getWeeklyRecords(season = ACTIVE_SEASON): Promise<WeeklyRe
 
     return WEEKS_2026_CONFIG.map((w) => {
       const weekGames = games.filter((g) => {
-        if (!g.game_date) return false;
-        const d = g.game_date.slice(0, 10);
-        return d >= w.startDate && d <= w.endDate;
+        const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
+        if (!effDate) return false;
+        return effDate >= w.startDate && effDate <= w.endDate;
       });
 
       let wWins = 0;
@@ -510,9 +519,10 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
         const oppScore = isHomeLeones ? awayScore : homeScore;
         const leonesWon = leonesScore > oppScore;
 
-        let gameDateFormatted = g.game_date || "";
-        if (g.game_date && g.game_date.length >= 10) {
-          const parts = g.game_date.slice(0, 10).split("-");
+        const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
+        let gameDateFormatted = effDate || g.game_date || "";
+        if (effDate && effDate.length >= 10) {
+          const parts = effDate.slice(0, 10).split("-");
           const months = [
             "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
@@ -683,9 +693,10 @@ export async function getRecentTrends(limit = 10, season = ACTIVE_SEASON): Promi
           const rivalScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
           const won = caracasScore > rivalScore;
 
-          let fecha = g.game_date?.slice(5) || "";
-          if (g.game_date && g.game_date.length >= 10) {
-            const parts = g.game_date.slice(0, 10).split("-");
+          const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
+          let fecha = effDate?.slice(5) || "";
+          if (effDate && effDate.length >= 10) {
+            const parts = effDate.slice(0, 10).split("-");
             fecha = `${parts[2]}/${parts[1]}`;
           }
 

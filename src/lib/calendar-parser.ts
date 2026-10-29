@@ -1,4 +1,5 @@
 import { LVBP_TEAMS, MONTH_NAMES_ES, getTeam } from "./constants";
+import { getVenezuelanDate } from "./utils";
 import {
   CalendarGameEvent,
   CalendarApiResponse,
@@ -25,21 +26,7 @@ interface SupabaseGameMatch {
   status?: string;
 }
 
-function getVenezuelanDate(dateStr?: string, datetimeStr?: string): string {
-  if (datetimeStr) {
-    try {
-      const dt = new Date(datetimeStr);
-      if (!isNaN(dt.getTime())) {
-        // Venezuela es UTC-4 estricto sin horario estacional
-        const vet = new Date(dt.getTime() - 4 * 3600 * 1000);
-        return vet.toISOString().slice(0, 10);
-      }
-    } catch {
-      // fallback
-    }
-  }
-  return dateStr ? dateStr.slice(0, 10) : "";
-}
+
 
 const OPPONENT_NAME_TO_ID: Record<string, number> = {
   "aguilas del zulia": 692,

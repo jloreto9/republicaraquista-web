@@ -46,3 +46,23 @@ export function isDayGame(gameDatetimeOrTime?: string | null, isDayGameFlag?: bo
 
   return false;
 }
+
+/**
+ * Normaliza y obtiene la fecha calendario oficial en Venezuela (VET / UTC-4).
+ * Corrige el desfase de medianoche UTC (e.g., '2026-10-25T00:00:00Z' -> '2026-10-24' en Venezuela).
+ */
+export function getVenezuelanDate(dateStr?: string | null, datetimeStr?: string | null): string {
+  if (datetimeStr) {
+    try {
+      const dt = new Date(datetimeStr);
+      if (!isNaN(dt.getTime())) {
+        // Venezuela es UTC-4 estricto sin horario estacional
+        const vet = new Date(dt.getTime() - 4 * 3600 * 1000);
+        return vet.toISOString().slice(0, 10);
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return dateStr ? String(dateStr).slice(0, 10) : "";
+}

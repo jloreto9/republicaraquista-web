@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { ACTIVE_SEASON, LVBP_TEAMS, LVBP_TEAM_IDS, getTeam, getPlayerHeadshotUrl } from "./constants";
-import { isDayGame } from "./utils";
+import { isDayGame, getVenezuelanDate } from "./utils";
 import {
   PlayerSplitRow,
   PitcherSplitRow,
@@ -802,8 +802,9 @@ export async function getPlayerSplitsProfile(
 
         if (rivalMap[opponentId]) rivalMap[opponentId].push(row);
 
-        if (g.game_date) {
-          const d = new Date(g.game_date);
+        const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
+        if (effDate) {
+          const d = new Date(`${effDate}T12:00:00Z`);
           const m = d.getUTCMonth() + 1;
           if (monthMap[m]) monthMap[m].push(row);
           const wd = (d.getUTCDay() + 6) % 7;
@@ -1101,8 +1102,9 @@ export async function getPlayerSplitsProfile(
 
         if (rivalMap[opponentId]) rivalMap[opponentId].push(row);
 
-        if (g.game_date) {
-          const d = new Date(g.game_date);
+        const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
+        if (effDate) {
+          const d = new Date(`${effDate}T12:00:00Z`);
           const m = d.getUTCMonth() + 1;
           if (monthMap[m]) monthMap[m].push(row);
           const wd = (d.getUTCDay() + 6) % 7;
