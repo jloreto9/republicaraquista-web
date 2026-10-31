@@ -166,17 +166,24 @@ export function PitchingView({ initialSeason = 2026 }: PitchingViewProps) {
           gameType: phase,
           phase: phase,
           ip: gameData?.boxscore.ip || "0.0",
+          bf: gameData?.boxscore.bf || 0,
           h: gameData?.boxscore.h || 0,
           r: gameData?.boxscore.r || 0,
           er: gameData?.boxscore.er || 0,
           bb: gameData?.boxscore.bb || 0,
           so: gameData?.boxscore.so || 0,
-          hr: 0,
+          hr: gameData?.boxscore.hr || 0,
           pitches: gameData?.boxscore.pitches || 0,
           strikes: gameData?.boxscore.strikes || 0,
           era: gameData?.boxscore.era || "0.00",
-          decision: (gameData?.decision as any) || "",
+          decision: (gameData?.decision as PitcherGameLog["decision"]) || "",
           league: branch === "lvbp" ? "LVBP" : "MLB",
+          cswPct: gameData?.boxscore.cswPct,
+          whiffPct: gameData?.boxscore.whiffPct,
+          fStrikePct: gameData?.boxscore.fStrikePct,
+          gsv2: gameData?.contextMetrics?.avgGsv2 ?? null,
+          wpa: gameData?.contextMetrics?.wpa ?? null,
+          re24: gameData?.contextMetrics?.re24 ?? null,
         }
       : gameLogs.find((l) => l.gamePk === selectedGamePk) || gameLogs[0];
 
@@ -199,8 +206,9 @@ export function PitchingView({ initialSeason = 2026 }: PitchingViewProps) {
       <PitchingSearch
         onSelectPitcher={(pitcher) => {
           setSelectedPitcher(pitcher);
-          // Si el lanzador tiene historial de Caracas, default a lvbp, sino mlb
-          if (!pitcher.hasCaracasHistory && !pitcher.hasLvbpHistory) {
+          if (pitcher.hasLvbpHistory || pitcher.hasCaracasHistory) {
+            setBranch("lvbp");
+          } else {
             setBranch("mlb");
           }
         }}
@@ -228,7 +236,7 @@ export function PitchingView({ initialSeason = 2026 }: PitchingViewProps) {
         isDownloadingCard={isDownloadingCard}
       />
 
-      {/* Fallback Inteligente de Temporada (estilo Streamlit) */}
+      {/* Fallback Inteligente de Temporada */}
       {fallbackNotice && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#002D62]/70 border border-[#FDB827]/40 text-xs text-amber-200 shadow-md">
           <span className="text-base shrink-0">ℹ️</span>
@@ -242,7 +250,7 @@ export function PitchingView({ initialSeason = 2026 }: PitchingViewProps) {
         </div>
       )}
 
-      {/* Pestañas de Navegación idénticas a Streamlit (RepubliCaraquistApp) */}
+      {/* Pestañas de Navegación */}
       <div className="flex border-b border-[#1E2B4D] gap-2 pt-2">
         <button
           onClick={() => setActiveTab("card")}
@@ -253,7 +261,7 @@ export function PitchingView({ initialSeason = 2026 }: PitchingViewProps) {
           }`}
         >
           <Sparkles className="w-4 h-4" />
-          <span>🎨 Tarjeta HD Oficial (Thomas Nestico)</span>
+          <span>🎨 Reporte HD 3:4 (Thomas Nestico)</span>
         </button>
 
         <button
@@ -311,7 +319,7 @@ export function PitchingView({ initialSeason = 2026 }: PitchingViewProps) {
             <StatcastPanel data={gameData} pitcherName={selectedPitcher.name} />
           )}
 
-          {/* Sección de Historial de Salidas / Últimos 10 Juegos con Rol Destacado (idéntico a Streamlit) */}
+          {/* Sección de Historial de Salidas / Últimos 10 Juegos con PBP Real */}
           <PitchingGameLogsTable
             gameLogs={gameLogs}
             selectedGamePk={timeMode === "game" ? selectedGamePk : undefined}

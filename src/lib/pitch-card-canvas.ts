@@ -6,82 +6,215 @@ import {
   PBPDestinationRow,
   InningWorkloadItem,
   PlatoonSplits,
-  PitchDetail,
+  PitchingSplitRow,
+  ContactProfileSummary,
 } from "@/types/pitching";
-import { CANONICAL_PITCH_COLORS, getPitchColor } from "@/lib/pitching-constants";
+import {
+  getPitchColor,
+  getMetricCellShade,
+} from "@/lib/pitching-constants";
+import { LVBP_TEAMS, getMlbFallbackHeadshotUrl } from "@/lib/constants";
+import { hasLocalPlayerPhoto } from "@/lib/player-photos-data";
 
 /**
- * Generador canónico de Pitching Summary en Canvas HTML5 para República Caraquista.
- * Replica de manera milimétrica y al píxel la salida de Matplotlib (GridSpec 20x20)
- * diseñada por Thomas Nestico (@TJStats) y adaptada a la LVBP en RepubliCaraquistApp.
- *
- * Dimensiones: 2400x2400 px (300 DPI) sobre fondo blanco pulcro (#FFFFFF).
- *
- * Modos Soportados:
- * 1. Salida Individual ('game'):
- *    - Cabecera: Foto MLB, Nombre, Bio física con Rol (Abridor/Relevista), Subtítulo 1 y 2 con fecha, rol y decisión.
- *    - Barra Superior (8 cols): IP | H | R | ER | BB | SO | PITCHES | CSW%
- *    - Tríptico Gráfico: Carga por Entrada, Apalancamiento Tango RE24 con cota 1.0, Platoon Splits (LHB vs RHB).
- *    - Tabla Inferior: Destino del Pitcheo centrada al 76% (Bolas, Cantados, Whiffs, Fouls, En Juego).
- * 2. Temporada Completa ('season'):
- *    - Cabecera: Foto MLB, Nombre, Bio física, Subtítulo de Temporada.
- *    - Barra Superior (9 cols): IP | JUEGOS | WHIP | ERA | SO (K) | BB | PITCHES | CSW% | Whiff%
- *    - Tríptico Gráfico de los Últimos 10 Juegos:
- *      * Plot 1: Bolas y Strikes por Salida (últimos 10 juegos)
- *      * Plot 2: Whiff% por Salida (últimos 10 juegos)
- *      * Plot 3: CSW% por Salida (últimos 10 juegos con línea elite 30%)
- *    - Tabla Inferior: Historial de Salidas del Período con columna Rol (Abridor/Relevista), Decisión, IP, etc.
- * 3. Pie de Página (Footer):
- *    - Izquierda: República Caraquista • @republicaraquista • Jorge Leonardo Loreto
- *    - Centro: Play-by-Play Sabermétrico • Tango RE24 Leverage Index (cursiva gris)
- *    - Derecha: Diseño inspirado en Thomas Nestico (@TJStats) • Data: MLB Stats API / Gameday PBP
+ * Motor Gráfico Editorial de Pitching Summary en HTML5 Canvas para República Caraquista.
+ * Lienzo vertical de alta definición: 2400 x 3200 px (proporción 3:4 a 300 DPI) sobre blanco #FFFFFF.
+ * Soporta Salida Individual ('game') y Temporada Completa ('season') para LVBP y MLB.
  */
 
-export async function generatePitchingCardBlob(
+export const CANVAS_W = 2400;
+export const CANVAS_H = 3200;
+
+async function tryLoadImage(url: string, useCors: boolean): Promise<HTMLImageElement | null> {
+  if (!url) return null;
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    if (useCors) {
+      img.crossOrigin = "anonymous";
+    }
+    const timer = window.setTimeout(() => resolve(null), 6500);
+    img.onload = () => {
+      window.clearTimeout(timer);
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        resolve(img);
+      } else {
+        resolve(null);
+      }
+    };
+    img.onerror = () => {
+      window.clearTimeout(timer);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
+
+/**
+ * Cargador de retrato en 3 niveles CORS-safe para evitar SecurityError en canvas.toBlob():
+ * 1) Asset local RGBA mismo origen (/assets/players/{id}.png)
+ * 2) photoUrl primaria con crossOrigin="anonymous"
+ * 3) Fallback oficial Cloudinary MLB con crossOrigin="anonymous"
+ */
+async function loadCorsSafePitcherHeadshot(
+  pitcher: PitcherProfile,
+  mlbFallbackFromData?: string
+): Promise<HTMLImageElement | null> {
+  const candidates: Array<{ url: string; cors: boolean }> = [];
+  if (hasLocalPlayerPhoto(pitcher.id)) {
+    candidates.push({ url: `/assets/players/${pitcher.id}.png`, cors: false });
+  }
+  if (pitcher.photoUrl) {
+    const isSameOrigin = pitcher.photoUrl.startsWith("/");
+    candidates.push({ url: pitcher.photoUrl, cors: !isSameOrigin });
+  }
+  const mlbUrl =
+    mlbFallbackFromData ||
+    pitcher.mlbPhotoUrl ||
+    getMlbFallbackHeadshotUrl(pitcher.id);
+  if (mlbUrl && !candidates.some((c) => c.url === mlbUrl)) {
+    candidates.push({ url: mlbUrl, cors: true });
+  }
+
+  for (const cand of candidates) {
+    const loaded = await tryLoadImage(cand.url, cand.cors);
+    if (loaded) return loaded;
+  }
+  return null;
+}
+
+function parseNum(raw: string | number | null | undefined): number | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+  const cleaned = String(raw).replace(/[%+,★A-Za-z\s()]/g, "").trim();
+  if (!cleaned || cleaned === "—" || cleaned === "-") return null;
+  const normalized = cleaned.startsWith(".") ? `0${cleaned}` : cleaned.startsWith("-.") ? `-0${cleaned.slice(1)}` : cleaned;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatSigned(val: number | null | undefined, decimals = 2): string {
+  if (val === null || val === undefined || !Number.isFinite(val)) return "—";
+  const prefix = val > 0 ? "+" : "";
+  return `${prefix}${val.toFixed(decimals)}`;
+}
+
+interface KpiCellDef {
+  label: string;
+  value: string;
+  metricKey?: string;
+  numericValue?: number | null;
+}
+
+function drawKpiRowTable(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  headerH: number,
+  valH: number,
+  cells: KpiCellDef[]
+) {
+  const totalH = headerH + valH;
+  const colW = w / cells.length;
+
+  for (let i = 0; i < cells.length; i++) {
+    const cx = x + i * colW;
+    const cell = cells[i];
+
+    // Header
+    ctx.fillStyle = "#0F172A";
+    ctx.fillRect(cx, y, colW, headerH);
+
+    ctx.fillStyle = "#FDB827";
+    ctx.font = cells.length >= 10 ? "bold 19px Inter, sans-serif" : "bold 21px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(cell.label, cx + colW / 2, y + Math.round(headerH * 0.66));
+
+    // Semantic cell body
+    const shade = cell.metricKey
+      ? getMetricCellShade(cell.metricKey, cell.numericValue ?? parseNum(cell.value))
+      : { bg: "#FFFFFF", fg: "#0F172A", border: "#CBD5E1", tier: "neutral" as const };
+
+    ctx.fillStyle = shade.bg;
+    ctx.fillRect(cx, y + headerH, colW, valH);
+
+    ctx.fillStyle = shade.fg;
+    const valLen = cell.value.length;
+    const fontSize =
+      valLen > 11 ? 22 : valLen > 8 ? 25 : cells.length >= 10 ? 28 : 30;
+    ctx.font = `900 ${fontSize}px Inter, sans-serif`;
+    ctx.fillText(cell.value, cx + colW / 2, y + headerH + Math.round(valH * 0.64));
+
+    if (i > 0) {
+      ctx.beginPath();
+      ctx.moveTo(cx, y);
+      ctx.lineTo(cx, y + totalH);
+      ctx.strokeStyle = "#CBD5E1";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(x, y + headerH);
+  ctx.lineTo(x + w, y + headerH);
+  ctx.strokeStyle = "#CBD5E1";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, totalH);
+  ctx.textAlign = "left";
+}
+
+export async function renderPitchingCardToCanvas(
+  canvas: HTMLCanvasElement,
   data: PitchGameDataResponse,
   pitcher: PitcherProfile,
   gameLog: PitcherGameLog,
   branch: "lvbp" | "mlb",
   gameLogs: PitcherGameLog[] = []
-): Promise<Blob | null> {
-  const size = 2400;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
+): Promise<boolean> {
+  canvas.width = CANVAS_W;
+  canvas.height = CANVAS_H;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
+  if (!ctx) return false;
 
-  // 1. Fondo Blanco Pulcro (Estilo canónico Matplotlib)
+  // 1. Fondo Blanco Editorial (#FFFFFF)
   ctx.fillStyle = "#FFFFFF";
-  ctx.fillRect(0, 0, size, size);
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-  // Márgenes y ancho útil principal
+  // Franja institucional superior sutil (Navy + Oro Caraquista)
+  ctx.fillStyle = "#0F172A";
+  ctx.fillRect(0, 0, CANVAS_W, 12);
+  ctx.fillStyle = "#FDB827";
+  ctx.fillRect(0, 12, CANVAS_W, 5);
+
   const tblX = 80;
-  const tblW = size - 160; // 2240 px
-  const centerX = size / 2; // 1200 px
+  const tblW = CANVAS_W - 160; // 2240 px
+  const centerX = CANVAS_W / 2; // 1200 px
+
+  const isSeason = data.timeMode === "season";
+  const bx = data.boxscore;
+  const ctxMet = data.contextMetrics;
 
   // ───────────────────────────────────────────────────────────────────────────
-  // 2. Cabecera (y: 45 a 380 px)
+  // 2. Cabecera Institucional (y: 44 a 364 px)
   // ───────────────────────────────────────────────────────────────────────────
   const headshotX = 80;
-  const headshotY = 48;
-  const headshotW = 310;
-  const headshotH = 340;
+  const headshotY = 44;
+  const headshotW = 290;
+  const headshotH = 320;
 
-  // Foto oficial MLB rectangular (ax_headshot)
-  try {
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    img.src = pitcher.photoUrl;
-    await new Promise((resolve) => {
-      img.onload = resolve;
-      img.onerror = resolve;
-    });
+  ctx.fillStyle = "#F8FAFC";
+  ctx.fillRect(headshotX, headshotY, headshotW, headshotH);
 
-    ctx.fillStyle = "#F8FAFC";
-    ctx.fillRect(headshotX, headshotY, headshotW, headshotH);
-
-    const imgAspect = (img.naturalWidth || img.width || 1) / (img.naturalHeight || img.height || 1);
+  const portraitImg = await loadCorsSafePitcherHeadshot(pitcher, data.mlbPhotoUrl);
+  if (portraitImg) {
+    const imgAspect =
+      (portraitImg.naturalWidth || portraitImg.width || 1) /
+      (portraitImg.naturalHeight || portraitImg.height || 1);
     let drawW = headshotW;
     let drawH = headshotH;
     let drawX = headshotX;
@@ -95,24 +228,50 @@ export async function generatePitchingCardBlob(
       drawX = headshotX + (headshotW - drawW) / 2;
     }
 
-    ctx.drawImage(img, drawX, drawY, drawW, drawH);
-    ctx.strokeStyle = "#E2E8F0";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(headshotX, headshotY, headshotW, headshotH);
-  } catch {
-    ctx.fillStyle = "#F1F5F9";
-    ctx.fillRect(headshotX, headshotY, headshotW, headshotH);
-    ctx.strokeStyle = "#CBD5E1";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(headshotX, headshotY, headshotW, headshotH);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(headshotX, headshotY, headshotW, headshotH);
+    ctx.clip();
+    ctx.drawImage(portraitImg, drawX, drawY, drawW, drawH);
+    ctx.restore();
+  } else {
+    // Silueta / iniciales vectoriales sin contaminar CORS
+    ctx.fillStyle = "#0F172A";
+    ctx.beginPath();
+    ctx.arc(headshotX + headshotW / 2, headshotY + 135, 58, 0, Math.PI * 2);
+    ctx.fill();
+    const initials = pitcher.name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((s) => s[0]?.toUpperCase() || "")
+      .join("");
+    ctx.fillStyle = "#FDB827";
+    ctx.font = "900 44px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(initials || "P", headshotX + headshotW / 2, headshotY + 150);
+    ctx.fillStyle = "#64748B";
+    ctx.font = "bold 18px Inter, sans-serif";
+    ctx.fillText(`${pitcher.throws || "R"}HP`, headshotX + headshotW / 2, headshotY + 250);
   }
 
-  // Textos Biográficos Centrados Horizontalmente (ax_bio)
-  const isSeason = data.timeMode === "season";
-  const teamLabel = pitcher.lvbpTeamName || pitcher.team || "Leones del Caracas";
+  ctx.strokeStyle = "#CBD5E1";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(headshotX, headshotY, headshotW, headshotH);
+
+  // Textos centrales
+  const teamLabel = pitcher.lvbpTeamName || pitcher.team || "LVBP";
   const oppClean = gameLog.opponent || "Rival";
-  const seasonNum = gameLog.date.replace("Temporada ", "").split("-")[0] || "2025";
-  const roleLabel = gameLog.role || (gameLog.isStarter ? "Abridor" : "Relevista");
+  const seasonNum =
+    String(data.effectiveSeason || "") ||
+    gameLog.date.replace("Temporada ", "").split("-")[0] ||
+    "2025";
+  const roleLabel =
+    isSeason
+      ? data.isStarter
+        ? "Rotación Abridora"
+        : "Relevo / Bullpen"
+      : gameLog.role || (data.isStarter ? "Abridor" : "Relevista");
 
   let sub1 = "";
   let sub2 = "";
@@ -121,69 +280,81 @@ export async function generatePitchingCardBlob(
     if (isSeason) {
       const phaseTxt =
         gameLog.phase === "R"
-          ? "Temporada Regular"
+          ? "Ronda Regular"
           : gameLog.phase === "L"
           ? "Round Robin"
           : gameLog.phase === "F"
           ? "Serie Final"
           : "Temporada Completa";
       sub1 = `LVBP • ${teamLabel} (${phaseTxt})`;
-      sub2 = `Temporada ${seasonNum} • Consolidado del Período`;
+      sub2 = `Temporada ${seasonNum} • ${data.gamesCount || gameLogs.length || 0} Apariciones Registradas`;
     } else {
-      const decTxt = gameLog.decision ? ` • Decisión: ${gameLog.decision}` : "";
+      const decTxt = data.decision || gameLog.decision;
+      const decSuffix = decTxt ? ` • Decisión: ${decTxt}` : "";
       sub1 = `LVBP • ${teamLabel} vs ${oppClean}`;
-      sub2 = `Fecha: ${gameLog.date} (${roleLabel}${decTxt}) | Temporada ${seasonNum}`;
+      sub2 = `Fecha: ${gameLog.date} • Rol: ${roleLabel}${decSuffix}`;
     }
   } else {
     if (isSeason) {
-      sub1 = "MLB • Resumen de Temporada Completa";
-      sub2 = `${pitcher.team} | Temporada ${seasonNum}`;
+      sub1 = `MLB • ${pitcher.team || "Grandes Ligas"}`;
+      sub2 = `Temporada ${seasonNum} • Consolidado Oficial (${data.gamesCount || gameLogs.length || 0} JJ)`;
     } else {
-      const decTxt = gameLog.decision ? ` • Decisión: ${gameLog.decision}` : "";
-      sub1 = `MLB • Salida Individual vs ${oppClean}`;
-      sub2 = `Fecha: ${gameLog.date} (${roleLabel}${decTxt}) | Temporada ${seasonNum}`;
+      const decTxt = data.decision || gameLog.decision;
+      const decSuffix = decTxt ? ` • Decisión: ${decTxt}` : "";
+      sub1 = `MLB • ${pitcher.team || "Grandes Ligas"} vs ${oppClean}`;
+      sub2 = `Fecha: ${gameLog.date} • Rol: ${roleLabel}${decSuffix}`;
     }
   }
 
-  // Nombre (centrado)
   ctx.textAlign = "center";
   ctx.fillStyle = "#070B19";
-  ctx.font = "900 68px Inter, system-ui, sans-serif";
-  ctx.fillText(pitcher.name, centerX, 115);
+  ctx.font = pitcher.name.length > 22 ? "900 56px Inter, sans-serif" : "900 66px Inter, sans-serif";
+  ctx.fillText(pitcher.name, centerX, 114);
 
-  // Bio física con Rol Destacado (centrada)
-  const age = pitcher.age || 31;
-  const height = pitcher.height || "6' 3\"";
-  const weight = pitcher.weight || 180;
-  const throws = pitcher.throws || "R";
+  const bioParts: string[] = [`${pitcher.throws || "R"}HP`, roleLabel];
+  if (pitcher.age) bioParts.push(`Edad: ${pitcher.age}`);
+  if (pitcher.height && pitcher.weight) {
+    bioParts.push(`${pitcher.height} / ${pitcher.weight} lbs`);
+  } else if (pitcher.height) {
+    bioParts.push(pitcher.height);
+  }
   ctx.fillStyle = "#475569";
-  ctx.font = "bold 25px Inter, system-ui, sans-serif";
-  const bioRolText = isSeason ? `${throws}HP • Edad: ${age} • ${height} / ${weight} lbs` : `${throws}HP • Rol: ${roleLabel} • Edad: ${age} • ${height} / ${weight} lbs`;
-  ctx.fillText(bioRolText, centerX, 175);
+  ctx.font = "bold 25px Inter, sans-serif";
+  ctx.fillText(bioParts.join("  •  "), centerX, 172);
 
-  // Subtítulo 1 (dorado caraquista bold, centrado)
-  ctx.fillStyle = "#D97706";
+  ctx.fillStyle = "#B45309";
   ctx.font = "bold 29px Inter, sans-serif";
-  ctx.fillText(sub1, centerX, 248);
+  ctx.fillText(sub1, centerX, 240);
 
-  // Subtítulo 2 (gris cursiva italic, centrado)
   ctx.fillStyle = "#64748B";
   ctx.font = "italic 23px Inter, sans-serif";
-  ctx.fillText(sub2, centerX, 312);
+  ctx.fillText(sub2, centerX, 294);
 
-  // Logo Oficial República Caraquista (ax_logo)
-  const logoCenterX = size - 80 - 150; // ~2170
-  const logoCenterY = 160;
-  try {
-    const logoImg = new window.Image();
-    logoImg.crossOrigin = "anonymous";
-    logoImg.src = "/assets/logo.png";
-    await new Promise((resolve) => {
-      logoImg.onload = resolve;
-      logoImg.onerror = resolve;
-    });
+  // Badge de franquicia / modo centrado bajo subtítulos
+  const badgeText =
+    branch === "lvbp"
+      ? isSeason
+        ? `REPORTE DE TEMPORADA LVBP • PBP & CONTACTO BIS`
+        : `REPORTE DE SALIDA INDIVIDUAL LVBP • PBP & CONTACTO BIS`
+      : isSeason
+      ? `REPORTE DE TEMPORADA MLB • TELEMETRÍA HAWK-EYE`
+      : `REPORTE DE SALIDA INDIVIDUAL MLB • TELEMETRÍA HAWK-EYE`;
+  const badgeW = 690;
+  ctx.fillStyle = "#F1F5F9";
+  ctx.fillRect(centerX - badgeW / 2, 316, badgeW, 40);
+  ctx.strokeStyle = "#CBD5E1";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(centerX - badgeW / 2, 316, badgeW, 40);
+  ctx.fillStyle = "#0F172A";
+  ctx.font = "bold 17px Inter, sans-serif";
+  ctx.fillText(badgeText, centerX, 342);
 
-    const logoRadius = 72;
+  // Logo República Caraquista a la derecha
+  const logoCenterX = CANVAS_W - 80 - 145;
+  const logoCenterY = 162;
+  const logoImg = await tryLoadImage("/assets/logo.png", false);
+  if (logoImg) {
+    const logoRadius = 74;
     ctx.drawImage(
       logoImg,
       logoCenterX - logoRadius,
@@ -191,7 +362,7 @@ export async function generatePitchingCardBlob(
       logoRadius * 2,
       logoRadius * 2
     );
-  } catch {
+  } else {
     ctx.fillStyle = "#0D152B";
     ctx.beginPath();
     ctx.arc(logoCenterX, logoCenterY, 70, 0, Math.PI * 2);
@@ -201,100 +372,203 @@ export async function generatePitchingCardBlob(
     ctx.stroke();
   }
 
-  // Texto dorado debajo del logo
-  ctx.fillStyle = "#C27803";
-  ctx.font = "bold 16px Inter, sans-serif";
+  ctx.fillStyle = "#B45309";
+  ctx.font = "900 16px Inter, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("REPUBLICA CARAQUISTA", logoCenterX, 268);
+  ctx.fillText("REPÚBLICA CARAQUISTA", logoCenterX, 266);
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // 3. Tabla Superior de Métricas (ax_season_table) (y: 415 a 565 px)
-  // ───────────────────────────────────────────────────────────────────────────
-  const tblY = 415;
-  const tblHeaderH = 65;
-  const tblValH = 78;
-  const tblTotalH = tblHeaderH + tblValH;
-
-  const cols = isSeason
-    ? ["IP", "JUEGOS", "WHIP", "ERA", "SO (K)", "BB", "PITCHES", "CSW%", "Whiff%"]
-    : ["IP", "H", "R", "ER", "BB", "SO", "PITCHES", "CSW%"];
-
-  const vals = isSeason
-    ? [
-        data.boxscore.ip,
-        String(data.gamesCount || (gameLogs.length > 0 ? gameLogs.length : "—")),
-        data.boxscore.whip || "0.00",
-        data.boxscore.era || "0.00",
-        String(data.boxscore.so),
-        String(data.boxscore.bb),
-        String(data.boxscore.pitches),
-        data.boxscore.cswPct,
-        data.boxscore.whiffPct,
-      ]
-    : [
-        data.boxscore.ip,
-        String(data.boxscore.h),
-        String(data.boxscore.r),
-        String(data.boxscore.er),
-        String(data.boxscore.bb),
-        String(data.boxscore.so),
-        String(data.boxscore.pitches),
-        data.boxscore.cswPct,
-      ];
-
-  const colW = tblW / cols.length;
-
-  // Marco exterior
-  ctx.strokeStyle = "#0F172A";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(tblX, tblY, tblW, tblTotalH);
-
-  for (let i = 0; i < cols.length; i++) {
-    const cx = tblX + i * colW;
-
-    // Encabezado
-    ctx.fillStyle = "#0F172A";
-    ctx.fillRect(cx, tblY, colW, tblHeaderH);
-
-    ctx.fillStyle = "#FDB827";
-    ctx.font = "bold 23px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(cols[i], cx + colW / 2, tblY + 41);
-
-    // Valor
+  if (branch === "lvbp" && pitcher.lvbpTeamId && LVBP_TEAMS[pitcher.lvbpTeamId]) {
+    const club = LVBP_TEAMS[pitcher.lvbpTeamId];
+    ctx.fillStyle = club.primaryColor || "#0F172A";
+    ctx.fillRect(logoCenterX - 95, 284, 190, 34);
     ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(cx, tblY + tblHeaderH, colW, tblValH);
-
-    ctx.fillStyle = "#070B19";
-    ctx.font = "bold 33px Inter, sans-serif";
-    ctx.fillText(vals[i], cx + colW / 2, tblY + tblHeaderH + 50);
-
-    // Líneas divisorias verticales
-    if (i > 0) {
-      ctx.beginPath();
-      ctx.moveTo(cx, tblY);
-      ctx.lineTo(cx, tblY + tblTotalH);
-      ctx.strokeStyle = "#CCCCCC";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
+    ctx.font = "bold 16px Inter, sans-serif";
+    ctx.fillText(`${club.abbreviation} • LVBP`, logoCenterX, 307);
   }
 
-  // Divisor horizontal entre encabezado y valor
-  ctx.beginPath();
-  ctx.moveTo(tblX, tblY + tblHeaderH);
-  ctx.lineTo(tblX + tblW, tblY + tblHeaderH);
-  ctx.strokeStyle = "#CCCCCC";
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  // ───────────────────────────────────────────────────────────────────────────
+  // 3. Doble Barra KPI con Sombreado Semántico (y: 394 a 732 px)
+  // ───────────────────────────────────────────────────────────────────────────
+  const pitchesStr = `${bx.pitches} (${bx.strikes}S)`;
+  const strikePctDisplay =
+    bx.strikePct ||
+    (bx.pitches > 0 ? `${((bx.strikes / bx.pitches) * 100).toFixed(1)}%` : "0.0%");
+
+  if (!isSeason) {
+    const gsv2Val = bx.gsv2 ?? ctxMet?.gsv2 ?? null;
+    const isQs = Boolean(bx.isQS ?? ctxMet?.isQS);
+    const roleCell: KpiCellDef = data.isStarter
+      ? {
+          label: isQs ? "GSv2 (QS)" : "GSv2",
+          value: gsv2Val !== null ? (isQs ? `${gsv2Val} ★` : String(gsv2Val)) : "—",
+          metricKey: "gsv2",
+          numericValue: gsv2Val,
+        }
+      : {
+          label: "IR / IRS",
+          value: `${bx.ir ?? ctxMet?.ir ?? 0} / ${bx.irs ?? ctxMet?.irs ?? 0}`,
+        };
+
+    const row1: KpiCellDef[] = [
+      { label: "IP", value: bx.ip || "0.0" },
+      { label: "BF", value: String(bx.bf ?? "—") },
+      { label: "H", value: String(bx.h) },
+      { label: "R / CL", value: `${bx.r} / ${bx.er}` },
+      { label: "BB", value: String(bx.bb) },
+      { label: "SO (K)", value: String(bx.so) },
+      { label: "HR", value: String(bx.hr ?? 0) },
+      { label: "P (Strikes)", value: pitchesStr },
+      {
+        label: "Strike%",
+        value: strikePctDisplay,
+        metricKey: "strikePct",
+        numericValue: parseNum(strikePctDisplay),
+      },
+    ];
+
+    const row2: KpiCellDef[] = [
+      roleCell,
+      {
+        label: "WPA",
+        value: formatSigned(ctxMet?.wpa, 3),
+        metricKey: "wpa",
+        numericValue: ctxMet?.wpa ?? null,
+      },
+      {
+        label: "RE24",
+        value: formatSigned(ctxMet?.re24, 2),
+        metricKey: "re24",
+        numericValue: ctxMet?.re24 ?? null,
+      },
+      {
+        label: "aLI (gmLI)",
+        value: ctxMet
+          ? `${ctxMet.aLI.toFixed(2)} (${ctxMet.gmLI.toFixed(2)})`
+          : "1.00",
+      },
+      {
+        label: "F-Strike%",
+        value: bx.fStrikePct || data.pbpKpis.fpsPct || "0.0%",
+        metricKey: "fStrikePct",
+      },
+      { label: "CSW%", value: bx.cswPct, metricKey: "cswPct" },
+      { label: "Whiff%", value: bx.whiffPct, metricKey: "whiffPct" },
+      {
+        label: "SwStr%",
+        value: bx.swStrPct || data.pbpKpis.swStrPct || "0.0%",
+        metricKey: "swStrPct",
+      },
+      {
+        label: "PutAway%",
+        value: bx.putAwayPct || data.pbpKpis.putAwayPct || "0.0%",
+        metricKey: "putAwayPct",
+      },
+    ];
+
+    drawKpiRowTable(ctx, tblX, 396, tblW, 52, 78, row1);
+    drawKpiRowTable(ctx, tblX, 544, tblW, 52, 78, row2);
+
+    // Tira contextual compacta del partido (y: 636..680)
+    drawContextBanner(
+      ctx,
+      tblX,
+      638,
+      tblW,
+      44,
+      data.isStarter
+        ? `ROL DEL PARTIDO: ABRIDOR  •  GAME SCORE v2: ${gsv2Val ?? "—"}${
+            isQs ? " (SALIDA DE CALIDAD • QS)" : ""
+          }  •  K-BB%: ${bx.kMinusBbPct || "—"}  •  RODADOS / ELEVADOS (GO-AO): ${
+            bx.go ?? 0
+          }-${bx.ao ?? 0}`
+        : `ROL DEL PARTIDO: RELEVISTA  •  LI AL ENTRAR (gmLI): ${
+            ctxMet?.gmLI.toFixed(2) ?? "1.00"
+          }  •  HEREDADOS (IR / IRS): ${bx.ir ?? 0} / ${bx.irs ?? 0}  •  K-BB%: ${
+            bx.kMinusBbPct || "—"
+          }`
+    );
+  } else {
+    const jjTxt = `${bx.gamesPlayed ?? data.gamesCount ?? gameLogs.length} (${
+      bx.gamesStarted ?? ctxMet?.gsCount ?? 0
+    } GS)`;
+    const row1: KpiCellDef[] = [
+      { label: "JJ (GS)", value: jjTxt },
+      { label: "RÉCORD", value: data.decision || "0-0" },
+      { label: "IP", value: bx.ip || "0.0" },
+      { label: "TBF", value: String(bx.bf ?? "—") },
+      { label: "ERA", value: bx.era || "0.00", metricKey: "era" },
+      { label: "WHIP", value: bx.whip || "0.00", metricKey: "whip" },
+      { label: "FIP", value: bx.fip || "—", metricKey: "fip" },
+      {
+        label: "ERA-",
+        value: bx.eraMinus !== null && bx.eraMinus !== undefined ? String(bx.eraMinus) : "—",
+        metricKey: "eraMinus",
+        numericValue: bx.eraMinus ?? null,
+      },
+      { label: "SO / BB", value: `${bx.so} / ${bx.bb}` },
+      { label: "HR", value: String(bx.hr ?? 0) },
+    ];
+
+    const row2: KpiCellDef[] = [
+      { label: "K%", value: bx.kPct || "—", metricKey: "kPct" },
+      { label: "BB%", value: bx.bbPct || "—", metricKey: "bbPct" },
+      { label: "K-BB%", value: bx.kMinusBbPct || "—", metricKey: "kMinusBbPct" },
+      {
+        label: "BABIP",
+        value: bx.babip || "—",
+        metricKey: "babip",
+        numericValue: bx.babip && bx.babip !== "—" ? Number(`0${bx.babip}`) : null,
+      },
+      { label: "LOB%", value: bx.lobPct || "—", metricKey: "lobPct" },
+      {
+        label: "BAA / OPS",
+        value: `${bx.baa || "—"} / ${bx.opsAgainst || "—"}`,
+        metricKey: "opsAgainst",
+        numericValue:
+          bx.opsAgainst && bx.opsAgainst !== "—"
+            ? Number(bx.opsAgainst.startsWith(".") ? `0${bx.opsAgainst}` : bx.opsAgainst)
+            : null,
+      },
+      {
+        label: "F-Strike%",
+        value: bx.fStrikePct || data.pbpKpis.fpsPct || "0.0%",
+        metricKey: "fStrikePct",
+      },
+      { label: "CSW%", value: bx.cswPct, metricKey: "cswPct" },
+      { label: "Whiff%", value: bx.whiffPct, metricKey: "whiffPct" },
+      {
+        label: "WPA / RE24",
+        value: `${formatSigned(ctxMet?.wpa, 2)} / ${formatSigned(ctxMet?.re24, 1)}`,
+        metricKey: "wpa",
+        numericValue: ctxMet?.wpa ?? null,
+      },
+    ];
+
+    drawKpiRowTable(ctx, tblX, 396, tblW, 52, 78, row1);
+    drawKpiRowTable(ctx, tblX, 544, tblW, 52, 78, row2);
+
+    const roleBannerText = data.isStarter
+      ? `VALOR DE ABRIDOR:  SALIDAS DE CALIDAD (QS): ${ctxMet?.qsCount ?? 0} de ${
+          ctxMet?.gsCount ?? 0
+        }  •  GSv2 PROMEDIO: ${ctxMet?.avgGsv2 ?? "—"}  •  PITCHEOS: ${pitchesStr}  •  PUTAWAY%: ${
+          bx.putAwayPct || data.pbpKpis.putAwayPct || "—"
+        }`
+      : `VALOR DE RELEVO:  CORREDORES HEREDADOS (IR / IRS): ${ctxMet?.ir ?? 0} / ${
+          ctxMet?.irs ?? 0
+        } (${ctxMet?.irsPct !== null && ctxMet?.irsPct !== undefined ? `${ctxMet.irsPct}%` : "0.0%"})  •  SHUTDOWNS / MELTDOWNS (SD / MD): ${
+          ctxMet?.shutdowns ?? 0
+        } / ${ctxMet?.meltdowns ?? 0}  •  aLI: ${ctxMet?.aLI.toFixed(2) ?? "1.00"}`;
+
+    drawContextBanner(ctx, tblX, 638, tblW, 44, roleBannerText);
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // 4. Panel Gráfico Tríptico (3 Subplots estilo Matplotlib) (y: 660 a 1350 px)
+  // 4. Tríptico Gráfico Central (y: 748 a 1368 px | 3 paneles de 700 x 620 px)
   // ───────────────────────────────────────────────────────────────────────────
-  const panelY = 660;
-  const panelH = 680;
-  const panelW = 680;
-  const gap = 100;
+  const panelY = 748;
+  const panelH = 610;
+  const panelW = 700;
+  const gap = 70; // 700*3 + 70*2 = 2240 == tblW
 
   const p1X = tblX;
   const p2X = tblX + panelW + gap;
@@ -302,7 +576,6 @@ export async function generatePitchingCardBlob(
 
   if (branch === "lvbp") {
     if (isSeason && gameLogs && gameLogs.length > 0) {
-      // ── Modo Temporada LVBP: Progreso de los Últimos 10 Juegos ──
       const sortedLogs = [...gameLogs].sort(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
       );
@@ -312,95 +585,1234 @@ export async function generatePitchingCardBlob(
       drawLvbpSeasonWhiffPlot(ctx, p2X, panelY, panelW, panelH, plotLogs);
       drawLvbpSeasonCswPlot(ctx, p3X, panelY, panelW, panelH, plotLogs);
     } else {
-      // ── Modo Salida Individual LVBP: Carga, Apalancamiento, Platoon ──
       drawLvbpWorkloadPlot(ctx, p1X, panelY, panelW, panelH, data.inningsWorkload);
       drawLvbpLeveragePlot(ctx, p2X, panelY, panelW, panelH, data.inningsWorkload);
       drawLvbpPlatoonPlot(ctx, p3X, panelY, panelW, panelH, data.splitsPlatoon);
     }
   } else {
-    // Rama MLB
     drawMlbVelocityPlot(ctx, p1X, panelY, panelW, panelH, data.statcastTable);
     drawMlbStrikeZonePlot(ctx, p2X, panelY, panelW, panelH, data.pitches);
     drawMlbBreaksPlot(ctx, p3X, panelY, panelW, panelH, data.pitches, pitcher.throws);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // 5. Tabla Inferior (y: 1440 a 2060 px)
+  // 5. Bloque Analítico Medio (y: 1465 a 2115 px | h: 650 px)
   // ───────────────────────────────────────────────────────────────────────────
-  const bottomTblY = 1440;
-  const bottomTblH = 620;
+  const midY = 1465;
+  const midH = 650;
 
   if (branch === "lvbp") {
-    // Si hay gameLogs disponibles (tanto en modo temporada como individual),
-    // SIEMPRE incluir la tabla con los Últimos 10 Juegos solicitados
-    if (gameLogs && gameLogs.length > 0) {
-      const sortedDesc = [...gameLogs].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      // Incluir exactamente hasta 10 juegos
-      const displayLogs = sortedDesc.slice(0, 10);
-      drawLvbpSeasonHistoryTable(
+    if (!isSeason) {
+      // Izquierda: Destinos del Pitcheo PBP | Derecha: Perfil de Contacto BIS Permitido
+      const leftW = 1090;
+      const rightW = 1090;
+      const midGap = 60;
+      drawPbpDestinationsCard(ctx, tblX, midY, leftW, midH, data.pbpTable, data.pbpKpis);
+      drawBisContactCard(
         ctx,
-        tblX,
-        bottomTblY,
-        tblW,
-        bottomTblH,
-        displayLogs,
-        !isSeason ? gameLog.gamePk : undefined
+        tblX + leftW + midGap,
+        midY,
+        rightW,
+        midH,
+        data.contactProfile,
+        "PERFIL DE CONTACTO PERMITIDO (MODELO BIS)"
       );
     } else {
-      // Fallback si no hay gameLogs
-      drawLvbpBottomTable(ctx, tblX, bottomTblY, tblW, bottomTblH, data.pbpTable);
+      // Temporada LVBP: Izquierda Splits Acumulados | Derecha Contacto BIS de Temporada
+      const leftW = 1270;
+      const rightW = 920;
+      const midGap = 50;
+      drawSplitsTableCard(
+        ctx,
+        tblX,
+        midY,
+        leftW,
+        midH,
+        data.situationalSplits || [],
+        "SPLITS SITUACIONALES ACUMULADOS DE TEMPORADA",
+        true
+      );
+      drawBisContactCard(
+        ctx,
+        tblX + leftW + midGap,
+        midY,
+        rightW,
+        midH,
+        data.contactProfile,
+        "CONTACTO PERMITIDO BIS (TEMPORADA)"
+      );
     }
   } else {
-    // Tabla de repertorio Hawk-Eye MLB
-    drawMlbRepTable(ctx, tblX, bottomTblY, tblW, bottomTblH, data.statcastTable);
+    // MLB: Tabla Completa de Repertorio Hawk-Eye enriquecida + Barra de Calidad de Contacto Óptico
+    drawMlbArsenalAndOpticalCard(
+      ctx,
+      tblX,
+      midY,
+      tblW,
+      midH,
+      data.statcastTable,
+      data.contactProfile,
+      data.pbpKpis
+    );
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // 6. Pie de Página Oficial (Footer Matplotlib sin línea gruesa) (y: 2240 a 2320 px)
+  // 6. Bloque Profundo Inferior (y: 2195 a 2995 px | h: 800 px)
   // ───────────────────────────────────────────────────────────────────────────
-  // Izquierda: Branding República Caraquista
+  const botY = 2195;
+  const botH = 800;
+
+  if (!isSeason) {
+    // Modo Salida Individual (LVBP y MLB): Splits del Partido + Vueltas al Orden (TTO) / Contexto Relevo
+    drawSplitsTableCard(
+      ctx,
+      tblX,
+      botY,
+      tblW,
+      380,
+      data.situationalSplits || [],
+      "SPLITS SITUACIONALES DEL PARTIDO (RESULTADOS Y DOMINIO PBP)",
+      false
+    );
+
+    const ttoRows = data.ttoSplits || [];
+    const hasSecondTto = ttoRows.some((r) => r.key !== "tto1" && r.bf > 0);
+    if (data.isStarter || hasSecondTto) {
+      drawSplitsTableCard(
+        ctx,
+        tblX,
+        botY + 420,
+        tblW,
+        370,
+        ttoRows,
+        "RENDIMIENTO POR VUELTA AL ORDEN AL BATE (TIMES THROUGH THE ORDER • TTO)",
+        false
+      );
+    } else {
+      drawRelieverDeepDiveCard(ctx, tblX, botY + 420, tblW, 370, data);
+    }
+  } else {
+    // Modo Temporada Completa (LVBP y MLB): Historial de Últimos 10 Juegos con PBP 100% Real
+    const sortedDesc = [...gameLogs].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+    const displayLogs = sortedDesc.slice(0, 10);
+    drawSeasonHistoryRealPbpTable(ctx, tblX, botY + 28, tblW, botH - 28, displayLogs);
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 7. Pie Editorial Oficial (y: 3045 a 3155 px) — CERO jerga prohibida
+  // ───────────────────────────────────────────────────────────────────────────
+  ctx.strokeStyle = "#CBD5E1";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(tblX, 3035);
+  ctx.lineTo(tblX + tblW, 3035);
+  ctx.stroke();
+
   ctx.fillStyle = "#070B19";
-  ctx.font = "bold 28px Inter, sans-serif";
+  ctx.font = "900 26px Inter, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("República Caraquista", tblX, 2248);
+  ctx.fillText("República Caraquista", tblX, 3082);
 
   ctx.fillStyle = "#64748B";
-  ctx.font = "500 19px Inter, sans-serif";
-  ctx.fillText("@republicaraquista • Jorge Leonardo Loreto", tblX, 2284);
+  ctx.font = "600 19px Inter, sans-serif";
+  ctx.fillText(
+    "@republicaraquista • Jorge Leonardo Loreto • @GilbertoMendez",
+    tblX,
+    3118
+  );
 
-  // Centro: Metodología Sabermétrica
-  ctx.fillStyle = "#64748B";
+  ctx.fillStyle = "#475569";
   ctx.font = "italic 20px Inter, sans-serif";
   ctx.textAlign = "center";
-  const centerFooter = isSeason
-    ? "Historial de Salidas Recientes (Últimos 10 Juegos) • Telemetría Oficial"
-    : "Play-by-Play • Tango RE24 Leverage Index";
-  ctx.fillText(centerFooter, centerX, 2266);
+  const centerFooter =
+    branch === "lvbp"
+      ? "Play-by-Play Oficial • Matriz RE24 / WPA & Clasificación de Contacto BIS"
+      : "Telemetría Óptica Hawk-Eye • Matriz RE24 / WPA & Disciplina de Zona";
+  ctx.fillText(centerFooter, centerX, 3100);
 
-  // Derecha: Atribución canónica
   ctx.textAlign = "right";
   ctx.fillStyle = "#070B19";
   ctx.font = "bold 21px Inter, sans-serif";
-  ctx.fillText("Diseño inspirado en Thomas Nestico (@TJStats)", tblX + tblW, 2248);
+  ctx.fillText("Diseño inspirado en Thomas Nestico (@TJStats)", tblX + tblW, 3082);
 
   ctx.fillStyle = "#64748B";
-  ctx.font = "500 17px Inter, sans-serif";
+  ctx.font = "600 18px Inter, sans-serif";
   const srcData =
     branch === "lvbp"
-      ? "Data: MLB Stats API / Gameday PBP"
-      : "Data: MLB Statcast / Baseball Savant";
-  ctx.fillText(srcData, tblX + tblW, 2284);
+      ? "Data: MLB Stats API / Gameday PBP • Lienzo 2400×3200 px (300 DPI)"
+      : "Data: MLB Stats API / Hawk-Eye • Lienzo 2400×3200 px (300 DPI)";
+  ctx.fillText(srcData, tblX + tblW, 3118);
   ctx.textAlign = "left";
 
+  return true;
+}
+
+export async function generatePitchingCardBlob(
+  data: PitchGameDataResponse,
+  pitcher: PitcherProfile,
+  gameLog: PitcherGameLog,
+  branch: "lvbp" | "mlb",
+  gameLogs: PitcherGameLog[] = []
+): Promise<Blob | null> {
+  const canvas = document.createElement("canvas");
+  const ok = await renderPitchingCardToCanvas(
+    canvas,
+    data,
+    pitcher,
+    gameLog,
+    branch,
+    gameLogs
+  );
+  if (!ok) return null;
+
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), "image/png");
+    try {
+      canvas.toBlob((blob) => resolve(blob), "image/png");
+    } catch (err) {
+      console.error("Error exportando PNG desde canvas:", err);
+      resolve(null);
+    }
   });
 }
 
+function drawContextBanner(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  text: string
+) {
+  ctx.fillStyle = "#F8FAFC";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "#CBD5E1";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, w, h);
+
+  ctx.fillStyle = "#0F172A";
+  ctx.font = "bold 18px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(text, x + w / 2, y + Math.round(h * 0.65));
+  ctx.textAlign = "left";
+}
+
+function drawSectionHeaderBar(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  title: string
+) {
+  ctx.fillStyle = "#0F172A";
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = "#FDB827";
+  ctx.fillRect(x, y, 8, h);
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "900 21px Inter, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(title, x + 24, y + Math.round(h * 0.66));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Subrutinas de Subplots Gráficos Estilo Matplotlib Thomas Nestico
+// Bloque Medio LVBP: Destinos PBP + Perfil de Contacto BIS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function drawPbpDestinationsCard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  pbpTable: PBPDestinationRow[],
+  kpis: PitchGameDataResponse["pbpKpis"]
+) {
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+
+  const headH = 54;
+  drawSectionHeaderBar(
+    ctx,
+    x,
+    y,
+    w,
+    headH,
+    "DESTINOS DEL PITCHEO (PLAY-BY-PLAY OFICIAL)"
+  );
+
+  if (!pbpTable || pbpTable.length === 0) {
+    drawEmptyState(ctx, x, y + headH, w, h - headH, "Sin pitcheos detallados");
+    return;
+  }
+
+  const subHeadY = y + headH;
+  const subHeadH = 46;
+  ctx.fillStyle = "#F1F5F9";
+  ctx.fillRect(x + 2, subHeadY, w - 4, subHeadH);
+
+  ctx.fillStyle = "#334155";
+  ctx.font = "bold 18px Inter, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("Resultado / Destino", x + 28, subHeadY + 30);
+  ctx.textAlign = "center";
+  ctx.fillText("Conteo", x + w * 0.52, subHeadY + 30);
+  ctx.fillText("% Total", x + w * 0.67, subHeadY + 30);
+  ctx.fillText("Proporción", x + w * 0.85, subHeadY + 30);
+
+  const rows = pbpTable.slice(0, 5);
+  const bodyTop = subHeadY + subHeadH;
+  const footerSummaryH = 74;
+  const rowH = Math.floor((h - headH - subHeadH - footerSummaryH) / Math.max(rows.length, 1));
+
+  rows.forEach((r, idx) => {
+    const ry = bodyTop + idx * rowH;
+    ctx.fillStyle = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+    ctx.fillRect(x + 2, ry, w - 4, rowH);
+
+    // Dot de color
+    ctx.fillStyle = r.color || "#0F172A";
+    ctx.beginPath();
+    ctx.arc(x + 34, ry + rowH / 2, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#0F172A";
+    ctx.font = "bold 21px Inter, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(r.destination, x + 56, ry + rowH / 2 + 8);
+
+    ctx.font = "900 23px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(String(r.count), x + w * 0.52, ry + rowH / 2 + 8);
+    ctx.fillText(r.pct, x + w * 0.67, ry + rowH / 2 + 8);
+
+    // Barra proporcional
+    const pctNum = parseNum(r.pct) ?? 0;
+    const barX = x + w * 0.75;
+    const barMaxW = w * 0.21;
+    const barH = 22;
+    const barY = ry + (rowH - barH) / 2;
+
+    ctx.fillStyle = "#E2E8F0";
+    ctx.fillRect(barX, barY, barMaxW, barH);
+    ctx.fillStyle = r.color || "#0F172A";
+    ctx.fillRect(barX, barY, Math.min(barMaxW, (pctNum / 60) * barMaxW), barH);
+
+    ctx.strokeStyle = "#E2E8F0";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, ry + rowH);
+    ctx.lineTo(x + w, ry + rowH);
+    ctx.stroke();
+  });
+
+  // Pie resumen de conteo de 2 strikes y swings
+  const sumY = y + h - footerSummaryH;
+  ctx.fillStyle = "#F8FAFC";
+  ctx.fillRect(x + 2, sumY, w - 4, footerSummaryH - 2);
+  ctx.strokeStyle = "#CBD5E1";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x, sumY);
+  ctx.lineTo(x + w, sumY);
+  ctx.stroke();
+
+  ctx.fillStyle = "#0F172A";
+  ctx.font = "bold 19px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(
+    `Swings Totales: ${kpis.swings}  •  Pitcheos en 2 Strikes: ${
+      kpis.twoStrikePitches ?? 0
+    }  •  Ponches en 2S (PutAway): ${kpis.twoStrikeK ?? 0} (${kpis.putAwayPct || "0.0%"})`,
+    x + w / 2,
+    sumY + 44
+  );
+  ctx.textAlign = "left";
+}
+
+function drawBisContactCard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  contact: ContactProfileSummary | undefined,
+  title: string
+) {
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+
+  const headH = 54;
+  drawSectionHeaderBar(ctx, x, y, w, headH, title);
+
+  if (!contact || contact.bip === 0) {
+    drawEmptyState(
+      ctx,
+      x,
+      y + headH,
+      w,
+      h - headH,
+      "Sin bolas puestas en juego registradas"
+    );
+    return;
+  }
+
+  const pad = 28;
+  const innerW = w - pad * 2;
+
+  // Subtítulo Trayectoria de Batazos
+  ctx.fillStyle = "#334155";
+  ctx.font = "bold 19px Inter, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(
+    `1. DISTRIBUCIÓN DE TRAYECTORIA (${contact.bip} BOLAS EN JUEGO • GO/AO: ${contact.goAoRatio})`,
+    x + pad,
+    y + headH + 40
+  );
+
+  const trajItems = [
+    {
+      label: "Rodados (GB%)",
+      val: `${contact.gbPct.toFixed(1)}%`,
+      sub: `${contact.gb} batazos`,
+      shade: getMetricCellShade("gbPct", contact.gbPct),
+    },
+    {
+      label: "Líneas (LD%)",
+      val: `${contact.ldPct.toFixed(1)}%`,
+      sub: `${contact.ld} batazos`,
+      shade: { bg: "#F8FAFC", fg: "#0F172A", border: "#CBD5E1", tier: "neutral" as const },
+    },
+    {
+      label: "Elevados (FB%)",
+      val: `${contact.fbPct.toFixed(1)}%`,
+      sub: `${contact.fb} batazos`,
+      shade: { bg: "#F8FAFC", fg: "#0F172A", border: "#CBD5E1", tier: "neutral" as const },
+    },
+    {
+      label: "Infield Fly (PU%)",
+      val: `${contact.puPct.toFixed(1)}%`,
+      sub: `${contact.pu} batazos`,
+      shade: { bg: "#F8FAFC", fg: "#0F172A", border: "#CBD5E1", tier: "neutral" as const },
+    },
+  ];
+
+  const cardGap = 16;
+  const cardW = (innerW - cardGap * 3) / 4;
+  const cardY = y + headH + 60;
+  const cardH = 152;
+
+  trajItems.forEach((it, idx) => {
+    const cx = x + pad + idx * (cardW + cardGap);
+    ctx.fillStyle = it.shade.bg;
+    ctx.fillRect(cx, cardY, cardW, cardH);
+    ctx.strokeStyle = it.shade.border;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx, cardY, cardW, cardH);
+
+    ctx.fillStyle = "#475569";
+    ctx.font = "bold 17px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(it.label, cx + cardW / 2, cardY + 34);
+
+    ctx.fillStyle = it.shade.fg;
+    ctx.font = "900 34px Inter, sans-serif";
+    ctx.fillText(it.val, cx + cardW / 2, cardY + 92);
+
+    ctx.fillStyle = "#64748B";
+    ctx.font = "600 16px Inter, sans-serif";
+    ctx.fillText(it.sub, cx + cardW / 2, cardY + 130);
+  });
+
+  // Subtítulo Dureza Determinística BIS
+  const hardTitleY = cardY + cardH + 54;
+  ctx.fillStyle = "#334155";
+  ctx.font = "bold 19px Inter, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(
+    "2. SEVERIDAD DE CONTACTO PERMITIDO (CLASIFICACIÓN DETERMINÍSTICA BIS)",
+    x + pad,
+    hardTitleY
+  );
+
+  // Barra apilada horizontal Soft / Med / Hard
+  const barY = hardTitleY + 24;
+  const barH = 48;
+  const softW = (contact.softPct / 100) * innerW;
+  const medW = (contact.medPct / 100) * innerW;
+  const hardW = Math.max(0, innerW - softW - medW);
+
+  ctx.fillStyle = "#10B981";
+  ctx.fillRect(x + pad, barY, softW, barH);
+  ctx.fillStyle = "#F59E0B";
+  ctx.fillRect(x + pad + softW, barY, medW, barH);
+  ctx.fillStyle = "#EF4444";
+  ctx.fillRect(x + pad + softW + medW, barY, hardW, barH);
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x + pad, barY, innerW, barH);
+
+  // 3 tarjetas de severidad debajo
+  const sevY = barY + barH + 26;
+  const sevH = 148;
+  const sevW = (innerW - cardGap * 2) / 3;
+  const hardShade = getMetricCellShade("hardPct", contact.hardPct);
+
+  const sevItems = [
+    {
+      label: "Contacto Débil (Soft%)",
+      val: `${contact.softPct.toFixed(1)}%`,
+      sub: `${contact.soft} batazos • Favorable`,
+      bg: "rgba(16, 185, 129, 0.10)",
+      fg: "#065F46",
+      border: "rgba(16, 185, 129, 0.35)",
+    },
+    {
+      label: "Contacto Medio (Med%)",
+      val: `${contact.medPct.toFixed(1)}%`,
+      sub: `${contact.med} batazos • Neutro`,
+      bg: "#F8FAFC",
+      fg: "#0F172A",
+      border: "#CBD5E1",
+    },
+    {
+      label: "Contacto Sólido (Hard%)",
+      val: `${contact.hardPct.toFixed(1)}%`,
+      sub: `${contact.hard} batazos • Peligro`,
+      bg: hardShade.bg,
+      fg: hardShade.fg,
+      border: hardShade.border,
+    },
+  ];
+
+  sevItems.forEach((sv, idx) => {
+    const cx = x + pad + idx * (sevW + cardGap);
+    ctx.fillStyle = sv.bg;
+    ctx.fillRect(cx, sevY, sevW, sevH);
+    ctx.strokeStyle = sv.border;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx, sevY, sevW, sevH);
+
+    ctx.fillStyle = "#475569";
+    ctx.font = "bold 17px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(sv.label, cx + sevW / 2, sevY + 34);
+
+    ctx.fillStyle = sv.fg;
+    ctx.font = "900 34px Inter, sans-serif";
+    ctx.fillText(sv.val, cx + sevW / 2, sevY + 90);
+
+    ctx.fillStyle = "#64748B";
+    ctx.font = "600 16px Inter, sans-serif";
+    ctx.fillText(sv.sub, cx + sevW / 2, sevY + 128);
+  });
+
+  ctx.textAlign = "left";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tablas de Splits Situacionales y Vueltas al Orden (TTO)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function drawSplitsTableCard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rows: PitchingSplitRow[],
+  title: string,
+  compactCols: boolean
+) {
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+
+  const headH = 52;
+  drawSectionHeaderBar(ctx, x, y, w, headH, title);
+
+  if (!rows || rows.length === 0) {
+    drawEmptyState(ctx, x, y + headH, w, h - headH, "Sin registros situacionales");
+    return;
+  }
+
+  const colDefs = compactCols
+    ? [
+        { label: "Situación", weight: 2.3 },
+        { label: "BF", weight: 0.8 },
+        { label: "H-AB", weight: 1.1 },
+        { label: "AVG", weight: 0.95 },
+        { label: "OPS", weight: 0.95 },
+        { label: "K%", weight: 0.95 },
+        { label: "BB%", weight: 0.95 },
+        { label: "CSW%", weight: 1.05 },
+        { label: "Whiff%", weight: 1.05 },
+      ]
+    : [
+        { label: "Situación / Vuelta", weight: 2.4 },
+        { label: "BF", weight: 0.8 },
+        { label: "AB", weight: 0.8 },
+        { label: "H", weight: 0.75 },
+        { label: "HR", weight: 0.75 },
+        { label: "BB", weight: 0.75 },
+        { label: "SO", weight: 0.75 },
+        { label: "AVG", weight: 1.0 },
+        { label: "OPS", weight: 1.0 },
+        { label: "F-Strike%", weight: 1.15 },
+        { label: "CSW%", weight: 1.1 },
+        { label: "Whiff%", weight: 1.1 },
+      ];
+
+  const totalWeight = colDefs.reduce((s, c) => s + c.weight, 0);
+  const colWidths = colDefs.map((c) => (w / totalWeight) * c.weight);
+  const colX: number[] = [];
+  let accX = x;
+  for (const cw of colWidths) {
+    colX.push(accX);
+    accX += cw;
+  }
+
+  const tblHeadY = y + headH;
+  const tblHeadH = 46;
+  ctx.fillStyle = "#F1F5F9";
+  ctx.fillRect(x + 2, tblHeadY, w - 4, tblHeadH);
+
+  colDefs.forEach((col, c) => {
+    ctx.fillStyle = "#0F172A";
+    ctx.font = "bold 18px Inter, sans-serif";
+    ctx.textAlign = c === 0 ? "left" : "center";
+    const tx = c === 0 ? colX[c] + 22 : colX[c] + colWidths[c] / 2;
+    ctx.fillText(col.label, tx, tblHeadY + 30);
+
+    if (c > 0) {
+      ctx.strokeStyle = "#CBD5E1";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(colX[c], tblHeadY);
+      ctx.lineTo(colX[c], y + h);
+      ctx.stroke();
+    }
+  });
+
+  const availBodyH = h - headH - tblHeadH;
+  const rowH = Math.min(72, Math.floor(availBodyH / Math.max(rows.length, 1)));
+
+  rows.forEach((r, idx) => {
+    const ry = tblHeadY + tblHeadH + idx * rowH;
+    const baseBg = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+    ctx.fillStyle = baseBg;
+    ctx.fillRect(x + 2, ry, w - 4, rowH);
+
+    const hasSample = r.bf >= 2;
+    const opsNum =
+      r.ops && r.ops !== "—"
+        ? Number(r.ops.startsWith(".") ? `0${r.ops}` : r.ops)
+        : null;
+
+    const cells: Array<{ txt: string; metric?: string; num?: number | null }> = compactCols
+      ? [
+          { txt: r.label },
+          { txt: String(r.bf) },
+          { txt: `${r.h}-${r.ab}` },
+          { txt: r.bf > 0 ? r.avg : "—" },
+          {
+            txt: r.bf > 0 ? r.ops : "—",
+            metric: hasSample ? "opsAgainst" : undefined,
+            num: opsNum,
+          },
+          {
+            txt: r.bf > 0 ? `${r.kPct.toFixed(1)}%` : "—",
+            metric: hasSample ? "kPct" : undefined,
+            num: r.kPct,
+          },
+          {
+            txt: r.bf > 0 ? `${r.bbPct.toFixed(1)}%` : "—",
+            metric: hasSample ? "bbPct" : undefined,
+            num: r.bbPct,
+          },
+          {
+            txt: (r.pitches ?? 0) > 0 ? `${r.cswPct.toFixed(1)}%` : "—",
+            metric: hasSample ? "cswPct" : undefined,
+            num: r.cswPct,
+          },
+          {
+            txt: (r.pitches ?? 0) > 0 ? `${r.whiffPct.toFixed(1)}%` : "—",
+            metric: hasSample ? "whiffPct" : undefined,
+            num: r.whiffPct,
+          },
+        ]
+      : [
+          { txt: r.label },
+          { txt: String(r.bf) },
+          { txt: String(r.ab) },
+          { txt: String(r.h) },
+          { txt: String(r.hr) },
+          { txt: String(r.bb) },
+          { txt: String(r.so) },
+          { txt: r.bf > 0 ? r.avg : "—" },
+          {
+            txt: r.bf > 0 ? r.ops : "—",
+            metric: hasSample ? "opsAgainst" : undefined,
+            num: opsNum,
+          },
+          {
+            txt: (r.pitches ?? 0) > 0 ? `${r.fStrikePct.toFixed(1)}%` : "—",
+            metric: hasSample ? "fStrikePct" : undefined,
+            num: r.fStrikePct,
+          },
+          {
+            txt: (r.pitches ?? 0) > 0 ? `${r.cswPct.toFixed(1)}%` : "—",
+            metric: hasSample ? "cswPct" : undefined,
+            num: r.cswPct,
+          },
+          {
+            txt: (r.pitches ?? 0) > 0 ? `${r.whiffPct.toFixed(1)}%` : "—",
+            metric: hasSample ? "whiffPct" : undefined,
+            num: r.whiffPct,
+          },
+        ];
+
+    cells.forEach((cell, c) => {
+      const cx = colX[c];
+      const cw = colWidths[c];
+      const shade = cell.metric
+        ? getMetricCellShade(cell.metric, cell.num)
+        : null;
+
+      if (shade && shade.tier !== "neutral") {
+        ctx.fillStyle = shade.bg;
+        ctx.fillRect(cx + 1, ry + 1, cw - 2, rowH - 2);
+      }
+
+      ctx.fillStyle = shade && shade.tier !== "neutral" ? shade.fg : "#0F172A";
+      ctx.font = c === 0 ? "bold 20px Inter, sans-serif" : "900 20px Inter, sans-serif";
+      ctx.textAlign = c === 0 ? "left" : "center";
+      const tx = c === 0 ? cx + 22 : cx + cw / 2;
+      ctx.fillText(cell.txt, tx, ry + Math.round(rowH * 0.62));
+    });
+
+    ctx.strokeStyle = "#E2E8F0";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, ry + rowH);
+    ctx.lineTo(x + w, ry + rowH);
+    ctx.stroke();
+  });
+
+  ctx.textAlign = "left";
+}
+
+function drawRelieverDeepDiveCard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  data: PitchGameDataResponse
+) {
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+
+  const headH = 52;
+  drawSectionHeaderBar(
+    ctx,
+    x,
+    y,
+    w,
+    headH,
+    "IMPACTO SITUACIONAL Y EJECUCIÓN EN RELEVO (BULLPEN CONTEXT)"
+  );
+
+  const cm = data.contextMetrics;
+  const bx = data.boxscore;
+  const kpis = data.pbpKpis;
+
+  const cards = [
+    {
+      label: "Presión al Entrar (gmLI)",
+      val: cm ? cm.gmLI.toFixed(2) : "1.00",
+      sub: cm && cm.gmLI >= 1.5 ? "Alta Presión" : "Situación Estándar",
+      shade: { bg: "#F8FAFC", fg: "#0F172A", border: "#CBD5E1" },
+    },
+    {
+      label: "Heredados (IR / IRS)",
+      val: `${bx.ir ?? cm?.ir ?? 0} / ${bx.irs ?? cm?.irs ?? 0}`,
+      sub:
+        (bx.ir ?? 0) > 0 && (bx.irs ?? 0) === 0
+          ? "100% Contenidos"
+          : "Corredores en Base",
+      shade:
+        (bx.ir ?? 0) > 0 && (bx.irs ?? 0) === 0
+          ? getMetricCellShade("cswPct", 35)
+          : { bg: "#F8FAFC", fg: "#0F172A", border: "#CBD5E1" },
+    },
+    {
+      label: "Impacto Victoria (WPA)",
+      val: formatSigned(cm?.wpa, 3),
+      sub:
+        (cm?.wpa ?? 0) >= 0.06
+          ? "Shutdown (+0.06+)"
+          : (cm?.wpa ?? 0) <= -0.06
+          ? "Meltdown (-0.06-)"
+          : "Relevo Neutro",
+      shade: getMetricCellShade("wpa", cm?.wpa ?? null),
+    },
+    {
+      label: "Carreras Ahorradas (RE24)",
+      val: formatSigned(cm?.re24, 2),
+      sub: "vs Matriz 24 Estados",
+      shade: getMetricCellShade("re24", cm?.re24 ?? null),
+    },
+    {
+      label: "Conversión 2 Strikes",
+      val: kpis.putAwayPct || "0.0%",
+      sub: `${kpis.twoStrikeK ?? 0} K en ${kpis.twoStrikePitches ?? 0} P`,
+      shade: getMetricCellShade("putAwayPct", parseNum(kpis.putAwayPct)),
+    },
+    {
+      label: "Dominio K-BB%",
+      val: bx.kMinusBbPct || "0.0%",
+      sub: `K%: ${bx.kPct || "0%"} • BB%: ${bx.bbPct || "0%"}`,
+      shade: getMetricCellShade("kMinusBbPct", parseNum(bx.kMinusBbPct)),
+    },
+  ];
+
+  const pad = 28;
+  const gap = 20;
+  const cw = (w - pad * 2 - gap * 5) / 6;
+  const cy = y + headH + 45;
+  const ch = h - headH - 90;
+
+  cards.forEach((c, idx) => {
+    const cx = x + pad + idx * (cw + gap);
+    ctx.fillStyle = c.shade.bg;
+    ctx.fillRect(cx, cy, cw, ch);
+    ctx.strokeStyle = c.shade.border;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx, cy, cw, ch);
+
+    ctx.fillStyle = "#475569";
+    ctx.font = "bold 17px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(c.label, cx + cw / 2, cy + 44);
+
+    ctx.fillStyle = c.shade.fg;
+    ctx.font = "900 38px Inter, sans-serif";
+    ctx.fillText(c.val, cx + cw / 2, cy + 122);
+
+    ctx.fillStyle = "#64748B";
+    ctx.font = "600 16px Inter, sans-serif";
+    ctx.fillText(c.sub, cx + cw / 2, cy + 178);
+  });
+
+  ctx.textAlign = "left";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque Medio MLB: Repertorio Hawk-Eye Enriquecido + Contacto Óptico
+// ─────────────────────────────────────────────────────────────────────────────
+
+function drawMlbArsenalAndOpticalCard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  summary: StatcastPitchRow[],
+  contact: ContactProfileSummary | undefined,
+  kpis: PitchGameDataResponse["pbpKpis"]
+) {
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+
+  const headH = 52;
+  drawSectionHeaderBar(
+    ctx,
+    x,
+    y,
+    w,
+    headH,
+    "ARSENAL HAWK-EYE (VELOCIDAD, MOVIMIENTO, EXTENSIÓN Y DISCIPLINA DE ZONA)"
+  );
+
+  if (!summary || summary.length === 0) {
+    drawEmptyState(ctx, x, y + headH, w, h - headH, "Sin datos de repertorio Hawk-Eye");
+    return;
+  }
+
+  const opticalBarH = 104;
+  const tableAreaH = h - headH - opticalBarH;
+  const rows = summary.slice(0, 7);
+  const subHeadH = 44;
+  const rowH = Math.min(58, Math.floor((tableAreaH - subHeadH) / (rows.length + 1)));
+
+  const cols = [
+    { label: "Pitcheo", weight: 1.9 },
+    { label: "#", weight: 0.65 },
+    { label: "Uso%", weight: 0.85 },
+    { label: "Velo (Máx)", weight: 1.25 },
+    { label: "Spin", weight: 0.85 },
+    { label: "iVB\"", weight: 0.75 },
+    { label: "HB\"", weight: 0.75 },
+    { label: "Ext (ft)", weight: 0.85 },
+    { label: "Zone%", weight: 0.9 },
+    { label: "Chase%", weight: 0.9 },
+    { label: "Z-Con%", weight: 0.9 },
+    { label: "Whiff%", weight: 0.95 },
+    { label: "CSW%", weight: 0.95 },
+  ];
+
+  const totW = cols.reduce((s, c) => s + c.weight, 0);
+  const colWidths = cols.map((c) => (w / totW) * c.weight);
+  const colX: number[] = [];
+  let accX = x;
+  for (const cw of colWidths) {
+    colX.push(accX);
+    accX += cw;
+  }
+
+  const thY = y + headH;
+  ctx.fillStyle = "#F1F5F9";
+  ctx.fillRect(x + 2, thY, w - 4, subHeadH);
+
+  cols.forEach((col, c) => {
+    ctx.fillStyle = "#0F172A";
+    ctx.font = "bold 17px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(col.label, colX[c] + colWidths[c] / 2, thY + 29);
+    if (c > 0) {
+      ctx.strokeStyle = "#CBD5E1";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(colX[c], thY);
+      ctx.lineTo(colX[c], thY + subHeadH + (rows.length + 1) * rowH);
+      ctx.stroke();
+    }
+  });
+
+  rows.forEach((pt, idx) => {
+    const ry = thY + subHeadH + idx * rowH;
+    const pColor = pt.color || getPitchColor(pt.pitchName, pt.pitchType);
+    const bg = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+
+    ctx.fillStyle = bg;
+    ctx.fillRect(x + 2, ry, w - 4, rowH);
+
+    // Primera celda coloreada por tipo de pitcheo
+    ctx.fillStyle = pColor;
+    ctx.fillRect(colX[0] + 2, ry + 2, colWidths[0] - 4, rowH - 4);
+    ctx.fillStyle = ["#67E18D", "#F79E70", "#FE6100", "#FFB000"].includes(pColor)
+      ? "#070B19"
+      : "#FFFFFF";
+    ctx.font = "bold 18px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(pt.pitchName, colX[0] + colWidths[0] / 2, ry + Math.round(rowH * 0.62));
+
+    const veloTxt =
+      pt.veloAvg !== "—" && pt.veloMax !== "—"
+        ? `${pt.veloAvg} (${pt.veloMax})`
+        : String(pt.veloAvg);
+
+    const vals: Array<{ txt: string; metric?: string }> = [
+      { txt: String(pt.count) },
+      { txt: pt.usagePct },
+      { txt: veloTxt },
+      { txt: String(pt.spinAvg) },
+      { txt: String(pt.ivb) },
+      { txt: String(pt.hb) },
+      { txt: pt.extAvg !== undefined && pt.extAvg !== null ? String(pt.extAvg) : "—" },
+      { txt: pt.zonePct || "—" },
+      { txt: pt.chasePct || "—", metric: pt.count >= 5 ? "chasePct" : undefined },
+      { txt: pt.zContactPct || "—", metric: pt.count >= 5 ? "zContactPct" : undefined },
+      { txt: pt.whiffPct, metric: pt.count >= 5 ? "whiffPct" : undefined },
+      { txt: pt.cswPct, metric: pt.count >= 5 ? "cswPct" : undefined },
+    ];
+
+    vals.forEach((v, cIdx) => {
+      const c = cIdx + 1;
+      const cx = colX[c];
+      const cw = colWidths[c];
+      const shade = v.metric ? getMetricCellShade(v.metric, parseNum(v.txt)) : null;
+
+      if (shade && shade.tier !== "neutral") {
+        ctx.fillStyle = shade.bg;
+        ctx.fillRect(cx + 1, ry + 1, cw - 2, rowH - 2);
+      }
+
+      ctx.fillStyle = shade && shade.tier !== "neutral" ? shade.fg : "#0F172A";
+      ctx.font = "900 18px Inter, sans-serif";
+      ctx.fillText(v.txt, cx + cw / 2, ry + Math.round(rowH * 0.62));
+    });
+
+    ctx.strokeStyle = "#E2E8F0";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, ry + rowH);
+    ctx.lineTo(x + w, ry + rowH);
+    ctx.stroke();
+  });
+
+  // Fila Total
+  const totY = thY + subHeadH + rows.length * rowH;
+  ctx.fillStyle = "#0F172A";
+  ctx.fillRect(x + 2, totY, w - 4, rowH);
+  ctx.fillStyle = "#FDB827";
+  ctx.font = "900 18px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Total / Prom", colX[0] + colWidths[0] / 2, totY + Math.round(rowH * 0.62));
+
+  const totCount = summary.reduce((s, r) => s + r.count, 0);
+  const totVals = [
+    String(totCount),
+    "100%",
+    "—",
+    "—",
+    "—",
+    "—",
+    "—",
+    "—",
+    kpis.chasePct || "—",
+    kpis.zContactPct || "—",
+    kpis.whiffPct,
+    kpis.cswPct,
+  ];
+  totVals.forEach((tv, idx) => {
+    const c = idx + 1;
+    ctx.fillText(tv, colX[c] + colWidths[c] / 2, totY + Math.round(rowH * 0.62));
+  });
+
+  // Barra inferior de Calidad de Contacto Óptico Hawk-Eye
+  const optY = y + h - opticalBarH;
+  ctx.fillStyle = "#F8FAFC";
+  ctx.fillRect(x + 2, optY, w - 4, opticalBarH - 2);
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x, optY);
+  ctx.lineTo(x + w, optY);
+  ctx.stroke();
+
+  const optMetrics = [
+    `Bolas en Juego: ${contact?.bip ?? 0}`,
+    `EV Promedio Rival: ${contact?.avgEv != null ? `${contact.avgEv} mph` : "—"}`,
+    `EV Máx: ${contact?.maxEv != null ? `${contact.maxEv} mph` : "—"}`,
+    `HardHit% (≥95 mph): ${contact?.hardHitPct != null ? `${contact.hardHitPct}%` : "—"}`,
+    `Barrel%: ${contact?.barrelPct != null ? `${contact.barrelPct}%` : "—"}`,
+    `GB%: ${contact ? `${contact.gbPct}%` : "—"} (GO/AO: ${contact?.goAoRatio || "—"})`,
+  ];
+
+  ctx.fillStyle = "#0F172A";
+  ctx.font = "900 20px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(optMetrics.join("   •   "), x + w / 2, optY + 60);
+  ctx.textAlign = "left";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Historial de Últimos 10 Juegos con PBP 100% Real (Modo Temporada)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getRealLogRates(g: PitcherGameLog): {
+  cswNum: number | null;
+  whiffNum: number | null;
+  cswStr: string;
+  whiffStr: string;
+} {
+  const cswNum = parseNum(g.cswPct);
+  const whiffNum = parseNum(g.whiffPct);
+  return {
+    cswNum,
+    whiffNum,
+    cswStr: cswNum !== null ? `${cswNum.toFixed(1)}%` : "—",
+    whiffStr: whiffNum !== null ? `${whiffNum.toFixed(1)}%` : "—",
+  };
+}
+
+function drawSeasonHistoryRealPbpTable(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  displayLogs: PitcherGameLog[]
+) {
+  if (!displayLogs || displayLogs.length === 0) {
+    drawEmptyState(ctx, x, y, w, h, "Sin registros de salidas para este período");
+    return;
+  }
+
+  ctx.fillStyle = "#070B19";
+  ctx.font = "900 23px Inter, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(
+    "HISTORIAL DE SALIDAS RECIENTES (ÚLTIMOS 10 JUEGOS • PBP 100% REAL)",
+    x,
+    y - 16
+  );
+
+  const colDefs = [
+    { label: "Fecha", weight: 1.05 },
+    { label: "Rival", weight: 2.15 },
+    { label: "Rol", weight: 1.15 },
+    { label: "Dec.", weight: 0.75 },
+    { label: "IP", weight: 0.75 },
+    { label: "H", weight: 0.65 },
+    { label: "CL", weight: 0.65 },
+    { label: "BB", weight: 0.65 },
+    { label: "K", weight: 0.65 },
+    { label: "P (S-B)", weight: 1.55 },
+    { label: "GSv2", weight: 0.85 },
+    { label: "WPA", weight: 0.95 },
+    { label: "CSW%", weight: 1.0 },
+    { label: "Whiff%", weight: 1.0 },
+  ];
+
+  const totalWeight = colDefs.reduce((acc, c) => acc + c.weight, 0);
+  const colWidths = colDefs.map((c) => (w / totalWeight) * c.weight);
+  const colX: number[] = [];
+  let currX = x;
+  for (const cw of colWidths) {
+    colX.push(currX);
+    currX += cw;
+  }
+
+  const headerH = 54;
+  const rowH = Math.min(66, Math.floor((h - headerH) / Math.max(displayLogs.length, 1)));
+  const totalH = headerH + displayLogs.length * rowH;
+
+  for (let c = 0; c < colDefs.length; c++) {
+    const cx = colX[c];
+    const cw = colWidths[c];
+
+    ctx.fillStyle = "#0F172A";
+    ctx.fillRect(cx, y, cw, headerH);
+
+    ctx.fillStyle = "#FDB827";
+    ctx.font = "bold 18px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(colDefs[c].label, cx + cw / 2, y + 34);
+  }
+
+  displayLogs.forEach((g, idx) => {
+    const ry = y + headerH + idx * rowH;
+    const bg = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+    ctx.fillStyle = bg;
+    ctx.fillRect(x, ry, w, rowH);
+
+    const pVal = g.pitches || 0;
+    const sVal = g.strikes || 0;
+    const bVal = Math.max(0, pVal - sVal);
+    const pStr = pVal > 0 ? `${pVal} (${sVal}-${bVal})` : "—";
+    const { cswNum, whiffNum, cswStr, whiffStr } = getRealLogRates(g);
+
+    const dateFormatted = String(g.date || "").slice(-5).replace("-", "/");
+    const roleFormatted = g.role || (g.isStarter ? "Abridor" : "Relevista");
+    const decFormatted = g.decision || "—";
+    const gsv2Txt =
+      g.isStarter && g.gsv2 !== null && g.gsv2 !== undefined
+        ? `${g.gsv2}${g.isQS ? "★" : ""}`
+        : "—";
+    const wpaTxt =
+      g.wpa !== null && g.wpa !== undefined ? formatSigned(g.wpa, 2) : "—";
+
+    const cells: Array<{ txt: string; metric?: string; num?: number | null }> = [
+      { txt: dateFormatted },
+      { txt: g.opponent || "Rival" },
+      { txt: roleFormatted },
+      { txt: decFormatted },
+      { txt: String(g.ip || "0.0") },
+      { txt: String(g.h ?? 0) },
+      { txt: String(g.er ?? 0) },
+      { txt: String(g.bb ?? 0) },
+      { txt: String(g.so ?? 0) },
+      { txt: pStr },
+      {
+        txt: gsv2Txt,
+        metric: g.isStarter ? "gsv2" : undefined,
+        num: g.gsv2 ?? null,
+      },
+      {
+        txt: wpaTxt,
+        metric: g.wpa !== null && g.wpa !== undefined ? "wpa" : undefined,
+        num: g.wpa ?? null,
+      },
+      { txt: cswStr, metric: cswNum !== null ? "cswPct" : undefined, num: cswNum },
+      { txt: whiffStr, metric: whiffNum !== null ? "whiffPct" : undefined, num: whiffNum },
+    ];
+
+    cells.forEach((cell, c) => {
+      const cx = colX[c];
+      const cw = colWidths[c];
+      const shade = cell.metric ? getMetricCellShade(cell.metric, cell.num) : null;
+
+      if (shade && shade.tier !== "neutral") {
+        ctx.fillStyle = shade.bg;
+        ctx.fillRect(cx + 1, ry + 1, cw - 2, rowH - 2);
+      }
+
+      if (c === 3) {
+        ctx.fillStyle =
+          decFormatted === "W"
+            ? "#16A34A"
+            : decFormatted === "L"
+            ? "#DC2626"
+            : decFormatted === "SV" || decFormatted === "HLD"
+            ? "#D97706"
+            : "#64748B";
+        ctx.font = "900 18px Inter, sans-serif";
+      } else if (c === 2) {
+        ctx.fillStyle = roleFormatted === "Abridor" ? "#002D62" : "#475569";
+        ctx.font = "bold 18px Inter, sans-serif";
+      } else {
+        ctx.fillStyle = shade && shade.tier !== "neutral" ? shade.fg : "#070B19";
+        ctx.font = c <= 1 ? "bold 18px Inter, sans-serif" : "900 18px Inter, sans-serif";
+      }
+
+      ctx.textAlign = "center";
+      ctx.fillText(cell.txt, cx + cw / 2, ry + Math.round(rowH * 0.62));
+
+      if (c > 0) {
+        ctx.strokeStyle = "#CBD5E1";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx, y);
+        ctx.lineTo(cx, y + totalH);
+        ctx.stroke();
+      }
+    });
+
+    ctx.strokeStyle = "#CBD5E1";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, ry + rowH);
+    ctx.lineTo(x + w, ry + rowH);
+    ctx.stroke();
+  });
+
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, totalH);
+  ctx.textAlign = "left";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subrutinas Gráficas del Tríptico Central
 // ─────────────────────────────────────────────────────────────────────────────
 
 function drawSubplotFrame(
@@ -415,17 +1827,16 @@ function drawSubplotFrame(
   ctx.fillRect(x, y, w, h);
 
   ctx.strokeStyle = "#0F172A";
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.8;
   ctx.strokeRect(x, y, w, h);
 
   ctx.fillStyle = "#070B19";
-  ctx.font = "bold 23px Inter, sans-serif";
+  ctx.font = "bold 22px Inter, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(title, x + w / 2, y - 18);
+  ctx.fillText(title, x + w / 2, y - 16);
   ctx.textAlign = "left";
 }
 
-// Subplot 1 (Salida): Carga por Entrada (Strikes abajo #0C162D, Bolas arriba #F5A623)
 function drawLvbpWorkloadPlot(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -434,7 +1845,7 @@ function drawLvbpWorkloadPlot(
   h: number,
   workload: InningWorkloadItem[]
 ) {
-  drawSubplotFrame(ctx, x, y, w, h, "Carga por Entrada");
+  drawSubplotFrame(ctx, x, y, w, h, "Carga por Entrada (Strikes vs Bolas)");
 
   if (!workload || workload.length === 0) {
     drawEmptyState(ctx, x, y, w, h, "Sin registros de carga por entrada");
@@ -442,7 +1853,7 @@ function drawLvbpWorkloadPlot(
   }
 
   const plotBottom = y + h;
-  const pCounts = workload.map((w) => w.pitches);
+  const pCounts = workload.map((wk) => wk.pitches);
   const maxP = Math.max(...pCounts, 25);
   const yUpper = Math.ceil(maxP / 5) * 5;
 
@@ -464,20 +1875,6 @@ function drawLvbpWorkloadPlot(
     ctx.fillText(String(tick), x - 10, ty + 5);
   }
   ctx.setLineDash([]);
-
-  ctx.save();
-  ctx.translate(x - 45, y + h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 18px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Pitcheos Totales", 0, 0);
-  ctx.restore();
-
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 18px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Entrada (Inning)", x + w / 2, y + h + 55);
 
   const n = workload.length;
   const slotW = w / n;
@@ -503,10 +1900,7 @@ function drawLvbpWorkloadPlot(
     ctx.font = "bold 16px Inter, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(String(wk.pitches), cx, plotBottom - strikeH - ballH - 8);
-
-    ctx.fillStyle = "#070B19";
-    ctx.font = "bold 16px Inter, sans-serif";
-    ctx.fillText(`Inn ${wk.inning}`, cx, plotBottom + 26);
+    ctx.fillText(`Inn ${wk.inning}`, cx, plotBottom + 28);
   });
 
   const legX = x + w - 135;
@@ -530,7 +1924,6 @@ function drawLvbpWorkloadPlot(
   ctx.fillText("Bolas", legX + 32, legY + 43);
 }
 
-// Subplot 2 (Salida): Apalancamiento Tango RE24
 function drawLvbpLeveragePlot(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -539,7 +1932,7 @@ function drawLvbpLeveragePlot(
   h: number,
   workload: InningWorkloadItem[]
 ) {
-  drawSubplotFrame(ctx, x, y, w, h, "Apalancamiento (Tango RE24)");
+  drawSubplotFrame(ctx, x, y, w, h, "Índice de Presión por Entrada (Tango LI)");
 
   if (!workload || workload.length === 0) {
     drawEmptyState(ctx, x, y, w, h, "Sin datos de Leverage Index");
@@ -569,20 +1962,6 @@ function drawLvbpLeveragePlot(
     ctx.fillText(tick.toFixed(1), x - 10, ty + 5);
   }
   ctx.setLineDash([]);
-
-  ctx.save();
-  ctx.translate(x - 48, y + h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 18px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Leverage Index (LI)", 0, 0);
-  ctx.restore();
-
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 18px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Entrada (Inning)", x + w / 2, y + h + 55);
 
   const base1Y = plotBottom - (1.0 / yUpper) * h;
   ctx.strokeStyle = "#5B7083";
@@ -617,66 +1996,29 @@ function drawLvbpLeveragePlot(
   points.forEach((pt) => {
     ctx.fillStyle = "#D97706";
     ctx.beginPath();
-    ctx.arc(pt.px, pt.py, 6.5, 0, Math.PI * 2);
+    ctx.arc(pt.px, pt.py, 7, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "#D97706";
     ctx.font = "bold 15px Inter, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(pt.li.toFixed(2), pt.px, pt.py - 12);
 
     ctx.fillStyle = "#070B19";
     ctx.font = "bold 16px Inter, sans-serif";
-    ctx.fillText(`Inn ${pt.inn}`, pt.px, plotBottom + 26);
+    ctx.fillText(`Inn ${pt.inn}`, pt.px, plotBottom + 28);
   });
-
-  const legX = x + w - 195;
-  const legY = y + 14;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.strokeStyle = "#CBD5E1";
-  ctx.lineWidth = 1;
-  ctx.fillRect(legX, legY, 182, 54);
-  ctx.strokeRect(legX, legY, 182, 54);
-
-  ctx.strokeStyle = "#D97706";
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(legX + 8, legY + 18);
-  ctx.lineTo(legX + 26, legY + 18);
-  ctx.stroke();
-  ctx.fillStyle = "#D97706";
-  ctx.beginPath();
-  ctx.arc(legX + 17, legY + 18, 4.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 13px Inter, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("LI Promedio", legX + 34, legY + 22);
-
-  ctx.strokeStyle = "#5B7083";
-  ctx.lineWidth = 1.8;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(legX + 8, legY + 38);
-  ctx.lineTo(legX + 26, legY + 38);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.fillStyle = "#070B19";
-  ctx.fillText("Presión Base (1.0 LI)", legX + 34, legY + 42);
 }
 
-// Subplot 3 (Salida): Platoon Splits (LHB vs RHB)
 function drawLvbpPlatoonPlot(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   w: number,
   h: number,
-  splits: PitchGameDataResponse["splitsPlatoon"]
+  splits: PlatoonSplits
 ) {
-  drawSubplotFrame(ctx, x, y, w, h, "Platoon Splits (LHB vs RHB)");
+  drawSubplotFrame(ctx, x, y, w, h, "Tasas por Mano del Bateador (LHB vs RHB)");
 
   if (!splits || (!splits.vsLhb?.pitches && !splits.vsRhb?.pitches)) {
     drawEmptyState(ctx, x, y, w, h, "Sin datos de Platoon disponibles");
@@ -684,7 +2026,6 @@ function drawLvbpPlatoonPlot(
   }
 
   const plotBottom = y + h;
-
   ctx.strokeStyle = "#E5E7EB";
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 4]);
@@ -704,18 +2045,8 @@ function drawLvbpPlatoonPlot(
   }
   ctx.setLineDash([]);
 
-  ctx.save();
-  ctx.translate(x - 52, y + h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 18px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Porcentaje (%)", 0, 0);
-  ctx.restore();
-
   const cats = ["Strike%", "Whiff%", "CSW%"];
-  const parseRate = (v: string | number) =>
-    typeof v === "number" ? v : parseFloat(String(v || "0").replace("%", ""));
+  const parseRate = (v: string | number) => parseNum(v) ?? 0;
 
   const valsL = [
     parseRate(splits.vsLhb.strikePct),
@@ -758,84 +2089,30 @@ function drawLvbpPlatoonPlot(
 
     ctx.fillStyle = "#070B19";
     ctx.font = "bold 16px Inter, sans-serif";
-    ctx.fillText(cat, cx, plotBottom + 26);
+    ctx.fillText(cat, cx, plotBottom + 28);
   });
 
-  const legX = x + w - 176;
+  const legX = x + w - 184;
   const legY = y + 14;
-  const pL = splits.vsLhb.pitches || 0;
-  const pR = splits.vsRhb.pitches || 0;
-
   ctx.fillStyle = "#FFFFFF";
   ctx.strokeStyle = "#CBD5E1";
   ctx.lineWidth = 1;
-  ctx.fillRect(legX, legY, 164, 54);
-  ctx.strokeRect(legX, legY, 164, 54);
+  ctx.fillRect(legX, legY, 170, 54);
+  ctx.strokeRect(legX, legY, 170, 54);
 
   ctx.fillStyle = "#3B82F6";
   ctx.fillRect(legX + 10, legY + 11, 14, 14);
-  ctx.strokeStyle = "#0F172A";
-  ctx.strokeRect(legX + 10, legY + 11, 14, 14);
   ctx.fillStyle = "#070B19";
   ctx.font = "bold 13px Inter, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText(`vs Zurdos (${pL} P)`, legX + 32, legY + 23);
+  ctx.fillText(`vs Zurdos (${splits.vsLhb.pitches} P)`, legX + 32, legY + 23);
 
   ctx.fillStyle = "#F59E0B";
   ctx.fillRect(legX + 10, legY + 31, 14, 14);
-  ctx.strokeRect(legX + 10, legY + 31, 14, 14);
   ctx.fillStyle = "#070B19";
-  ctx.fillText(`vs Derechos (${pR} P)`, legX + 32, legY + 43);
+  ctx.fillText(`vs Derechos (${splits.vsRhb.pitches} P)`, legX + 32, legY + 43);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Subrutinas de Modo Temporada LVBP: Últimos 10 Juegos
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Helper sabermétrico para calcular o extraer Whiff% y CSW% precisos por salida
-function getLogMetrics(g: PitcherGameLog): {
-  cswNum: number;
-  whiffNum: number;
-  cswStr: string;
-  whiffStr: string;
-} {
-  const p = Number(g.pitches || 0);
-  const s = Number(g.strikes || Math.round(p * 0.62));
-  const so = Number(g.so || 0);
-  const bb = Number(g.bb || 0);
-
-  let cswNum = 0;
-  let whiffNum = 0;
-
-  if (g.cswPct || (g as any).csw_pct) {
-    cswNum = parseFloat(String(g.cswPct || (g as any).csw_pct).replace("%", "")) || 0;
-  }
-  if (g.whiffPct || (g as any).whiff_pct) {
-    whiffNum = parseFloat(String(g.whiffPct || (g as any).whiff_pct).replace("%", "")) || 0;
-  }
-
-  // Modelo sabermétrico refinado Tango RE24 / Nestico si no venía en el log o era 0
-  if (cswNum <= 0 && p > 0) {
-    const calledEst = Math.round(p * 0.175);
-    const whiffEst = Math.max(Math.round(so * 1.7), Math.round(Math.max(0, s - bb * 2) * 0.17));
-    const cswCount = Math.min(s, Math.max(calledEst + whiffEst, Math.round(s * 0.46)));
-    cswNum = Number(Math.min(42.0, Math.max(20.0, (cswCount / p) * 100)).toFixed(1));
-  }
-
-  if (whiffNum <= 0 && p > 0) {
-    const whiffEst = Math.max(Math.round(so * 1.7), Math.round(Math.max(0, s - bb * 2) * 0.17));
-    whiffNum = Number(Math.min(32.0, Math.max(8.0, (whiffEst / p) * 100)).toFixed(1));
-  }
-
-  return {
-    cswNum,
-    whiffNum,
-    cswStr: cswNum > 0 ? `${cswNum.toFixed(1)}%` : "—",
-    whiffStr: whiffNum > 0 ? `${whiffNum.toFixed(1)}%` : "—",
-  };
-}
-
-// Plot 1 (Temporada): Bolas y Strikes por Salida (Últimos 10 Juegos)
 function drawLvbpSeasonPitchesPlot(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -844,7 +2121,7 @@ function drawLvbpSeasonPitchesPlot(
   h: number,
   plotLogs: PitcherGameLog[]
 ) {
-  drawSubplotFrame(ctx, x, y, w, h, "Bolas y Strikes por Salida");
+  drawSubplotFrame(ctx, x, y, w, h, "Bolas y Strikes por Salida (Últ. 10)");
 
   const plotBottom = y + h;
   const pCounts = plotLogs.map((g) => g.pitches || 0);
@@ -862,7 +2139,6 @@ function drawLvbpSeasonPitchesPlot(
       ctx.lineTo(x + w, ty);
       ctx.stroke();
     }
-
     ctx.fillStyle = "#475569";
     ctx.font = "bold 14px Inter, sans-serif";
     ctx.textAlign = "right";
@@ -870,16 +2146,7 @@ function drawLvbpSeasonPitchesPlot(
   }
   ctx.setLineDash([]);
 
-  ctx.save();
-  ctx.translate(x - 42, y + h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 16px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Conteo Pitcheos", 0, 0);
-  ctx.restore();
-
-  const n = plotLogs.length;
+  const n = Math.max(plotLogs.length, 1);
   const slotW = w / n;
   const barW = Math.min(slotW * 0.62, 54);
 
@@ -887,7 +2154,7 @@ function drawLvbpSeasonPitchesPlot(
     const cx = x + i * slotW + slotW / 2;
     const bx = cx - barW / 2;
     const tot = g.pitches || 0;
-    const strks = g.strikes || Math.round(tot * 0.62);
+    const strks = g.strikes || 0;
     const bolas = Math.max(0, tot - strks);
 
     const strikeH = (strks / yUpper) * h;
@@ -895,13 +2162,8 @@ function drawLvbpSeasonPitchesPlot(
 
     ctx.fillStyle = "#002D62";
     ctx.fillRect(bx, plotBottom - strikeH, barW, strikeH);
-    ctx.strokeStyle = "#0F172A";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(bx, plotBottom - strikeH, barW, strikeH);
-
     ctx.fillStyle = "#FDB827";
     ctx.fillRect(bx, plotBottom - strikeH - ballH, barW, ballH);
-    ctx.strokeRect(bx, plotBottom - strikeH - ballH, barW, ballH);
 
     if (tot > 0) {
       ctx.fillStyle = "#070B19";
@@ -910,10 +2172,9 @@ function drawLvbpSeasonPitchesPlot(
       ctx.fillText(String(tot), cx, plotBottom - strikeH - ballH - 6);
     }
 
-    // Fecha MM/DD rotada a 45°
     const dStr = String(g.date || "").slice(-5).replace("-", "/");
     ctx.save();
-    ctx.translate(cx, plotBottom + 12);
+    ctx.translate(cx, plotBottom + 14);
     ctx.rotate(-Math.PI / 4);
     ctx.fillStyle = "#070B19";
     ctx.font = "bold 13px Inter, sans-serif";
@@ -921,30 +2182,9 @@ function drawLvbpSeasonPitchesPlot(
     ctx.fillText(dStr, 0, 0);
     ctx.restore();
   });
-
-  // Leyenda
-  const legX = x + w - 130;
-  const legY = y + 14;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.strokeStyle = "#CBD5E1";
-  ctx.lineWidth = 1;
-  ctx.fillRect(legX, legY, 118, 52);
-  ctx.strokeRect(legX, legY, 118, 52);
-
-  ctx.fillStyle = "#002D62";
-  ctx.fillRect(legX + 8, legY + 10, 13, 13);
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 13px Inter, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("Strikes", legX + 28, legY + 21);
-
-  ctx.fillStyle = "#FDB827";
-  ctx.fillRect(legX + 8, legY + 29, 13, 13);
-  ctx.fillStyle = "#070B19";
-  ctx.fillText("Bolas", legX + 28, legY + 40);
 }
 
-// Plot 2 (Temporada): Whiff% por Salida (Últimos 10 Juegos)
 function drawLvbpSeasonWhiffPlot(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -953,10 +2193,10 @@ function drawLvbpSeasonWhiffPlot(
   h: number,
   plotLogs: PitcherGameLog[]
 ) {
-  drawSubplotFrame(ctx, x, y, w, h, "Whiff% por Salida");
+  drawSubplotFrame(ctx, x, y, w, h, "Whiff% Real por Salida (Últ. 10)");
 
   const plotBottom = y + h;
-  const whiffVals = plotLogs.map((g) => getLogMetrics(g).whiffNum);
+  const whiffVals = plotLogs.map((g) => getRealLogRates(g).whiffNum ?? 0);
   const maxW = Math.max(...whiffVals, 25);
   const yUpper = Math.max(Math.ceil((maxW * 1.35) / 10) * 10, 35);
 
@@ -971,7 +2211,6 @@ function drawLvbpSeasonWhiffPlot(
       ctx.lineTo(x + w, ty);
       ctx.stroke();
     }
-
     ctx.fillStyle = "#475569";
     ctx.font = "bold 14px Inter, sans-serif";
     ctx.textAlign = "right";
@@ -979,37 +2218,16 @@ function drawLvbpSeasonWhiffPlot(
   }
   ctx.setLineDash([]);
 
-  ctx.save();
-  ctx.translate(x - 45, y + h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 16px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Whiff% (Abanicados)", 0, 0);
-  ctx.restore();
-
-  const avgWhiff = whiffVals.reduce((a, b) => a + b, 0) / Math.max(whiffVals.length, 1);
-  const avgY = plotBottom - (avgWhiff / yUpper) * h;
-  ctx.strokeStyle = "#94A3B8";
-  ctx.lineWidth = 1.8;
-  ctx.setLineDash([5, 5]);
-  ctx.beginPath();
-  ctx.moveTo(x, avgY);
-  ctx.lineTo(x + w, avgY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  const n = plotLogs.length;
+  const n = Math.max(plotLogs.length, 1);
   const paddingX = 35;
   const step = n > 1 ? (w - paddingX * 2) / (n - 1) : 0;
 
-  const points: { px: number; py: number; val: number; date: string }[] = [];
-  plotLogs.forEach((g, i) => {
-    const px = n > 1 ? x + paddingX + i * step : x + w / 2;
-    const val = whiffVals[i];
-    const py = plotBottom - (val / yUpper) * h;
-    points.push({ px, py, val, date: g.date });
-  });
+  const points = plotLogs.map((g, i) => ({
+    px: n > 1 ? x + paddingX + i * step : x + w / 2,
+    py: plotBottom - (whiffVals[i] / yUpper) * h,
+    val: whiffVals[i],
+    date: g.date,
+  }));
 
   ctx.strokeStyle = "#2563EB";
   ctx.lineWidth = 3;
@@ -1033,7 +2251,7 @@ function drawLvbpSeasonWhiffPlot(
 
     const dStr = String(pt.date || "").slice(-5).replace("-", "/");
     ctx.save();
-    ctx.translate(pt.px, plotBottom + 12);
+    ctx.translate(pt.px, plotBottom + 14);
     ctx.rotate(-Math.PI / 4);
     ctx.fillStyle = "#070B19";
     ctx.font = "bold 13px Inter, sans-serif";
@@ -1041,44 +2259,9 @@ function drawLvbpSeasonWhiffPlot(
     ctx.fillText(dStr, 0, 0);
     ctx.restore();
   });
-
-  // Leyenda
-  const legX = x + w - 170;
-  const legY = y + 14;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.strokeStyle = "#CBD5E1";
-  ctx.lineWidth = 1;
-  ctx.fillRect(legX, legY, 158, 52);
-  ctx.strokeRect(legX, legY, 158, 52);
-
-  ctx.strokeStyle = "#2563EB";
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(legX + 8, legY + 17);
-  ctx.lineTo(legX + 24, legY + 17);
-  ctx.stroke();
-  ctx.fillStyle = "#2563EB";
-  ctx.beginPath();
-  ctx.arc(legX + 16, legY + 17, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 13px Inter, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("Whiff%", legX + 32, legY + 21);
-
-  ctx.strokeStyle = "#94A3B8";
-  ctx.lineWidth = 1.6;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(legX + 8, legY + 36);
-  ctx.lineTo(legX + 24, legY + 36);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#070B19";
-  ctx.fillText(`Prom (${avgWhiff.toFixed(1)}%)`, legX + 32, legY + 40);
 }
 
-// Plot 3 (Temporada): CSW% por Salida (Últimos 10 Juegos)
 function drawLvbpSeasonCswPlot(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -1087,10 +2270,10 @@ function drawLvbpSeasonCswPlot(
   h: number,
   plotLogs: PitcherGameLog[]
 ) {
-  drawSubplotFrame(ctx, x, y, w, h, "CSW% por Salida");
+  drawSubplotFrame(ctx, x, y, w, h, "CSW% Real por Salida (Cota Élite 30%)");
 
   const plotBottom = y + h;
-  const cswVals = plotLogs.map((g) => getLogMetrics(g).cswNum);
+  const cswVals = plotLogs.map((g) => getRealLogRates(g).cswNum ?? 0);
   const maxC = Math.max(...cswVals, 35);
   const yUpper = Math.max(Math.ceil((maxC * 1.35) / 10) * 10, 45);
 
@@ -1105,7 +2288,6 @@ function drawLvbpSeasonCswPlot(
       ctx.lineTo(x + w, ty);
       ctx.stroke();
     }
-
     ctx.fillStyle = "#475569";
     ctx.font = "bold 14px Inter, sans-serif";
     ctx.textAlign = "right";
@@ -1113,49 +2295,26 @@ function drawLvbpSeasonCswPlot(
   }
   ctx.setLineDash([]);
 
-  ctx.save();
-  ctx.translate(x - 45, y + h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 16px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("CSW% (Called + Whiff)", 0, 0);
-  ctx.restore();
-
-  // Línea Elite 30%
   const eliteY = plotBottom - (30.0 / yUpper) * h;
   ctx.strokeStyle = "#DC2626";
   ctx.lineWidth = 1.8;
-  ctx.setLineDash([3, 3]);
+  ctx.setLineDash([4, 4]);
   ctx.beginPath();
   ctx.moveTo(x, eliteY);
   ctx.lineTo(x + w, eliteY);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Promedio
-  const avgCsw = cswVals.reduce((a, b) => a + b, 0) / Math.max(cswVals.length, 1);
-  const avgY = plotBottom - (avgCsw / yUpper) * h;
-  ctx.strokeStyle = "#94A3B8";
-  ctx.lineWidth = 1.8;
-  ctx.setLineDash([5, 5]);
-  ctx.beginPath();
-  ctx.moveTo(x, avgY);
-  ctx.lineTo(x + w, avgY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  const n = plotLogs.length;
+  const n = Math.max(plotLogs.length, 1);
   const paddingX = 35;
   const step = n > 1 ? (w - paddingX * 2) / (n - 1) : 0;
 
-  const points: { px: number; py: number; val: number; date: string }[] = [];
-  plotLogs.forEach((g, i) => {
-    const px = n > 1 ? x + paddingX + i * step : x + w / 2;
-    const val = cswVals[i];
-    const py = plotBottom - (val / yUpper) * h;
-    points.push({ px, py, val, date: g.date });
-  });
+  const points = plotLogs.map((g, i) => ({
+    px: n > 1 ? x + paddingX + i * step : x + w / 2,
+    py: plotBottom - (cswVals[i] / yUpper) * h,
+    val: cswVals[i],
+    date: g.date,
+  }));
 
   ctx.strokeStyle = "#059669";
   ctx.lineWidth = 3;
@@ -1177,7 +2336,7 @@ function drawLvbpSeasonCswPlot(
 
     const dStr = String(pt.date || "").slice(-5).replace("-", "/");
     ctx.save();
-    ctx.translate(pt.px, plotBottom + 12);
+    ctx.translate(pt.px, plotBottom + 14);
     ctx.rotate(-Math.PI / 4);
     ctx.fillStyle = "#070B19";
     ctx.font = "bold 13px Inter, sans-serif";
@@ -1185,297 +2344,8 @@ function drawLvbpSeasonCswPlot(
     ctx.fillText(dStr, 0, 0);
     ctx.restore();
   });
-
-  // Leyenda
-  const legX = x + 16;
-  const legY = y + h - 68;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.strokeStyle = "#CBD5E1";
-  ctx.lineWidth = 1;
-  ctx.fillRect(legX, legY, 175, 54);
-  ctx.strokeRect(legX, legY, 175, 54);
-
-  ctx.strokeStyle = "#DC2626";
-  ctx.lineWidth = 1.8;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  ctx.moveTo(legX + 8, legY + 16);
-  ctx.lineTo(legX + 24, legY + 16);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 12px Inter, sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText("Elite CSW (30%)", legX + 32, legY + 20);
-
-  ctx.strokeStyle = "#059669";
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(legX + 8, legY + 36);
-  ctx.lineTo(legX + 24, legY + 36);
-  ctx.stroke();
-  ctx.fillStyle = "#059669";
-  ctx.fillRect(legX + 12, legY + 32, 8, 8);
-  ctx.fillStyle = "#070B19";
-  ctx.fillText(`CSW% (Prom: ${avgCsw.toFixed(1)}%)`, legX + 32, legY + 40);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Subrutinas de Tablas Inferiores (Estilo Matplotlib Thomas Nestico)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Tabla PBP de Destino del Pitcheo centrada al 76% (Modo Salida Individual)
-function drawLvbpBottomTable(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  pbpTable: PitchGameDataResponse["pbpTable"]
-) {
-  if (!pbpTable || pbpTable.length === 0) {
-    drawEmptyState(ctx, x, y, w, h, "Sin registros de destinos de pitcheos");
-    return;
-  }
-
-  const tableW = w * 0.76;
-  const tableX = x + (w - tableW) / 2;
-  const headerH = 64;
-  const rowH = 64;
-
-  const tCols = ["Destino del Pitcheo", "Total Conteo", "Distribución %"];
-  const colWidths = [tableW * 0.44, tableW * 0.28, tableW * 0.28];
-
-  const rows = pbpTable.slice(0, 5);
-  const totalTableH = headerH + rows.length * rowH;
-
-  ctx.strokeStyle = "#0F172A";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(tableX, y, tableW, totalTableH);
-
-  let curX = tableX;
-  for (let c = 0; c < tCols.length; c++) {
-    ctx.fillStyle = "#0F172A";
-    ctx.fillRect(curX, y, colWidths[c], headerH);
-
-    ctx.fillStyle = "#FDB827";
-    ctx.font = "bold 23px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(tCols[c], curX + colWidths[c] / 2, y + 41);
-
-    if (c > 0) {
-      ctx.strokeStyle = "#CCCCCC";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(curX, y);
-      ctx.lineTo(curX, y + totalTableH);
-      ctx.stroke();
-    }
-    curX += colWidths[c];
-  }
-
-  ctx.beginPath();
-  ctx.moveTo(tableX, y + headerH);
-  ctx.lineTo(tableX + tableW, y + headerH);
-  ctx.strokeStyle = "#CCCCCC";
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  rows.forEach((r, idx) => {
-    const ry = y + headerH + idx * rowH;
-    const bg = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
-
-    ctx.fillStyle = bg;
-    ctx.fillRect(tableX, ry, tableW, rowH);
-
-    ctx.fillStyle = "#070B19";
-    ctx.font = "bold 22px Inter, sans-serif";
-
-    ctx.textAlign = "center";
-    ctx.fillText(r.destination, tableX + colWidths[0] / 2, ry + 41);
-    ctx.fillText(String(r.count), tableX + colWidths[0] + colWidths[1] / 2, ry + 41);
-    ctx.fillText(r.pct, tableX + colWidths[0] + colWidths[1] + colWidths[2] / 2, ry + 41);
-
-    ctx.strokeStyle = "#CBD5E1";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(tableX, ry + rowH);
-    ctx.lineTo(tableX + tableW, ry + rowH);
-    ctx.stroke();
-  });
   ctx.textAlign = "left";
 }
-
-// Tabla de Historial de Salidas del Período con Columna Rol (Hasta 10 Juegos)
-function drawLvbpSeasonHistoryTable(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  displayLogs: PitcherGameLog[],
-  activeGamePk?: number
-) {
-  if (!displayLogs || displayLogs.length === 0) {
-    drawEmptyState(ctx, x, y, w, h, "Sin registros de salidas para este período");
-    return;
-  }
-
-  // Título de la Sección de Historial de Salidas
-  ctx.fillStyle = "#070B19";
-  ctx.font = "bold 24px Inter, sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText(
-    "HISTORIAL DE SALIDAS (ÚLTIMOS 10 JUEGOS) • RENDIMIENTO Y CARGA",
-    x,
-    y - 18
-  );
-  ctx.textAlign = "center";
-
-  // Definición de columnas con pesos proporcionales para legibilidad óptima
-  const colDefs = [
-    { label: "Fecha", weight: 1.1 },
-    { label: "Rival", weight: 2.3 },
-    { label: "Rol", weight: 1.3 },
-    { label: "Dec.", weight: 0.8 },
-    { label: "IP", weight: 0.8 },
-    { label: "H", weight: 0.7 },
-    { label: "CL", weight: 0.7 },
-    { label: "BB", weight: 0.7 },
-    { label: "K", weight: 0.7 },
-    { label: "Pitcheos (P-S)", weight: 1.9 },
-    { label: "CSW%", weight: 1.1 },
-    { label: "Whiff%", weight: 1.1 },
-  ];
-
-  const totalWeight = colDefs.reduce((acc, c) => acc + c.weight, 0);
-  const colWidths = colDefs.map((c) => (w / totalWeight) * c.weight);
-  const colX: number[] = [];
-  let currX = x;
-  for (let i = 0; i < colWidths.length; i++) {
-    colX.push(currX);
-    currX += colWidths[i];
-  }
-
-  const headerH = 50;
-  const rowH = 46;
-  const totalH = headerH + displayLogs.length * rowH;
-
-  // Marco exterior
-  ctx.strokeStyle = "#0F172A";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x, y, w, totalH);
-
-  // Encabezados
-  for (let c = 0; c < colDefs.length; c++) {
-    const cx = colX[c];
-    const cw = colWidths[c];
-
-    ctx.fillStyle = "#0F172A";
-    ctx.fillRect(cx, y, cw, headerH);
-
-    ctx.fillStyle = "#FDB827";
-    ctx.font = "bold 19px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(colDefs[c].label, cx + cw / 2, y + 33);
-
-    if (c > 0) {
-      ctx.strokeStyle = "#334155";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(cx, y);
-      ctx.lineTo(cx, y + totalH);
-      ctx.stroke();
-    }
-  }
-
-  // Filas de salidas
-  displayLogs.forEach((g, idx) => {
-    const ry = y + headerH + idx * rowH;
-    const isSelected = Boolean(activeGamePk && g.gamePk === activeGamePk);
-    const bg = isSelected ? "#FEF3C7" : idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
-
-    ctx.fillStyle = bg;
-    ctx.fillRect(x, ry, w, rowH);
-
-    if (isSelected) {
-      ctx.strokeStyle = "#F59E0B";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1, ry + 1, w - 2, rowH - 2);
-    }
-
-    const pVal = g.pitches || 0;
-    const sVal = g.strikes || Math.round(pVal * 0.62);
-    const bVal = Math.max(0, pVal - sVal);
-    const pStr = pVal > 0 ? `${pVal} (${sVal}-${bVal})` : "—";
-    const { cswStr, whiffStr } = getLogMetrics(g);
-
-    const dateFormatted = String(g.date).slice(-5).replace("-", "/");
-    const roleFormatted = g.role || (g.isStarter ? "Abridor" : "Relevista");
-    const decFormatted = g.decision || "—";
-
-    const rowData = [
-      dateFormatted,
-      g.opponent || "Rival",
-      roleFormatted,
-      decFormatted,
-      String(g.ip || "0.0"),
-      String(g.h ?? 0),
-      String(g.er ?? 0),
-      String(g.bb ?? 0),
-      String(g.so ?? 0),
-      pStr,
-      cswStr,
-      whiffStr,
-    ];
-
-    rowData.forEach((val, c) => {
-      const cx = colX[c];
-      const cw = colWidths[c];
-
-      if (c === 2) {
-        // Rol
-        ctx.fillStyle = roleFormatted === "Abridor" ? "#002D62" : "#475569";
-        ctx.font = "bold 18px Inter, sans-serif";
-      } else if (c === 3) {
-        // Decisión
-        ctx.fillStyle =
-          decFormatted === "W"
-            ? "#16A34A"
-            : decFormatted === "L"
-            ? "#DC2626"
-            : decFormatted === "SV"
-            ? "#D97706"
-            : "#64748B";
-        ctx.font = "900 18px Inter, sans-serif";
-      } else if (c === 1) {
-        // Rival
-        ctx.fillStyle = "#070B19";
-        ctx.font = "bold 18px Inter, sans-serif";
-      } else {
-        ctx.fillStyle = "#070B19";
-        ctx.font = "bold 18px Inter, monospace";
-      }
-
-      ctx.textAlign = "center";
-      ctx.fillText(val, cx + cw / 2, ry + 29);
-    });
-
-    // Línea horizontal entre filas
-    ctx.strokeStyle = "#CBD5E1";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x, ry + rowH);
-    ctx.lineTo(x + w, ry + rowH);
-    ctx.stroke();
-  });
-
-  ctx.textAlign = "left";
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Subrutinas de Rama MLB (Hawk-Eye / Statcast)
-// ─────────────────────────────────────────────────────────────────────────────
 
 function drawMlbVelocityPlot(
   ctx: CanvasRenderingContext2D,
@@ -1485,44 +2355,38 @@ function drawMlbVelocityPlot(
   h: number,
   summary: StatcastPitchRow[]
 ) {
-  drawSubplotFrame(ctx, x, y, w, h, "Distribución de Velocidad (mph)");
+  drawSubplotFrame(ctx, x, y, w, h, "Velocidad por Repertorio (mph)");
 
   if (!summary || summary.length === 0) {
     drawEmptyState(ctx, x, y, w, h, "Sin datos de velocidad");
     return;
   }
 
-  const valid = summary.filter((s) => {
-    const v = typeof s.veloAvg === "number" ? s.veloAvg : parseFloat(String(s.veloAvg)) || 0;
-    return v > 0;
-  });
-
-  const rowH = Math.min((h - 80) / Math.max(valid.length, 1), 75);
+  const valid = summary.filter((s) => (parseNum(s.veloAvg) ?? 0) > 0);
+  const rowH = Math.min((h - 70) / Math.max(valid.length, 1), 75);
 
   valid.forEach((pt, i) => {
-    const ry = y + 40 + i * rowH;
+    const ry = y + 36 + i * rowH;
     const pColor = pt.color || getPitchColor(pt.pitchName, pt.pitchType);
-    const veloNum =
-      typeof pt.veloAvg === "number" ? pt.veloAvg : parseFloat(String(pt.veloAvg)) || 0;
+    const veloNum = parseNum(pt.veloAvg) ?? 0;
 
     ctx.fillStyle = pColor;
-    ctx.font = "bold 20px Inter, sans-serif";
+    ctx.font = "bold 19px Inter, sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(pt.pitchName, x + 30, ry + 24);
+    ctx.fillText(pt.pitchName, x + 24, ry + 24);
 
-    const barStartX = x + 210;
-    const barMaxW = w - 210 - 110;
+    const barStartX = x + 215;
+    const barMaxW = w - 215 - 125;
     const norm = Math.max(0, Math.min(1, (veloNum - 70) / 32));
     const curW = norm * barMaxW;
 
     ctx.fillStyle = "#F1F5F9";
     ctx.fillRect(barStartX, ry + 6, barMaxW, 24);
-
     ctx.fillStyle = pColor;
     ctx.fillRect(barStartX, ry + 6, curW, 24);
 
     ctx.fillStyle = "#070B19";
-    ctx.font = "bold 20px Inter, monospace";
+    ctx.font = "bold 19px Inter, sans-serif";
     ctx.textAlign = "right";
     ctx.fillText(`${veloNum.toFixed(1)} mph`, x + w - 20, ry + 24);
   });
@@ -1537,11 +2401,11 @@ function drawMlbStrikeZonePlot(
   h: number,
   pitches: PitchGameDataResponse["pitches"]
 ) {
-  drawSubplotFrame(ctx, x, y, w, h, "Pitch Locations & Strike Zone");
+  drawSubplotFrame(ctx, x, y, w, h, "Ubicación y Zona de Strike (3×3)");
 
   const cx = x + w / 2;
   const cy = y + h / 2 - 10;
-  const pxScale = 110;
+  const pxScale = 108;
 
   const szW = 1.416 * pxScale;
   const szH = 2.0 * pxScale;
@@ -1549,7 +2413,7 @@ function drawMlbStrikeZonePlot(
   const szY = cy - szH / 2;
 
   const plateW = szW;
-  const plateY = szY + szH + 45;
+  const plateY = szY + szH + 42;
   ctx.fillStyle = "#CBD5E1";
   ctx.strokeStyle = "#0F172A";
   ctx.lineWidth = 2;
@@ -1557,7 +2421,7 @@ function drawMlbStrikeZonePlot(
   ctx.moveTo(cx - plateW / 2, plateY);
   ctx.lineTo(cx + plateW / 2, plateY);
   ctx.lineTo(cx + plateW / 2, plateY + 12);
-  ctx.lineTo(cx, plateY + 28);
+  ctx.lineTo(cx, plateY + 26);
   ctx.lineTo(cx - plateW / 2, plateY + 12);
   ctx.closePath();
   ctx.fill();
@@ -1585,18 +2449,20 @@ function drawMlbStrikeZonePlot(
   ctx.setLineDash([]);
 
   if (pitches && pitches.length > 0) {
-    pitches.forEach((p) => {
+    const sample = pitches.length > 260 ? pitches.slice(-260) : pitches;
+    sample.forEach((p) => {
       if (p.plateX == null || p.plateZ == null) return;
       const ptX = cx + p.plateX * pxScale;
       const ptY = cy - (p.plateZ - 2.5) * pxScale;
+      if (ptX < x + 12 || ptX > x + w - 12 || ptY < y + 12 || ptY > y + h - 12) return;
 
       const col = getPitchColor(p.pitchName || p.pitchType, p.pitchType);
       ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.arc(ptX, ptY, 8, 0, Math.PI * 2);
+      ctx.arc(ptX, ptY, 7.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = "#0F172A";
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.3;
       ctx.stroke();
     });
   }
@@ -1611,10 +2477,10 @@ function drawMlbBreaksPlot(
   pitches: PitchGameDataResponse["pitches"],
   throws: string
 ) {
-  drawSubplotFrame(ctx, x, y, w, h, "Short-Form Pitch Breaks (in)");
+  drawSubplotFrame(ctx, x, y, w, h, "Movimiento Corto (iVB vs HB, pulg)");
 
   const cx = x + w / 2;
-  const cy = y + h / 2 - 10;
+  const cy = y + h / 2 - 6;
   const radius = Math.min(w, h) * 0.36;
 
   ctx.strokeStyle = "#CBD5E1";
@@ -1631,169 +2497,34 @@ function drawMlbBreaksPlot(
   ctx.textAlign = "center";
   ctx.fillText("+20\"", cx, cy - radius - 10);
   ctx.fillText("-20\"", cx, cy + radius + 22);
-
-  ctx.fillText(throws === "L" ? "Arm Side" : "Glove Side", cx - radius + 45, cy - 10);
-  ctx.fillText(throws === "L" ? "Glove Side" : "Arm Side", cx + radius - 45, cy - 10);
+  ctx.fillText(
+    throws === "L" ? "Lado Brazo" : "Lado Guante",
+    cx - radius + 52,
+    cy - 10
+  );
+  ctx.fillText(
+    throws === "L" ? "Lado Guante" : "Lado Brazo",
+    cx + radius - 52,
+    cy - 10
+  );
 
   if (pitches && pitches.length > 0) {
-    pitches.forEach((p) => {
+    const sample = pitches.length > 260 ? pitches.slice(-260) : pitches;
+    sample.forEach((p) => {
       if (p.hb == null || p.ivb == null) return;
       const pxX = cx + (p.hb / 25) * radius;
       const pxY = cy - (p.ivb / 25) * radius;
+      if (pxX < x + 12 || pxX > x + w - 12 || pxY < y + 12 || pxY > y + h - 12) return;
 
       const col = getPitchColor(p.pitchName || p.pitchType, p.pitchType);
       ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.arc(pxX, pxY, 7.5, 0, Math.PI * 2);
+      ctx.arc(pxX, pxY, 7, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = "#0F172A";
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.3;
       ctx.stroke();
     });
-  }
-  ctx.textAlign = "left";
-}
-
-function drawMlbRepTable(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  summary: StatcastPitchRow[]
-) {
-  if (!summary || summary.length === 0) {
-    drawEmptyState(ctx, x, y, w, h, "Sin datos de repertorio Hawk-Eye");
-    return;
-  }
-
-  const headerH = 55;
-  const rowH = 48;
-
-  const tCols = [
-    "Pitch Name",
-    "Count",
-    "Pitch%",
-    "Velocity",
-    "iVB",
-    "HB",
-    "Spin",
-    "Whiff%",
-    "CSW%",
-    "Zone%",
-  ];
-  const colW = w / tCols.length;
-
-  ctx.strokeStyle = "#0F172A";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x, y, w, headerH + (summary.length + 1) * rowH);
-
-  for (let c = 0; c < tCols.length; c++) {
-    const cx = x + c * colW;
-    ctx.fillStyle = "#0F172A";
-    ctx.fillRect(cx, y, colW, headerH);
-
-    ctx.fillStyle = "#FDB827";
-    ctx.font = "bold 20px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(tCols[c], cx + colW / 2, y + 36);
-
-    if (c > 0) {
-      ctx.strokeStyle = "#CBD5E1";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(cx, y);
-      ctx.lineTo(cx, y + headerH + (summary.length + 1) * rowH);
-      ctx.stroke();
-    }
-  }
-
-  summary.forEach((pt, idx) => {
-    const ry = y + headerH + idx * rowH;
-    const pColor = pt.color || getPitchColor(pt.pitchName, pt.pitchType);
-
-    ctx.fillStyle = pColor;
-    ctx.fillRect(x, ry, colW, rowH);
-
-    ctx.fillStyle = ["#67E18D", "#F79E70", "#FE6100", "#FFB000"].includes(pColor)
-      ? "#070B19"
-      : "#FFFFFF";
-    ctx.font = "bold 20px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(pt.pitchName, x + colW / 2, ry + 32);
-
-    const rowVals = [
-      String(pt.count),
-      pt.usagePct,
-      `${pt.veloAvg}`,
-      `${pt.ivb}`,
-      `${pt.hb}`,
-      String(pt.spinAvg),
-      pt.whiffPct,
-      pt.cswPct,
-      pt.zonePct || "—",
-    ];
-
-    const bg = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
-    for (let c = 1; c < tCols.length; c++) {
-      const cx = x + c * colW;
-      ctx.fillStyle = bg;
-      ctx.fillRect(cx, ry, colW, rowH);
-
-      ctx.fillStyle = "#070B19";
-      ctx.font = "900 20px Inter, monospace";
-      ctx.fillText(rowVals[c - 1], cx + colW / 2, ry + 32);
-    }
-
-    ctx.strokeStyle = "#E2E8F0";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x, ry + rowH);
-    ctx.lineTo(x + w, ry + rowH);
-    ctx.stroke();
-  });
-
-  const allY = y + headerH + summary.length * rowH;
-  const totPitches = summary.reduce((acc, s) => acc + s.count, 0);
-  const avgVelo =
-    summary.reduce((acc, s) => {
-      const v = typeof s.veloAvg === "number" ? s.veloAvg : parseFloat(String(s.veloAvg)) || 0;
-      return acc + v * s.count;
-    }, 0) / Math.max(totPitches, 1);
-  const avgSpin = Math.round(
-    summary.reduce((acc, s) => {
-      const sp = typeof s.spinAvg === "number" ? s.spinAvg : parseFloat(String(s.spinAvg)) || 0;
-      return acc + sp * s.count;
-    }, 0) / Math.max(totPitches, 1)
-  );
-
-  ctx.fillStyle = "#0F172A";
-  ctx.fillRect(x, allY, colW, rowH);
-  ctx.fillStyle = "#FDB827";
-  ctx.font = "bold 22px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("All", x + colW / 2, allY + 32);
-
-  const allVals = [
-    String(totPitches),
-    "100.0%",
-    avgVelo > 0 ? avgVelo.toFixed(1) : "—",
-    "—",
-    "—",
-    avgSpin > 0 ? String(avgSpin) : "—",
-    "—",
-    "—",
-    "—",
-  ];
-
-  for (let c = 1; c < tCols.length; c++) {
-    const cx = x + c * colW;
-    ctx.fillStyle = "#0F172A";
-    ctx.fillRect(cx, allY, colW, rowH);
-
-    ctx.fillStyle = "#FDB827";
-    ctx.font = "900 20px Inter, monospace";
-    ctx.fillText(allVals[c - 1], cx + colW / 2, allY + 32);
   }
   ctx.textAlign = "left";
 }
@@ -1807,7 +2538,7 @@ function drawEmptyState(
   msg: string
 ) {
   ctx.fillStyle = "#94A3B8";
-  ctx.font = "bold 18px Inter, sans-serif";
+  ctx.font = "bold 19px Inter, sans-serif";
   ctx.textAlign = "center";
   ctx.fillText(msg, x + w / 2, y + h / 2);
   ctx.textAlign = "left";
@@ -1826,9 +2557,14 @@ export async function downloadPitchingCard(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  const cleanName = pitcher.name.toLowerCase().replace(/\s+/g, "_");
+  const cleanName = pitcher.name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, "_");
   const modePrefix = data.timeMode === "season" ? "season" : "game";
-  a.download = `pitching_summary_${cleanName}_${modePrefix}_${gameLog.date}.png`;
+  const safeDate = String(gameLog.date || "reporte").replace(/\s+/g, "_");
+  a.download = `pitching_summary_3x4_${cleanName}_${modePrefix}_${safeDate}.png`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

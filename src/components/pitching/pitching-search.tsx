@@ -4,19 +4,64 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { Search, Loader2, Sparkles } from "lucide-react";
 import { PitcherProfile } from "@/types/pitching";
-import { CARACAS_FEATURED_PITCHERS } from "@/lib/pitching-constants";
+import {
+  CARACAS_FEATURED_PITCHERS,
+  getMlbFallbackHeadshotUrl,
+} from "@/lib/pitching-constants";
 
 interface PitchingSearchProps {
   onSelectPitcher: (pitcher: PitcherProfile) => void;
   selectedPitcherId?: number;
 }
 
+function PitcherThumb({ pitcher }: { pitcher: PitcherProfile }) {
+  const fallback = pitcher.mlbPhotoUrl || getMlbFallbackHeadshotUrl(pitcher.id);
+  const [src, setSrc] = useState<string>(pitcher.photoUrl || fallback);
+
+  return (
+    <div className="w-8 h-8 rounded-full overflow-hidden bg-[#070B19] border border-[#1E2B4D] shrink-0 relative">
+      <Image
+        src={src}
+        alt={pitcher.name}
+        fill
+        className="object-cover"
+        unoptimized
+        onError={() => {
+          if (src !== fallback) setSrc(fallback);
+        }}
+      />
+    </div>
+  );
+}
+
 export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingSearchProps) {
   const [query, setQuery] = useState("");
+  const [defaultDirectory, setDefaultDirectory] =
+    useState<PitcherProfile[]>(CARACAS_FEATURED_PITCHERS);
   const [results, setResults] = useState<PitcherProfile[]>(CARACAS_FEATURED_PITCHERS);
   const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/pitching/search")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (active && data?.results?.length) {
+          setDefaultDirectory(data.results);
+          setResults((prev) =>
+            prev === CARACAS_FEATURED_PITCHERS ? data.results : prev
+          );
+        }
+      })
+      .catch(() => {
+        // Conservar referentes iniciales si la consulta falla
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -30,7 +75,7 @@ export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingS
 
   useEffect(() => {
     if (query.trim().length < 2) {
-      setResults(CARACAS_FEATURED_PITCHERS);
+      setResults(defaultDirectory);
       setIsSearching(false);
       return;
     }
@@ -52,7 +97,7 @@ export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingS
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, defaultDirectory]);
 
   return (
     <div className="w-full max-w-3xl mx-auto flex flex-col items-center relative" ref={dropdownRef}>
@@ -67,7 +112,7 @@ export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingS
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder="Buscar lanzador por nombre o ID (ej: Albert Suárez, Erick Leal, Tarik Skubal...)"
+          placeholder="Buscar lanzador LVBP o MLB por nombre, club o ID (ej: Erick Leal, Magallanes, Cardenales, Skubal...)"
           className="w-full bg-transparent border-none text-slate-100 placeholder-slate-400 text-xs sm:text-sm px-3 focus:outline-none"
         />
         {isSearching ? (
@@ -76,9 +121,9 @@ export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingS
           <button
             onClick={() => {
               setQuery("");
-              setResults(CARACAS_FEATURED_PITCHERS);
+              setResults(defaultDirectory);
             }}
-            className="text-slate-400 hover:text-slate-200 text-xs px-2"
+            className="text-slate-400 hover:text-slate-200 text-xs px-2 cursor-pointer"
           >
             ✕
           </button>
@@ -100,7 +145,7 @@ export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingS
                 onSelectPitcher(p);
                 setIsOpen(false);
               }}
-              className={`text-[11px] px-2.5 py-1 rounded-full border transition-all flex items-center gap-1.5 ${
+              className={`text-[11px] px-2.5 py-1 rounded-full border transition-all flex items-center gap-1.5 cursor-pointer ${
                 isSelected
                   ? "bg-[#FDB827] text-slate-950 border-[#FDB827] font-bold shadow-[0_0_10px_rgba(253,184,39,0.3)]"
                   : "bg-[#0D152B] text-slate-300 border-[#1E2B4D] hover:border-[#FDB827]/60 hover:text-[#FDB827]"
@@ -125,26 +170,26 @@ export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingS
                   onSelectPitcher(p);
                   setIsOpen(false);
                 }}
-                className={`w-full px-4 py-2.5 flex items-center justify-between text-left transition-colors ${
+                className={`w-full px-4 py-2.5 flex items-center justify-between text-left transition-colors cursor-pointer ${
                   isSelected ? "bg-[#1E2B4D]/60" : "hover:bg-[#1E2B4D]/40"
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full overflow-hidden bg-[#070B19] border border-[#1E2B4D] shrink-0 relative">
-                    <Image
-                      src={p.photoUrl}
-                      alt={p.name}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  </div>
+                  <PitcherThumb pitcher={p} />
                   <div>
-                    <div className="text-xs sm:text-sm font-semibold text-slate-100 flex items-center gap-1.5">
-                      {p.name}
-                      {p.hasCaracasHistory && (
+                    <div className="text-xs sm:text-sm font-semibold text-slate-100 flex items-center gap-1.5 flex-wrap">
+                      <span>{p.name}</span>
+                      {p.hasCaracasHistory ? (
                         <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#002D62] text-[#FDB827] border border-[#FDB827]/40 font-bold">
                           CAR
+                        </span>
+                      ) : p.lvbpTeamAbbr ? (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#1E2B4D] text-cyan-300 border border-cyan-400/30 font-bold">
+                          {p.lvbpTeamAbbr}
+                        </span>
+                      ) : (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 border border-amber-400/30 font-bold">
+                          MLB
                         </span>
                       )}
                     </div>

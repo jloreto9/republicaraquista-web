@@ -1,3 +1,6 @@
+export type PitchingBranch = "lvbp" | "mlb";
+export type TimeMode = "game" | "season";
+
 export interface PitcherProfile {
   id: number;
   name: string;
@@ -10,6 +13,7 @@ export interface PitcherProfile {
   lvbpTeamName?: string;
   lvbpTeamAbbr?: string;
   photoUrl: string;
+  mlbPhotoUrl?: string;
   age?: number;
   height?: string;
   weight?: number;
@@ -19,17 +23,21 @@ export interface PitcherGameLog {
   gamePk: number;
   date: string;
   opponent: string;
+  isHome?: boolean;
   isStarter: boolean;
   role: "Abridor" | "Relevista" | "Temporada";
   gameType: string;
   phase: string;
   ip: string;
+  outs?: number;
+  bf?: number;
   h: number;
   r: number;
   er: number;
   bb: number;
   so: number;
   hr: number;
+  hbp?: number;
   pitches: number;
   strikes: number;
   era: string;
@@ -37,6 +45,14 @@ export interface PitcherGameLog {
   league: "LVBP" | "MLB" | "MiLB";
   cswPct?: string;
   whiffPct?: string;
+  fStrikePct?: string;
+  gsv2?: number | null;
+  isQS?: boolean;
+  wpa?: number | null;
+  re24?: number | null;
+  aLI?: number | null;
+  ir?: number;
+  irs?: number;
 }
 
 export interface PitchDetail {
@@ -47,6 +63,7 @@ export interface PitchDetail {
   spin: number | null;
   ivb: number | null; // Induced Vertical Break (pulgadas)
   hb: number | null;  // Horizontal Break (pulgadas)
+  ext?: number | null; // Release Extension (pies)
   plateX: number | null;
   plateZ: number | null;
   szTop: number;
@@ -61,6 +78,8 @@ export interface PitchDetail {
   isBall: boolean;
   isStrike: boolean;
   isZone: boolean;
+  isChase?: boolean;
+  isZoneContact?: boolean;
   outs: number;
   strikes: number;
   balls: number;
@@ -78,9 +97,12 @@ export interface StatcastPitchRow {
   spinAvg: number | string;
   ivb: number | string;
   hb: number | string;
+  extAvg?: number | string | null;
   whiffPct: string;
   cswPct: string;
   zonePct: string;
+  chasePct?: string;
+  zContactPct?: string;
   color: string;
 }
 
@@ -99,6 +121,12 @@ export interface PBPKPIs {
   cswPct: string;
   whiffPct: string;
   fpsPct: string;
+  swStrPct?: string;
+  putAwayPct?: string;
+  twoStrikePitches?: number;
+  twoStrikeK?: number;
+  chasePct?: string;
+  zContactPct?: string;
   swings: number;
   calledStrikes: number;
   fouls: number;
@@ -126,32 +154,138 @@ export interface PlatoonSplits {
   vsRhb: PlatoonSplitItem;
 }
 
-export type TimeMode = "game" | "season";
+export interface PitchingSplitRow {
+  key: string;
+  label: string;
+  bf: number;
+  ab: number;
+  h: number;
+  doubles?: number;
+  triples?: number;
+  hr: number;
+  bb: number;
+  hbp?: number;
+  so: number;
+  avg: string;
+  obp: string;
+  slg: string;
+  ops: string;
+  kPct: number;
+  bbPct: number;
+  fStrikePct: number;
+  cswPct: number;
+  whiffPct: number;
+  pitches?: number;
+}
+
+export interface ContactProfileSummary {
+  bip: number;
+  gb: number;
+  ld: number;
+  fb: number;
+  pu: number;
+  gbPct: number;
+  ldPct: number;
+  fbPct: number;
+  puPct: number;
+  goAoRatio: string;
+  hard: number;
+  med: number;
+  soft: number;
+  hardPct: number;
+  medPct: number;
+  softPct: number;
+  // Exclusivo para MLB con Hawk-Eye (hasStatcast === true)
+  avgEv?: number | null;
+  maxEv?: number | null;
+  hardHitPct?: number | null;
+  barrelPct?: number | null;
+}
+
+export interface PitchingContextMetrics {
+  wpa: number;
+  re24: number;
+  aLI: number;
+  gmLI: number;
+  gsv2: number | null;
+  isQS: boolean;
+  qsCount?: number;
+  gsCount?: number;
+  avgGsv2?: number | null;
+  ir: number;
+  irs: number;
+  irsPct: number | null;
+  shutdowns?: number;
+  meltdowns?: number;
+}
+
+export interface PitchBoxscoreSummary {
+  ip: string;
+  outs?: number;
+  bf?: number;
+  ab?: number;
+  h: number;
+  r: number;
+  er: number;
+  bb: number;
+  ibb?: number;
+  so: number;
+  hr?: number;
+  hbp?: number;
+  wp?: number;
+  pitches: number;
+  strikes: number;
+  strikePct?: string;
+  cswPct: string;
+  whiffPct: string;
+  fStrikePct?: string;
+  swStrPct?: string;
+  putAwayPct?: string;
+  era?: string;
+  whip?: string;
+  fip?: string;
+  eraMinus?: number | null;
+  kPct?: string;
+  bbPct?: string;
+  kMinusBbPct?: string;
+  babip?: string;
+  lobPct?: string;
+  baa?: string;
+  opsAgainst?: string;
+  wins?: number;
+  losses?: number;
+  saves?: number;
+  holds?: number;
+  gamesPlayed?: number;
+  gamesStarted?: number;
+  go?: number;
+  ao?: number;
+  ir?: number;
+  irs?: number;
+  gsv2?: number | null;
+  isQS?: boolean;
+}
 
 export interface PitchGameDataResponse {
   gamePk: number;
   pitcherId: number;
   timeMode?: TimeMode;
   gamesCount?: number;
+  gamesSampled?: number;
+  effectiveSeason?: number;
+  fallbackUsed?: boolean;
+  fallbackMessage?: string | null;
   isStarter: boolean;
   role: "Abridor" | "Relevista" | "Temporada";
   decision: string;
   totalPitches: number;
   hasStatcast: boolean;
-  boxscore: {
-    ip: string;
-    h: number;
-    r: number;
-    er: number;
-    bb: number;
-    so: number;
-    pitches: number;
-    strikes: number;
-    cswPct: string;
-    whiffPct: string;
-    era?: string;
-    whip?: string;
-  };
+  mlbPhotoUrl?: string;
+  boxscore: PitchBoxscoreSummary;
+  contextMetrics?: PitchingContextMetrics;
+  contactProfile?: ContactProfileSummary;
+  situationalSplits?: PitchingSplitRow[];
+  ttoSplits?: PitchingSplitRow[];
   statcastTable: StatcastPitchRow[];
   pbpTable: PBPDestinationRow[];
   pbpKpis: PBPKPIs;
@@ -159,3 +293,6 @@ export interface PitchGameDataResponse {
   splitsPlatoon: PlatoonSplits;
   pitches: PitchDetail[];
 }
+
+export type PitchingCardData = PitchGameDataResponse;
+export type PitchArsenalRow = StatcastPitchRow;

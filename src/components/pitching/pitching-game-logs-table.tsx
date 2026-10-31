@@ -2,7 +2,7 @@
 
 import React from "react";
 import { PitcherGameLog } from "@/types/pitching";
-import { Calendar, Shield, Award, Smartphone } from "lucide-react";
+import { Calendar, Smartphone } from "lucide-react";
 
 interface PitchingGameLogsTableProps {
   gameLogs: PitcherGameLog[];
@@ -29,21 +29,21 @@ export function PitchingGameLogsTable({
     .slice(0, maxRows);
 
   return (
-    <div className="w-full max-w-full lg:max-w-4xl bg-[#0D152B] border border-[#1E2B4D] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+    <div className="w-full max-w-full lg:max-w-6xl bg-[#0D152B] border border-[#1E2B4D] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1E2B4D] pb-3 gap-2">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-lg bg-[#002D62] text-[#FDB827] border border-[#FDB827]/30">
             <Calendar className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2 flex-wrap">
               <span>📋 {title}</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/30">
-                {recentLogs.length} Salidas
+                {recentLogs.length} Salidas • PBP 100% Real
               </span>
             </h3>
             <p className="text-xs text-slate-400 font-mono">
-              Haz clic en cualquier salida para cargar su telemetría y tarjeta oficial
+              Haz clic en cualquier salida para inspeccionar su telemetría y reporte oficial 3:4
             </p>
           </div>
         </div>
@@ -65,11 +65,12 @@ export function PitchingGameLogsTable({
               <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">Dec.</th>
               <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">IP</th>
               <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">H</th>
-              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">C</th>
               <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">CL</th>
               <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">BB</th>
               <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5">K</th>
               <th className="py-2.5 px-3 landscape:py-2 landscape:px-2">Pitcheos (S-B)</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5 text-emerald-300">GSv2</th>
+              <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5 text-cyan-300">WPA</th>
               <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5 text-[#FDB827]">CSW%</th>
               <th className="py-2.5 px-2 landscape:py-2 landscape:px-1.5 text-blue-400">Whiff%</th>
             </tr>
@@ -77,21 +78,20 @@ export function PitchingGameLogsTable({
           <tbody className="divide-y divide-[#1E2B4D]/50 text-slate-200 font-mono">
             {recentLogs.map((log) => {
               const isSelected = selectedGamePk === log.gamePk;
-              const strikes = log.strikes || Math.round((log.pitches || 0) * 0.62);
+              const strikes = log.strikes ?? 0;
               const balls = Math.max(0, (log.pitches || 0) - strikes);
 
-              // Decisión badge
               const decColor =
                 log.decision === "W"
                   ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                   : log.decision === "L"
                   ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
-                  : log.decision === "SV"
+                  : log.decision === "SV" || log.decision === "HLD"
                   ? "bg-[#FDB827]/20 text-[#FDB827] border-[#FDB827]/30"
                   : "text-slate-400";
 
-              // Rol badge
               const isStarter = log.isStarter || log.role === "Abridor";
+              const wpaVal = typeof log.wpa === "number" ? log.wpa : null;
 
               return (
                 <tr
@@ -103,10 +103,10 @@ export function PitchingGameLogsTable({
                       : "hover:bg-[#0D152B]/80"
                   }`}
                 >
-                  <td className="py-2.5 px-3 text-left text-slate-300 font-medium">
+                  <td className="py-2.5 px-3 text-left text-slate-300 font-medium whitespace-nowrap">
                     {log.date}
                   </td>
-                  <td className="py-2.5 px-3 text-left font-semibold text-slate-200">
+                  <td className="py-2.5 px-3 text-left font-semibold text-slate-200 whitespace-nowrap">
                     {log.opponent}
                   </td>
                   <td className="py-2.5 px-3">
@@ -133,15 +133,56 @@ export function PitchingGameLogsTable({
                   </td>
                   <td className="py-2.5 px-2 text-[#FDB827] font-bold">{log.ip}</td>
                   <td className="py-2.5 px-2">{log.h}</td>
-                  <td className="py-2.5 px-2 text-slate-400">{log.r}</td>
                   <td className="py-2.5 px-2">{log.er}</td>
                   <td className="py-2.5 px-2">{log.bb}</td>
                   <td className="py-2.5 px-2 text-emerald-400 font-bold">{log.so}</td>
-                  <td className="py-2.5 px-3">
+                  <td className="py-2.5 px-3 whitespace-nowrap">
                     <span>{log.pitches}</span>
                     <span className="text-[10px] text-slate-400 ml-1">
                       ({strikes}-{balls})
                     </span>
+                  </td>
+                  <td className="py-2.5 px-2 whitespace-nowrap">
+                    {isStarter && typeof log.gsv2 === "number" ? (
+                      <span
+                        className={`inline-flex items-center gap-1 font-bold ${
+                          log.gsv2 >= 60
+                            ? "text-emerald-400"
+                            : log.gsv2 <= 40
+                            ? "text-rose-400"
+                            : "text-slate-200"
+                        }`}
+                      >
+                        {log.gsv2}
+                        {log.isQS && (
+                          <span
+                            title="Salida de Calidad (≥6.0 IP y ≤3 CL)"
+                            className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                          >
+                            QS
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-slate-500">—</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-2 whitespace-nowrap font-bold">
+                    {wpaVal !== null ? (
+                      <span
+                        className={
+                          wpaVal >= 0.05
+                            ? "text-emerald-400"
+                            : wpaVal <= -0.05
+                            ? "text-rose-400"
+                            : "text-slate-300"
+                        }
+                      >
+                        {wpaVal >= 0 ? `+${wpaVal.toFixed(2)}` : wpaVal.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-500">—</span>
+                    )}
                   </td>
                   <td className="py-2.5 px-2 font-bold text-amber-300">
                     {log.cswPct || "—"}

@@ -1,134 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PitcherGameLog } from "@/types/pitching";
+import { PitchingBranch } from "@/types/pitching";
+import { fetchSeasonGameLogsWithRealTelemetry } from "@/lib/pitch-parser";
 import { getActiveSeason, getAvailableSeasons } from "@/lib/season-service";
-
-const HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  Accept: "application/json, text/plain, */*",
-};
-
-function parseDecision(stat: any): "W" | "L" | "SV" | "HLD" | "" {
-  if (!stat) return "";
-  if (Number(stat.wins || 0) > 0) return "W";
-  if (Number(stat.losses || 0) > 0) return "L";
-  if (Number(stat.saves || 0) > 0) return "SV";
-  if (Number(stat.holds || 0) > 0) return "HLD";
-  return "";
-}
-
-async function fetchLogsForSeason(
-  pitcherId: number,
-  season: number,
-  isLvbp: boolean,
-  phase: string
-): Promise<PitcherGameLog[]> {
-  const url = isLvbp
-    ? `https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${season}&sportId=17&gameType=R,F,D,L,W`
-    : `https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${season}&sportIds=1,11,12`;
-
-  const logs: PitcherGameLog[] = [];
-
-  try {
-    const res = await fetch(url, {
-      headers: HEADERS,
-      signal: AbortSignal.timeout(9000),
-      next: { revalidate: 3600 },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      const splits = data.stats?.[0]?.splits || [];
-
-      for (const s of splits) {
-        const game = s.game || {};
-        const stat = s.stat || {};
-        const gamePk = Number(game.gamePk) || 0;
-        const dateStr = s.date || "";
-        const opp = s.opponent?.name || "Rival";
-        const gameType = s.gameType || "R";
-
-        // Filtrar por fase si se solicitó
-        if (phase && phase !== "all" && gameType !== phase) {
-          continue;
-        }
-
-        const isStart = Number(stat.gamesStarted || 0) > 0;
-        const ip = String(stat.inningsPitched || "0.0");
-        const h = Number(stat.hits || 0);
-        const r = Number(stat.runs || 0);
-        const er = Number(stat.earnedRuns || 0);
-        const bb = Number(stat.baseOnBalls || 0);
-        const so = Number(stat.strikeOuts || 0);
-        const hr = Number(stat.homeRuns || 0);
-        const pitches = Number(stat.numberOfPitches || 0);
-        const strikes = Number(stat.strikes || 0);
-        const era = String(stat.era || "0.00");
-        const decision = parseDecision(stat);
-        const sportId = s.sport?.id;
-        const league: "LVBP" | "MLB" | "MiLB" = isLvbp
-          ? "LVBP"
-          : sportId === 1
-          ? "MLB"
-          : "MiLB";
-
-        // Filtrar registros vacíos
-        if (ip === "0.0" && h === 0 && r === 0 && er === 0 && bb === 0 && so === 0 && pitches === 0) {
-          continue;
-        }
-
-        // Estimación sabermétrica precisa de CSW% y Whiff% para PBP
-        let cswPct = "0.0%";
-        let whiffPct = "0.0%";
-        if (pitches > 0) {
-          const calledEst = Math.round(pitches * 0.175);
-          const whiffEst = Math.max(Math.round(so * 1.7), Math.round(Math.max(0, strikes - bb * 2) * 0.17));
-          const cswCount = Math.min(strikes, Math.max(calledEst + whiffEst, Math.round(strikes * 0.46)));
-          const cswNum = Math.min(42.0, Math.max(20.0, (cswCount / pitches) * 100));
-          const whiffNum = Math.min(32.0, Math.max(8.0, (whiffEst / pitches) * 100));
-          cswPct = `${cswNum.toFixed(1)}%`;
-          whiffPct = `${whiffNum.toFixed(1)}%`;
-        }
-
-        logs.push({
-          gamePk,
-          date: dateStr,
-          opponent: opp,
-          isStarter: isStart,
-          role: isStart ? "Abridor" : "Relevista",
-          gameType,
-          phase: gameType,
-          ip,
-          h,
-          r,
-          er,
-          bb,
-          so,
-          hr,
-          pitches,
-          strikes,
-          era,
-          decision,
-          league,
-          cswPct,
-          whiffPct,
-        });
-      }
-    }
-  } catch (err) {
-    console.error(`Error fetching pitcher game logs for season ${season}:`, err);
-  }
-
-  // Ordenar de más reciente a más antiguo
-  logs.sort((a, b) => b.date.localeCompare(a.date));
-  return logs;
-}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const pitcherIdParam = searchParams.get("pitcher_id");
   const activeSeason = await getActiveSeason();
   const seasonParam = searchParams.get("season");
-  const branch = (searchParams.get("branch") || "lvbp").toLowerCase();
+  const branchRaw = (searchParams.get("branch") || "lvbp").toLowerCase();
+  const branch: PitchingBranch = branchRaw === "mlb" ? "mlb" : "lvbp";
   const phase = searchParams.get("phase") || "all";
 
   const pitcherId = Number(pitcherIdParam);
@@ -137,20 +18,32 @@ export async function GET(request: NextRequest) {
   }
 
   const season = seasonParam ? Number(seasonParam) || activeSeason : activeSeason;
-  const isLvbp = branch === "lvbp";
 
   let effectiveSeason = season;
   let fallbackUsed = false;
-  let logs = await fetchLogsForSeason(pitcherId, season, isLvbp, phase);
+  let { logs } = await fetchSeasonGameLogsWithRealTelemetry(
+    pitcherId,
+    season,
+    branch,
+    phase
+  );
 
-  // Fallback inteligente como en Streamlit si la temporada pedida no tiene salidas (modo 'all')
   if (logs.length === 0 && phase === "all") {
     const available = await getAvailableSeasons();
-    const fallbackCandidates = available.filter((s) => s !== season);
+    const fallbackCandidates =
+      branch === "mlb"
+        ? [2025, 2024, 2023].filter((s) => s !== season)
+        : available.filter((s) => s !== season);
+
     for (const fallbackS of fallbackCandidates) {
-      const candidateLogs = await fetchLogsForSeason(pitcherId, fallbackS, isLvbp, phase);
-      if (candidateLogs.length > 0) {
-        logs = candidateLogs;
+      const candidate = await fetchSeasonGameLogsWithRealTelemetry(
+        pitcherId,
+        fallbackS,
+        branch,
+        phase
+      );
+      if (candidate.logs.length > 0) {
+        logs = candidate.logs;
         effectiveSeason = fallbackS;
         fallbackUsed = true;
         break;

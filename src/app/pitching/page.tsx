@@ -6,7 +6,7 @@ import { getActiveSeason } from "@/lib/constants";
 export const metadata: Metadata = {
   title: "Pitching Summary & Telemetría | República Caraquista",
   description:
-    "Buscador universal de lanzadores, telemetría Hawk-Eye (MLB) y analítica Play-by-Play adaptada para Leones del Caracas con exportación de tarjetas HD.",
+    "Buscador integral de lanzadores LVBP (8 equipos) y MLB, telemetría Hawk-Eye, analítica Play-by-Play y exportación de reportes HD 3:4 (2400×3200 px).",
 };
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export default async function PitchingPage() {
     <div className="flex-1 flex flex-col min-h-screen">
       <Header
         title="Pitching Summary & Telemetría"
-        subtitle="Telemetría Hawk-Eye (MLB) • Play-by-Play Leones del Caracas • Tarjetas HD Thomas Nestico"
+        subtitle="Telemetría Hawk-Eye (MLB) • Play-by-Play LVBP (8 Equipos) • Reportes HD 3:4 Thomas Nestico"
         season={activeSeason}
       />
 
