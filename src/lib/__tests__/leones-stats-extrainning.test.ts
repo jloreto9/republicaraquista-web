@@ -27,12 +27,19 @@ async function runTests() {
     true
   );
 
-  // 2. Pruebas unitarias de Pechofriadas (> 5 carreras de ventaja en cualquier momento y pierde)
-  // Ventaja máxima de +5 (ej. 7-2) y pierde -> NO es > 5 carreras
+  // 2. Pruebas unitarias de Pechofriadas (>= 5 carreras de ventaja en cualquier momento y pierde)
+  // Ventaja máxima de +4 (ej. 6-2) y pierde -> NO alcanza 5 carreras
+  assert.equal(
+    isPechofriadaGame(false, false, [{ result: { awayScore: 6, homeScore: 2 } }, { result: { awayScore: 8, homeScore: 9 } }], null),
+    false,
+    "Ventaja máxima de 4 carreras no alcanza >= 5"
+  );
+
+  // Ventaja de exactamente +5 (ej. 7-2 vs Caribes 17/10/2026) y pierde -> SÍ es Pechofriada
   assert.equal(
     isPechofriadaGame(false, false, [{ result: { awayScore: 7, homeScore: 2 } }, { result: { awayScore: 8, homeScore: 9 } }], null),
-    false,
-    "Ventaja máxima de exactamente 5 carreras no supera > 5"
+    true,
+    "Ventaja de +5 carreras (7-2) y derrota final SÍ es Pechofriada"
   );
 
   // Ventaja de +6 (ej. 9-3 o 10-4) y pierde -> SÍ es Pechofriada
@@ -49,13 +56,13 @@ async function runTests() {
     "Si Leones gana el partido nunca es Pechofriada"
   );
 
-  // Detección por linescore cuando allPlays está vacío (visitante anota 6 en el 1ro y pierde 6-7)
+  // Detección por linescore cuando allPlays está vacío (visitante anota 5 en el 1ro y pierde 5-6)
   assert.equal(
     isPechofriadaGame(false, false, [], {
-      innings: [{ away: { runs: 6 }, home: { runs: 7 } }],
+      innings: [{ away: { runs: 5 }, home: { runs: 6 } }],
     }),
     true,
-    "En la alta del 1ro tuvo ventaja 6-0 antes de la baja -> SÍ es Pechofriada"
+    "En la alta del 1ro tuvo ventaja 5-0 antes de la baja -> SÍ es Pechofriada"
   );
 
   // 3. Verificación real contra Supabase + MLB Stats API (temporada 2026 y baseline 2025)
@@ -67,8 +74,8 @@ async function runTests() {
     const [extW] = stats.extraInning.split("-").map(Number);
     assert.ok(extW >= 1, `Leones debe tener >= 1 victoria en extrainning en 2026 (actual: ${stats.extraInning})`);
     assert.ok(
-      stats.pechofriadas >= 2,
-      `Leones registra al menos 2 pechofriadas en 2026 (9-3 el 20/10 y 10-4 el 29/10). Actual: ${stats.pechofriadas}`
+      stats.pechofriadas >= 3,
+      `Leones registra al menos 3 pechofriadas en 2026 (7-2 el 17/10, 9-3 el 20/10 y 10-4 el 29/10). Actual: ${stats.pechofriadas}`
     );
     console.log(
       `[OK] Leones Stats 2026 verificado: Juego N°${stats.totalGames} (${stats.record}) | En extrainning: ${stats.extraInning} | Pechofriadas: ${stats.pechofriadas}`

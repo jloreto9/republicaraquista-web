@@ -196,8 +196,8 @@ export function isExtraInningGame(
 }
 
 /**
- * Determina si ocurrió una "Pechofriada": Leones llegó a tener una ventaja estrictamente
- * mayor a 5 carreras (`ventaja >= 6`) en cualquier instante del partido (evaluando jugada a jugada
+ * Determina si ocurrió una "Pechofriada": Leones llegó a tener una ventaja de
+ * 5 o más carreras (`ventaja >= 5`) en cualquier instante del partido (evaluando jugada a jugada
  * en `allPlays` y entrada por entrada en `linescore.innings`) y terminó perdiendo el juego.
  */
 export function isPechofriadaGame(
@@ -244,7 +244,7 @@ export function isPechofriadaGame(
     }
   }
 
-  return maxLead > 5;
+  return maxLead >= 5;
 }
 
 /**

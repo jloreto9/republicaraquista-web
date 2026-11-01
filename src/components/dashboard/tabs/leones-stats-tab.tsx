@@ -102,7 +102,7 @@ export function LeonesStatsTab({
             </p>
             <p
               className="flex justify-between border-b border-[#1E2B4D]/40 pb-1"
-              title="Derrotas tras ir ganando por más de 5 carreras en cualquier momento del juego"
+              title="Derrotas tras ir ganando por 5 o más carreras en cualquier momento del juego"
             >
               <span className="text-slate-400">Pechofriadas:</span>
               <span className="font-semibold text-rose-400">{stats.pechofriadas}</span>
