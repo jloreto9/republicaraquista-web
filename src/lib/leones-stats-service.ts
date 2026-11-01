@@ -169,6 +169,31 @@ const BASELINE_2025_LAST_GAME: LastGameDetail = {
 };
 
 /**
+ * Determina si un encuentro finalizado se extendió a entradas extras
+ * comparando las entradas reales jugadas en el `linescore` / `plays` oficial de MLB Stats API
+ * contra las entradas reglamentarias pactadas (`scheduledInnings`, 9 estándar o 7 en doble tanda).
+ */
+export function isExtraInningGame(
+  linescore?: {
+    scheduledInnings?: number;
+    currentInning?: number;
+    innings?: unknown[];
+  } | null,
+  lastPlayInning?: number | null,
+  fallbackCurrentInning?: number | null
+): boolean {
+  const scheduled = Number(linescore?.scheduledInnings || 9);
+  const inningsArrayLen = Array.isArray(linescore?.innings) ? linescore.innings.length : 0;
+  const played = Math.max(
+    Number(linescore?.currentInning || 0),
+    inningsArrayLen,
+    Number(lastPlayInning || 0),
+    Number(fallbackCurrentInning || 0)
+  );
+  return played > scheduled;
+}
+
+/**
  * Obtiene las estadísticas de situación de Leones del Caracas.
  */
 export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<LeonesAdvancedStats> {
@@ -249,10 +274,6 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       if (won && oScore === 0) shutouts++;
       if (Math.abs(cScore - oScore) === 1) { if (won) oneRunWins++; else oneRunLosses++; }
 
-      if (g.current_inning && g.current_inning > 9) {
-        if (won) extraWins++; else extraLosses++;
-      }
-
       const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
       if (effDate) {
         const d = new Date(`${effDate}T12:00:00Z`);
@@ -301,11 +322,21 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
 
     await Promise.all(
       sortedGames.map(async (g) => {
+        const isHome = Number(g.home_team_id) === 695;
+        const baseWon =
+          (isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0)) >
+          (isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0));
+
         try {
           const feed = await fetchGameLiveFeed(Number(g.id));
-          if (!feed) return;
+          if (!feed) {
+            if (isExtraInningGame(null, null, g.current_inning)) {
+              if (baseWon) extraWins++;
+              else extraLosses++;
+            }
+            return;
+          }
 
-          const isHome = Number(g.home_team_id) === 695;
           const live = feed.liveData || {};
           const linescore = live.linescore || {};
           const box = live.boxscore || {};
@@ -316,6 +347,18 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
           const cScore = isHome ? hScore : aScore;
           const oScore = isHome ? aScore : hScore;
           const won = cScore > oScore;
+
+          // Entradas extras oficiales desde linescore / última jugada del PBP
+          const allPlays = live.plays?.allPlays || [];
+          const lastPlay = allPlays[allPlays.length - 1] || {};
+          const lastPlayHalf = lastPlay.about?.halfInning;
+          const lastPlayInning = Number(lastPlay.about?.inning || 1);
+          const scheduledInnings = Number(linescore.scheduledInnings || 9);
+
+          if (isExtraInningGame(linescore, lastPlayInning, g.current_inning)) {
+            if (won) extraWins++;
+            else extraLosses++;
+          }
 
           // Carreras acumuladas al término del 6to inning
           let cRuns6 = 0;
@@ -333,14 +376,14 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
           if (ledAfter6 && won) arribaWins++;
           if (ledAfter6 && !won) arribaLosses++;
 
-          // Terreneadas: Leones como home team gana en el 9no o extrainning dejando en el terreno
-          const allPlays = live.plays?.allPlays || [];
-          const lastPlay = allPlays[allPlays.length - 1] || {};
-          const lastPlayHalf = lastPlay.about?.halfInning;
-          const lastPlayInning = Number(lastPlay.about?.inning || 1);
+          // Terreneadas: Leones como home team gana en la entrada final reglamentaria o extrainning dejando en el terreno
           const isWalkoffPlay = Boolean(lastPlay.about?.isWalkOff);
 
-          if (isHome && won && ((lastPlayHalf === "bottom" && lastPlayInning >= 9) || isWalkoffPlay)) {
+          if (
+            isHome &&
+            won &&
+            ((lastPlayHalf === "bottom" && lastPlayInning >= scheduledInnings) || isWalkoffPlay)
+          ) {
             terreneadas++;
           }
 
