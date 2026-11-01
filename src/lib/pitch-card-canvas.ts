@@ -141,9 +141,9 @@ function drawKpiRowTable(
     ctx.fillStyle = shade.fg;
     const valLen = cell.value.length;
     const fontSize =
-      valLen > 11 ? 22 : valLen > 8 ? 25 : cells.length >= 10 ? 28 : 30;
+      valLen > 11 ? 21 : valLen >= 9 ? 23 : cells.length >= 10 ? 27 : 29;
     ctx.font = `900 ${fontSize}px Inter, sans-serif`;
-    ctx.fillText(cell.value, cx + colW / 2, y + headerH + Math.round(valH * 0.64));
+    ctx.fillText(cell.value, cx + colW / 2, y + headerH + Math.round(valH * 0.63), colW - 14);
 
     if (i > 0) {
       ctx.beginPath();
@@ -465,16 +465,16 @@ export async function renderPitchingCardToCanvas(
       },
     ];
 
-    drawKpiRowTable(ctx, tblX, 396, tblW, 52, 78, row1);
-    drawKpiRowTable(ctx, tblX, 544, tblW, 52, 78, row2);
+    drawKpiRowTable(ctx, tblX, 384, tblW, 48, 72, row1);
+    drawKpiRowTable(ctx, tblX, 516, tblW, 48, 72, row2);
 
     // Tira contextual compacta del partido (y: 636..680)
     drawContextBanner(
       ctx,
       tblX,
-      638,
+      650,
       tblW,
-      44,
+      42,
       data.isStarter
         ? `ROL DEL PARTIDO: ABRIDOR  •  GAME SCORE v2: ${gsv2Val ?? "—"}${
             isQs ? " (SALIDA DE CALIDAD • QS)" : ""
@@ -544,8 +544,8 @@ export async function renderPitchingCardToCanvas(
       },
     ];
 
-    drawKpiRowTable(ctx, tblX, 396, tblW, 52, 78, row1);
-    drawKpiRowTable(ctx, tblX, 544, tblW, 52, 78, row2);
+    drawKpiRowTable(ctx, tblX, 384, tblW, 48, 72, row1);
+    drawKpiRowTable(ctx, tblX, 516, tblW, 48, 72, row2);
 
     const roleBannerText = data.isStarter
       ? `VALOR DE ABRIDOR:  SALIDAS DE CALIDAD (QS): ${ctxMet?.qsCount ?? 0} de ${
@@ -559,14 +559,14 @@ export async function renderPitchingCardToCanvas(
           ctxMet?.shutdowns ?? 0
         } / ${ctxMet?.meltdowns ?? 0}  •  aLI: ${ctxMet?.aLI.toFixed(2) ?? "1.00"}`;
 
-    drawContextBanner(ctx, tblX, 638, tblW, 44, roleBannerText);
+    drawContextBanner(ctx, tblX, 650, tblW, 42, roleBannerText);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
   // 4. Tríptico Gráfico Central (y: 748 a 1368 px | 3 paneles de 700 x 620 px)
   // ───────────────────────────────────────────────────────────────────────────
-  const panelY = 748;
-  const panelH = 610;
+  const panelY = 758;
+  const panelH = 600;
   const panelW = 700;
   const gap = 70; // 700*3 + 70*2 = 2240 == tblW
 
@@ -794,7 +794,7 @@ function drawContextBanner(
   ctx.fillStyle = "#0F172A";
   ctx.font = "bold 18px Inter, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(text, x + w / 2, y + Math.round(h * 0.65));
+  ctx.fillText(text, x + w / 2, y + Math.round(h * 0.66), w - 36);
   ctx.textAlign = "left";
 }
 
