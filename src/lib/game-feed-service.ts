@@ -287,23 +287,32 @@ function emptyBucket(): SplitBucket {
   return { pa: 0, ab: 0, h: 0, doubles: 0, triples: 0, hr: 0, bb: 0, so: 0, rbi: 0, hbp: 0, sf: 0 };
 }
 
-function recordPlayInBucket(bucket: SplitBucket, event: string, rbi: number) {
-  bucket.pa += 1;
-  const isBB = event.includes("Walk");
-  const isHBP = event.includes("Hit By Pitch");
-  const isSF = event.includes("Sac Fly");
-  const isSH = event.includes("Sac Bunt");
-  const isHit = ["Single", "Double", "Triple", "Home Run"].includes(event);
+const NON_PA_EVENT_RE =
+  /^(caught_stealing|pickoff|stolen_base|wild_pitch|passed_ball|balk|other_out|runner_double_play|defensive_indiff|game_advisory)/;
 
-  if (!isBB && !isHBP && !isSF && !isSH) {
+const MID_PA_RUNNER_EVENT_RE =
+  /^(stolen_base|wild_pitch|passed_ball|balk|defensive_indiff|caught_stealing|pickoff)/;
+
+function recordPlayInBucket(bucket: SplitBucket, event: string, eventType: string, rbi: number) {
+  bucket.pa += 1;
+  const isBB = eventType === "walk" || eventType === "intent_walk" || event.includes("Walk");
+  const isHBP = eventType === "hit_by_pitch" || event.includes("Hit By Pitch");
+  const isSF = eventType === "sac_fly" || eventType === "sac_fly_double_play" || event.includes("Sac Fly");
+  const isSH = eventType === "sac_bunt" || eventType === "sac_bunt_double_play" || event.includes("Sac Bunt");
+  const isCI = eventType === "catcher_interf" || event.includes("Catcher Interference");
+  const isHit =
+    ["single", "double", "triple", "home_run"].includes(eventType) ||
+    ["Single", "Double", "Triple", "Home Run"].includes(event);
+
+  if (!isBB && !isHBP && !isSF && !isSH && !isCI) {
     bucket.ab += 1;
   }
   if (isHit) bucket.h += 1;
-  if (event === "Double") bucket.doubles += 1;
-  if (event === "Triple") bucket.triples += 1;
-  if (event === "Home Run") bucket.hr += 1;
+  if (eventType === "double" || event === "Double") bucket.doubles += 1;
+  if (eventType === "triple" || event === "Triple") bucket.triples += 1;
+  if (eventType === "home_run" || event === "Home Run") bucket.hr += 1;
   if (isBB) bucket.bb += 1;
-  if (event.includes("Strikeout")) bucket.so += 1;
+  if (eventType.startsWith("strikeout") || event.includes("Strikeout")) bucket.so += 1;
   if (isHBP) bucket.hbp += 1;
   if (isSF) bucket.sf += 1;
   bucket.rbi += rbi;
@@ -326,38 +335,55 @@ function emptyPitchingBucket(): PitchingBucket {
   return { pa: 0, ab: 0, h: 0, doubles: 0, triples: 0, hr: 0, bb: 0, so: 0, er: 0, outs: 0 };
 }
 
-function recordPitchingPlayInBucket(bucket: PitchingBucket, event: string, outsMade: number, rbi: number) {
+function recordPitchingPlayInBucket(
+  bucket: PitchingBucket,
+  event: string,
+  eventType: string,
+  outsMade: number,
+  rbi: number
+) {
   bucket.pa += 1;
-  const isBB = event.includes("Walk");
-  const isHBP = event.includes("Hit By Pitch");
-  const isSF = event.includes("Sac Fly");
-  const isSH = event.includes("Sac Bunt");
-  const isHit = ["Single", "Double", "Triple", "Home Run"].includes(event);
+  const isBB = eventType === "walk" || eventType === "intent_walk" || event.includes("Walk");
+  const isHBP = eventType === "hit_by_pitch" || event.includes("Hit By Pitch");
+  const isSF = eventType === "sac_fly" || eventType === "sac_fly_double_play" || event.includes("Sac Fly");
+  const isSH = eventType === "sac_bunt" || eventType === "sac_bunt_double_play" || event.includes("Sac Bunt");
+  const isCI = eventType === "catcher_interf" || event.includes("Catcher Interference");
+  const isHit =
+    ["single", "double", "triple", "home_run"].includes(eventType) ||
+    ["Single", "Double", "Triple", "Home Run"].includes(event);
 
-  if (!isBB && !isHBP && !isSF && !isSH) {
+  if (!isBB && !isHBP && !isSF && !isSH && !isCI) {
     bucket.ab += 1;
   }
   if (isHit) bucket.h += 1;
-  if (event === "Double") bucket.doubles += 1;
-  if (event === "Triple") bucket.triples += 1;
-  if (event === "Home Run") {
+  if (eventType === "double" || event === "Double") bucket.doubles += 1;
+  if (eventType === "triple" || event === "Triple") bucket.triples += 1;
+  if (eventType === "home_run" || event === "Home Run") {
     bucket.hr += 1;
     bucket.er += Math.max(1, rbi);
   } else if (rbi > 0) {
     bucket.er += rbi;
   }
   if (isBB) bucket.bb += 1;
-  if (event.includes("Strikeout")) bucket.so += 1;
+  if (eventType.startsWith("strikeout") || event.includes("Strikeout")) bucket.so += 1;
   bucket.outs += outsMade;
 }
 
-export async function getDynamicSituationalData(season = 2026): Promise<SituationalData> {
-  const feeds = await getSeasonLiveFeeds(season);
-  if (!feeds.length) {
-    const { getLeonesSituationalData } = await import("./situational-engine");
-    return getLeonesSituationalData(season);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function resolvePostRunnerId(postBaseObj: any, fallbackSentinel: number): number | null {
+  if (!postBaseObj) return null;
+  if (typeof postBaseObj === "object" && postBaseObj.id !== undefined && postBaseObj.id !== null) {
+    return Number(postBaseObj.id);
   }
+  return fallbackSentinel;
+}
 
+/**
+ * Máquina de estados por media entrada que calcula Splits Situacionales (Bateo y Pitcheo),
+ * LOB Tracker (3er Out LOB, RISP LOB Terminar, RISP LOB Dentro) y BvP desde feeds oficiales MLB.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function computeSituationalDataFromFeeds(feeds: any[]): SituationalData {
   const buckets: Record<string, SplitBucket> = {
     total: emptyBucket(),
     bases_limpias: emptyBucket(),
@@ -421,140 +447,348 @@ export async function getDynamicSituationalData(season = 2026): Promise<Situatio
       : feed?.gameData?.teams?.home?.name || "Rival";
     const plays = feed?.liveData?.plays?.allPlays || [];
 
+    let currentHalfKey = "";
+    let outsBefore = 0;
+    let runnerOn1b: number | null = null;
+    let runnerOn2b: number | null = null;
+    let runnerOn3b: number | null = null;
+    let halfPlayIdx = 0;
+
     for (const play of plays) {
-      const isBottom = play.about?.halfInning === "bottom";
+      const inn = Number(play.about?.inning || 1);
+      const halfInning = String(play.about?.halfInning || "top");
+      const isBottom = halfInning === "bottom";
       const leonesBatting = isHome ? isBottom : !isBottom;
+      const halfKey = `${inn}-${halfInning}`;
+
+      if (halfKey !== currentHalfKey) {
+        currentHalfKey = halfKey;
+        outsBefore = 0;
+        runnerOn1b = null;
+        runnerOn2b = null;
+        runnerOn3b = null;
+        halfPlayIdx = 0;
+      }
+
+      // Sembrar corredor automático de extrainning (o juego reanudado) al iniciar media entrada
+      if (halfPlayIdx === 0 && outsBefore === 0 && Array.isArray(play.runners)) {
+        for (const r of play.runners) {
+          const rid = Number(r?.details?.runner?.id || 0);
+          const orig = r?.movement?.originBase;
+          if (orig === "1B" && runnerOn1b === null) runnerOn1b = rid || -1;
+          else if (orig === "2B" && runnerOn2b === null) runnerOn2b = rid || -2;
+          else if (orig === "3B" && runnerOn3b === null) runnerOn3b = rid || -3;
+        }
+      }
+      halfPlayIdx += 1;
+
+      const event = String(play.result?.event || "Out");
+      const eventType = String(play.result?.eventType || "");
+      const isNonPaPlay = NON_PA_EVENT_RE.test(eventType);
+
+      // Fase 1: Aplicar movimientos intermedios previos a la decisión del turno (SB, WP, PB, Balk, CS, PO)
+      if (!isNonPaPlay && Array.isArray(play.runners)) {
+        for (const r of play.runners) {
+          const rEvType = String(r?.details?.eventType || "");
+          if (!MID_PA_RUNNER_EVENT_RE.test(rEvType)) continue;
+          const rid = Number(r?.details?.runner?.id || 0);
+          const orig = r?.movement?.originBase;
+
+          if (runnerOn1b === rid || (runnerOn1b === -1 && orig === "1B")) runnerOn1b = null;
+          if (runnerOn2b === rid || (runnerOn2b === -2 && orig === "2B")) runnerOn2b = null;
+          if (runnerOn3b === rid || (runnerOn3b === -3 && orig === "3B")) runnerOn3b = null;
+
+          if (r?.movement?.isOut) {
+            outsBefore = Math.min(3, outsBefore + 1);
+          } else if (r?.movement?.end === "1B") {
+            runnerOn1b = rid || -1;
+          } else if (r?.movement?.end === "2B") {
+            runnerOn2b = rid || -2;
+          } else if (r?.movement?.end === "3B") {
+            runnerOn3b = rid || -3;
+          }
+        }
+      }
+
+      const outsAtDecision = outsBefore;
+      const on1b = runnerOn1b !== null;
+      const on2b = runnerOn2b !== null;
+      const on3b = runnerOn3b !== null;
+      const isRisp = on2b || on3b;
+      const isLoaded = on1b && on2b && on3b;
+      const isBasesEmpty = !on1b && !on2b && !on3b;
+
+      const outsAfter =
+        typeof play.count?.outs === "number"
+          ? Math.min(3, Math.max(0, Number(play.count.outs)))
+          : outsAtDecision;
+      const outsMadeOnPlay = Math.max(0, outsAfter - outsAtDecision);
+
+      const matchup = play.matchup || {};
+
+      // Fase 2: Rastrear destino final de corredores activos durante el desenlace de la jugada
+      const activeBases = new Map<number, "1B" | "2B" | "3B">();
+      if (runnerOn1b !== null) activeBases.set(runnerOn1b, "1B");
+      if (runnerOn2b !== null) activeBases.set(runnerOn2b, "2B");
+      if (runnerOn3b !== null) activeBases.set(runnerOn3b, "3B");
+
+      if (Array.isArray(play.runners) && play.runners.length > 0) {
+        for (const r of play.runners) {
+          const rEvType = String(r?.details?.eventType || "");
+          if (!isNonPaPlay && MID_PA_RUNNER_EVENT_RE.test(rEvType)) continue;
+          const rid = Number(r?.details?.runner?.id || 0);
+          const orig = r?.movement?.originBase;
+
+          if (!activeBases.has(rid)) {
+            if (orig === "1B" && activeBases.has(-1)) activeBases.delete(-1);
+            if (orig === "2B" && activeBases.has(-2)) activeBases.delete(-2);
+            if (orig === "3B" && activeBases.has(-3)) activeBases.delete(-3);
+          }
+
+          if (r?.movement?.isOut) {
+            activeBases.delete(rid);
+          } else if (r?.movement?.end === "score") {
+            activeBases.delete(rid);
+          } else if (
+            r?.movement?.end === "1B" ||
+            r?.movement?.end === "2B" ||
+            r?.movement?.end === "3B"
+          ) {
+            const endBase = r.movement.end as "1B" | "2B" | "3B";
+            const key = rid || (endBase === "1B" ? -1 : endBase === "2B" ? -2 : -3);
+            activeBases.set(key, endBase);
+          }
+        }
+      } else if (
+        outsAfter < 3 &&
+        ("postOnFirst" in matchup || "postOnSecond" in matchup || "postOnThird" in matchup)
+      ) {
+        activeBases.clear();
+        const p1 = resolvePostRunnerId(matchup.postOnFirst, -1);
+        const p2 = resolvePostRunnerId(matchup.postOnSecond, -2);
+        const p3 = resolvePostRunnerId(matchup.postOnThird, -3);
+        if (p1 !== null) activeBases.set(p1, "1B");
+        if (p2 !== null) activeBases.set(p2, "2B");
+        if (p3 !== null) activeBases.set(p3, "3B");
+      }
 
       if (leonesBatting) {
-        const inn = play.about?.inning || 1;
-        const outsBefore = play.count?.outs ?? 0;
-        const matchup = play.matchup || {};
-        const batterId = matchup.batter?.id || 0;
+        const batterId = Number(matchup.batter?.id || 0);
         const batterName = matchup.batter?.fullName || "Bateador";
-        const pitcherId = matchup.pitcher?.id || 0;
+        const pitcherId = Number(matchup.pitcher?.id || 0);
         const pitcherName = matchup.pitcher?.fullName || "Lanzador";
-        const isLeftHanded = matchup.pitcherHand?.code === "L" || (!matchup.pitcherHand?.code && getKnownPitcherHand(pitcherId) === "L");
+        const handCode = matchup.pitchHand?.code || matchup.pitcherHand?.code;
+        const isLeftHanded =
+          handCode === "L" || (!handCode && getKnownPitcherHand(pitcherId) === "L");
         const throwsRhp = !isLeftHanded;
 
-        const on1b = Boolean(matchup.postOnFirst);
-        const on2b = Boolean(matchup.postOnSecond);
-        const on3b = Boolean(matchup.postOnThird);
-        const isRisp = on2b || on3b;
-        const isLoaded = on1b && on2b && on3b;
-        const isBasesEmpty = !on1b && !on2b && !on3b;
-
-        const event = play.result?.event || "Out";
-        const rbi = play.result?.rbi || 0;
-        const isHit = ["Single", "Double", "Triple", "Home Run"].includes(event);
-        const isAb = !event.includes("Walk") && !event.includes("Hit By Pitch") && !event.includes("Sac");
-
-        // Categorizar en buckets ofensivos
-        recordPlayInBucket(buckets.total, event, rbi);
-        if (isBasesEmpty) recordPlayInBucket(buckets.bases_limpias, event, rbi);
-        else recordPlayInBucket(buckets.hombres_base, event, rbi);
-
-        if (isRisp) {
-          recordPlayInBucket(buckets.risp, event, rbi);
-          if (outsBefore === 2) recordPlayInBucket(buckets.risp_2outs, event, rbi);
-        }
-        if (isLoaded) recordPlayInBucket(buckets.bases_llenas, event, rbi);
-
-        if (throwsRhp) recordPlayInBucket(buckets.rhp, event, rbi);
-        else recordPlayInBucket(buckets.lhp, event, rbi);
-
-        if (inn <= 3) recordPlayInBucket(buckets.early, event, rbi);
-        else if (inn <= 6) recordPlayInBucket(buckets.mid, event, rbi);
-        else recordPlayInBucket(buckets.late, event, rbi);
-
-        // BVP (Batter vs Pitcher rival)
-        if (pitcherId) {
-          if (!bvpMap[pitcherId]) {
-            bvpMap[pitcherId] = { name: pitcherName, oppTeam: oppTeamName, bucket: emptyBucket() };
+        let endRunners = 0;
+        let endRispRunners = 0;
+        if (outsAfter === 3) {
+          for (const [, base] of activeBases.entries()) {
+            endRunners += 1;
+            if (base === "2B" || base === "3B") endRispRunners += 1;
           }
-          recordPlayInBucket(bvpMap[pitcherId].bucket, event, rbi);
         }
 
-        // LOB Tracker por bateador
-        if (batterId) {
-          if (!batterLobMap[batterId]) {
-            batterLobMap[batterId] = {
-              name: batterName,
-              pa: 0,
-              paRisp: 0,
-              hRisp: 0,
-              abRisp: 0,
-              rbi: 0,
-              lobEnding: 0,
-              rispLobEnding: 0,
-              rispLobMid: 0,
-            };
+        if (isNonPaPlay) {
+          if (outsAfter === 3) {
+            totalLobEnding += endRunners;
+            totalRispLobEnding += endRispRunners;
           }
-          const bRec = batterLobMap[batterId];
-          bRec.pa += 1;
-          bRec.rbi += rbi;
+        } else {
+          const rbi = Number(play.result?.rbi || 0);
+          const isBB = eventType === "walk" || eventType === "intent_walk" || event.includes("Walk");
+          const isHBP = eventType === "hit_by_pitch" || event.includes("Hit By Pitch");
+          const isSac =
+            eventType.startsWith("sac_") || event.includes("Sac Fly") || event.includes("Sac Bunt");
+          const isCI = eventType === "catcher_interf" || event.includes("Catcher Interference");
+          const isAb = !isBB && !isHBP && !isSac && !isCI;
+          const isHit =
+            ["single", "double", "triple", "home_run"].includes(eventType) ||
+            ["Single", "Double", "Triple", "Home Run"].includes(event);
+
+          // Categorizar en buckets ofensivos usando el estado REAL previo a la decisión del turno
+          recordPlayInBucket(buckets.total, event, eventType, rbi);
+          if (isBasesEmpty) recordPlayInBucket(buckets.bases_limpias, event, eventType, rbi);
+          else recordPlayInBucket(buckets.hombres_base, event, eventType, rbi);
+
           if (isRisp) {
-            bRec.paRisp += 1;
-            if (isAb) bRec.abRisp += 1;
-            if (isHit) bRec.hRisp += 1;
+            recordPlayInBucket(buckets.risp, event, eventType, rbi);
+            if (outsAtDecision === 2) recordPlayInBucket(buckets.risp_2outs, event, eventType, rbi);
+          }
+          if (isLoaded) recordPlayInBucket(buckets.bases_llenas, event, eventType, rbi);
+
+          if (throwsRhp) recordPlayInBucket(buckets.rhp, event, eventType, rbi);
+          else recordPlayInBucket(buckets.lhp, event, eventType, rbi);
+
+          if (inn <= 3) recordPlayInBucket(buckets.early, event, eventType, rbi);
+          else if (inn <= 6) recordPlayInBucket(buckets.mid, event, eventType, rbi);
+          else recordPlayInBucket(buckets.late, event, eventType, rbi);
+
+          // BVP (Batter vs Pitcher rival)
+          if (pitcherId) {
+            if (!bvpMap[pitcherId]) {
+              bvpMap[pitcherId] = { name: pitcherName, oppTeam: oppTeamName, bucket: emptyBucket() };
+            }
+            recordPlayInBucket(bvpMap[pitcherId].bucket, event, eventType, rbi);
           }
 
-          // Dejados en Base: si el turno terminó en out
-          const outsMade = (play.count?.outs ?? 0) - outsBefore;
-          if (outsMade > 0) {
-            const isThirdOut = play.count?.outs === 3;
-            let runnersOn = 0;
-            let rispRunners = 0;
-            if (on1b) runnersOn++;
-            if (on2b) { runnersOn++; rispRunners++; }
-            if (on3b) { runnersOn++; rispRunners++; }
+          // LOB Tracker por bateador
+          if (batterId) {
+            if (!batterLobMap[batterId]) {
+              batterLobMap[batterId] = {
+                name: batterName,
+                pa: 0,
+                paRisp: 0,
+                hRisp: 0,
+                abRisp: 0,
+                rbi: 0,
+                lobEnding: 0,
+                rispLobEnding: 0,
+                rispLobMid: 0,
+              };
+            }
+            const bRec = batterLobMap[batterId];
+            bRec.pa += 1;
+            bRec.rbi += rbi;
+            if (isRisp) {
+              bRec.paRisp += 1;
+              if (isAb) bRec.abRisp += 1;
+              if (isHit) bRec.hRisp += 1;
+            }
 
-            if (isThirdOut) {
-              bRec.lobEnding += runnersOn;
-              bRec.rispLobEnding += rispRunners;
-              totalLobEnding += runnersOn;
-              totalRispLobEnding += rispRunners;
-            } else if (rispRunners > 0) {
-              bRec.rispLobMid += rispRunners;
-              totalRispLobMid += rispRunners;
+            if (outsAfter === 3) {
+              bRec.lobEnding += endRunners;
+              bRec.rispLobEnding += endRispRunners;
+              totalLobEnding += endRunners;
+              totalRispLobEnding += endRispRunners;
+            } else if (outsMadeOnPlay > 0) {
+              const isPureSacrifice =
+                eventType === "sac_fly" ||
+                eventType === "sac_bunt" ||
+                event === "Sac Fly" ||
+                event === "Sac Bunt";
+              if (!isPureSacrifice) {
+                let midRispRunners = 0;
+                for (const [rid, base] of activeBases.entries()) {
+                  if (rid !== batterId && (base === "2B" || base === "3B")) {
+                    midRispRunners += 1;
+                  }
+                }
+                bRec.rispLobMid += midRispRunners;
+                totalRispLobMid += midRispRunners;
+              }
             }
           }
         }
       } else {
         // Pitcheo de Leones del Caracas
-        const inn = play.about?.inning || 1;
-        const outsBefore = play.count?.outs ?? 0;
-        const matchup = play.matchup || {};
         const rivalBatterHand = matchup.batSide?.code || "R";
         const isVsLhb = rivalBatterHand === "L";
+        const rbi = Number(play.result?.rbi || 0);
 
-        const on1b = Boolean(matchup.postOnFirst);
-        const on2b = Boolean(matchup.postOnSecond);
-        const on3b = Boolean(matchup.postOnThird);
-        const isRisp = on2b || on3b;
-        const isLoaded = on1b && on2b && on3b;
-        const isBasesEmpty = !on1b && !on2b && !on3b;
+        if (isNonPaPlay) {
+          if (outsMadeOnPlay > 0) {
+            pitchBuckets.total.outs += outsMadeOnPlay;
+            if (isBasesEmpty) pitchBuckets.bases_limpias.outs += outsMadeOnPlay;
+            else pitchBuckets.hombres_base.outs += outsMadeOnPlay;
+            if (isRisp) {
+              pitchBuckets.risp.outs += outsMadeOnPlay;
+              if (outsAtDecision === 2) pitchBuckets.risp_2outs.outs += outsMadeOnPlay;
+            }
+            if (isLoaded) pitchBuckets.bases_llenas.outs += outsMadeOnPlay;
+            if (isVsLhb) pitchBuckets.vs_lhb.outs += outsMadeOnPlay;
+            else pitchBuckets.vs_rhb.outs += outsMadeOnPlay;
+            if (inn <= 3) pitchBuckets.early.outs += outsMadeOnPlay;
+            else if (inn <= 6) pitchBuckets.mid.outs += outsMadeOnPlay;
+            else pitchBuckets.late.outs += outsMadeOnPlay;
+          }
+        } else {
+          recordPitchingPlayInBucket(pitchBuckets.total, event, eventType, outsMadeOnPlay, rbi);
+          if (isBasesEmpty) {
+            recordPitchingPlayInBucket(
+              pitchBuckets.bases_limpias,
+              event,
+              eventType,
+              outsMadeOnPlay,
+              rbi
+            );
+          } else {
+            recordPitchingPlayInBucket(
+              pitchBuckets.hombres_base,
+              event,
+              eventType,
+              outsMadeOnPlay,
+              rbi
+            );
+          }
 
-        const event = play.result?.event || "Out";
-        const rbi = play.result?.rbi || 0;
-        const outsMade = Math.max(0, (play.count?.outs ?? 0) - outsBefore);
+          if (isRisp) {
+            recordPitchingPlayInBucket(pitchBuckets.risp, event, eventType, outsMadeOnPlay, rbi);
+            if (outsAtDecision === 2) {
+              recordPitchingPlayInBucket(
+                pitchBuckets.risp_2outs,
+                event,
+                eventType,
+                outsMadeOnPlay,
+                rbi
+              );
+            }
+          }
+          if (isLoaded) {
+            recordPitchingPlayInBucket(
+              pitchBuckets.bases_llenas,
+              event,
+              eventType,
+              outsMadeOnPlay,
+              rbi
+            );
+          }
 
-        recordPitchingPlayInBucket(pitchBuckets.total, event, outsMade, rbi);
-        if (isBasesEmpty) recordPitchingPlayInBucket(pitchBuckets.bases_limpias, event, outsMade, rbi);
-        else recordPitchingPlayInBucket(pitchBuckets.hombres_base, event, outsMade, rbi);
+          if (isVsLhb) {
+            recordPitchingPlayInBucket(pitchBuckets.vs_lhb, event, eventType, outsMadeOnPlay, rbi);
+          } else {
+            recordPitchingPlayInBucket(pitchBuckets.vs_rhb, event, eventType, outsMadeOnPlay, rbi);
+          }
 
-        if (isRisp) {
-          recordPitchingPlayInBucket(pitchBuckets.risp, event, outsMade, rbi);
-          if (outsBefore === 2) recordPitchingPlayInBucket(pitchBuckets.risp_2outs, event, outsMade, rbi);
+          if (inn <= 3) {
+            recordPitchingPlayInBucket(pitchBuckets.early, event, eventType, outsMadeOnPlay, rbi);
+          } else if (inn <= 6) {
+            recordPitchingPlayInBucket(pitchBuckets.mid, event, eventType, outsMadeOnPlay, rbi);
+          } else {
+            recordPitchingPlayInBucket(pitchBuckets.late, event, eventType, outsMadeOnPlay, rbi);
+          }
         }
-        if (isLoaded) recordPitchingPlayInBucket(pitchBuckets.bases_llenas, event, outsMade, rbi);
-
-        if (isVsLhb) recordPitchingPlayInBucket(pitchBuckets.vs_lhb, event, outsMade, rbi);
-        else recordPitchingPlayInBucket(pitchBuckets.vs_rhb, event, outsMade, rbi);
-
-        if (inn <= 3) recordPitchingPlayInBucket(pitchBuckets.early, event, outsMade, rbi);
-        else if (inn <= 6) recordPitchingPlayInBucket(pitchBuckets.mid, event, outsMade, rbi);
-        else recordPitchingPlayInBucket(pitchBuckets.late, event, outsMade, rbi);
       }
+
+      // Avanzar estado hacia la siguiente jugada de la misma media entrada
+      if (outsAfter < 3) {
+        const hasAuthoritativePost =
+          "splits" in matchup ||
+          Boolean(matchup.postOnFirst || matchup.postOnSecond || matchup.postOnThird) ||
+          activeBases.size === 0;
+
+        if (hasAuthoritativePost) {
+          runnerOn1b = resolvePostRunnerId(matchup.postOnFirst, -1);
+          runnerOn2b = resolvePostRunnerId(matchup.postOnSecond, -2);
+          runnerOn3b = resolvePostRunnerId(matchup.postOnThird, -3);
+        } else {
+          runnerOn1b = null;
+          runnerOn2b = null;
+          runnerOn3b = null;
+          for (const [rid, base] of activeBases.entries()) {
+            if (base === "1B") runnerOn1b = rid;
+            else if (base === "2B") runnerOn2b = rid;
+            else if (base === "3B") runnerOn3b = rid;
+          }
+        }
+      } else {
+        runnerOn1b = null;
+        runnerOn2b = null;
+        runnerOn3b = null;
+      }
+      outsBefore = outsAfter;
     }
   }
 
@@ -636,7 +870,7 @@ export async function getDynamicSituationalData(season = 2026): Promise<Situatio
         totalRispLob: d.rispLobEnding + d.rispLobMid,
       };
     })
-    .sort((a, b) => b.totalRispLob - a.totalRispLob || b.lobEnding - a.lobEnding);
+    .sort((a, b) => b.totalRispLob - a.totalRispLob || b.lobEnding - a.lobEnding || b.paRisp - a.paRisp);
 
   const bvpRecords: BvpRecord[] = Object.entries(bvpMap)
     .map(([pIdStr, d]) => {
@@ -668,6 +902,16 @@ export async function getDynamicSituationalData(season = 2026): Promise<Situatio
     lobBatterRanking,
     bvpRecords,
   };
+}
+
+export async function getDynamicSituationalData(season = 2026): Promise<SituationalData> {
+  const feeds = await getSeasonLiveFeeds(season);
+  if (!feeds.length) {
+    const { getLeonesSituationalData } = await import("./situational-engine");
+    return getLeonesSituationalData(season);
+  }
+
+  return computeSituationalDataFromFeeds(feeds);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -10,7 +10,6 @@ import {
   Search,
   Info,
   Shield,
-  Sparkles,
 } from "lucide-react";
 import { useSeason } from "@/context/season-context";
 
@@ -98,9 +97,9 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
             )}
           </div>
           <p className="text-xs text-slate-400">
-            {currentSeason === 2026
-              ? "Datos oficiales en curso • Temporada 2026-2027 (Juego 870090 vs Águilas del Zulia)"
-              : "Línea base histórica auditada • Temporada Regular 2024-2025"}
+            {currentSeason >= 2026
+              ? `Datos oficiales en curso • Temporada Regular ${currentSeason}-${currentSeason + 1}`
+              : `Línea base histórica auditada • Temporada Regular ${currentSeason}-${currentSeason + 1}`}
           </p>
         </div>
 
@@ -132,10 +131,10 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
                 <Target className="w-4 h-4 text-[#FDB827]" />
               </div>
               <div className="text-xl font-mono font-extrabold text-[#FDB827]">
-                {rispSplit?.avg || ".327"}
+                {rispSplit?.avg || ".000"}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
-                OPS en RISP: <span className="text-slate-200 font-mono font-bold">{rispSplit?.ops || ".915"}</span>
+                OPS en RISP: <span className="text-slate-200 font-mono font-bold">{rispSplit?.ops || ".000"}</span>
               </div>
             </div>
 
@@ -145,10 +144,10 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
                 <Flame className="w-4 h-4 text-rose-400" />
               </div>
               <div className="text-xl font-mono font-extrabold text-rose-400">
-                {clutchSplit?.avg || ".311"}
+                {clutchSplit?.avg || ".000"}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
-                OPS: <span className="text-slate-200 font-mono font-bold">{clutchSplit?.ops || ".882"}</span>
+                OPS: <span className="text-slate-200 font-mono font-bold">{clutchSplit?.ops || ".000"}</span>
               </div>
             </div>
 
@@ -186,10 +185,10 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
                 <Target className="w-4 h-4 text-[#FDB827]" />
               </div>
               <div className="text-xl font-mono font-extrabold text-[#FDB827]">
-                {pitchRisp?.baa || ".231"}
+                {pitchRisp?.baa || ".000"}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
-                OPS Rival: <span className="text-slate-200 font-mono font-bold">{pitchRisp?.ops || ".650"}</span>
+                OPS Rival: <span className="text-slate-200 font-mono font-bold">{pitchRisp?.ops || ".000"}</span>
               </div>
             </div>
 
@@ -199,10 +198,10 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
                 <Flame className="w-4 h-4 text-rose-400" />
               </div>
               <div className="text-xl font-mono font-extrabold text-rose-400">
-                {pitchClutch?.baa || ".198"}
+                {pitchClutch?.baa || ".000"}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
-                OPS Rival: <span className="text-slate-200 font-mono font-bold">{pitchClutch?.ops || ".590"}</span>
+                OPS Rival: <span className="text-slate-200 font-mono font-bold">{pitchClutch?.ops || ".000"}</span>
               </div>
             </div>
 
@@ -212,10 +211,10 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
                 <Shield className="w-4 h-4 text-blue-400" />
               </div>
               <div className="text-xl font-mono font-extrabold text-slate-100">
-                {pitchTotal?.whip || "1.25"}
+                {pitchTotal?.whip || "0.00"}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
-                BB/9: <span className="text-slate-200 font-mono font-bold">{pitchTotal?.bbPer9 || "3.2"}</span>
+                BB/9: <span className="text-slate-200 font-mono font-bold">{pitchTotal?.bbPer9 || "0.0"}</span>
               </div>
             </div>
 
@@ -225,10 +224,10 @@ export function SituacionalView({ initialData, season = 2026 }: SituacionalViewP
                 <Users className="w-4 h-4 text-emerald-400" />
               </div>
               <div className="text-xl font-mono font-extrabold text-emerald-400">
-                {pitchTotal?.era || "3.60"}
+                {pitchTotal?.era || "0.00"}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
-                K/9: <span className="text-slate-200 font-mono font-bold">{pitchTotal?.kPer9 || "8.8"}</span>
+                K/9: <span className="text-slate-200 font-mono font-bold">{pitchTotal?.kPer9 || "0.0"}</span>
               </div>
             </div>
           </>
