@@ -37,7 +37,7 @@ export function PlayerSplitsView({
 }: PlayerSplitsViewProps) {
   const [playerType, setPlayerType] = useState<"batter" | "pitcher">(initialType);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(
-    initialPlayerId || (initialType === "batter" ? 605612 : 660508)
+    initialPlayerId ?? null
   );
 
   const [playersList, setPlayersList] = useState<PlayerSelectorItem[]>([]);
@@ -46,17 +46,17 @@ export function PlayerSplitsView({
 
   const [profile, setProfile] = useState<PlayerSplitsProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
-  const [loadingList, setLoadingList] = useState<boolean>(false);
+  const [loadingList, setLoadingList] = useState<boolean>(true);
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
-  // Sincronizar props entrantes si cambian por navegación externa
+  // Sincronizar props entrantes si cambian por navegación externa desde tablas individuales
   useEffect(() => {
     if (initialType) setPlayerType(initialType);
     if (initialPlayerId) setSelectedPlayerId(initialPlayerId);
   }, [initialPlayerId, initialType]);
 
-  // Cargar lista de jugadores al iniciar
+  // Cargar lista real de jugadores activos en la temporada seleccionada
   useEffect(() => {
     let isMounted = true;
     async function fetchPlayers() {
@@ -65,14 +65,8 @@ export function PlayerSplitsView({
         const res = await fetch(`/api/stats/player-splits?mode=list&season=${season}`);
         if (res.ok) {
           const json = await res.json();
-          if (isMounted && json.players) {
+          if (isMounted && Array.isArray(json.players)) {
             setPlayersList(json.players);
-            if (!selectedPlayerId && json.players.length > 0) {
-              const firstMatching = json.players.find(
-                (p: PlayerSelectorItem) => p.type === playerType
-              );
-              if (firstMatching) setSelectedPlayerId(firstMatching.id);
-            }
           }
         }
       } catch (err) {
@@ -85,13 +79,35 @@ export function PlayerSplitsView({
     return () => {
       isMounted = false;
     };
-  }, [playerType, selectedPlayerId, season]);
+  }, [season]);
+
+  // Asegurar que siempre haya un jugador activo válido de la temporada seleccionada
+  useEffect(() => {
+    if (loadingList) return;
+    const matching = playersList.filter((p) => p.type === playerType);
+    if (matching.length === 0) {
+      setSelectedPlayerId(null);
+      setProfile(null);
+      setLoadingProfile(false);
+      return;
+    }
+    const existsInSeason = matching.some((p) => p.id === selectedPlayerId);
+    if (!selectedPlayerId || !existsInSeason) {
+      setSelectedPlayerId(matching[0].id);
+    }
+  }, [playersList, playerType, selectedPlayerId, loadingList]);
 
   // Cargar perfil del jugador seleccionado
   useEffect(() => {
     let isMounted = true;
     async function fetchProfile() {
-      if (!selectedPlayerId) return;
+      if (!selectedPlayerId) {
+        if (!loadingList) {
+          setProfile(null);
+          setLoadingProfile(false);
+        }
+        return;
+      }
       setLoadingProfile(true);
       try {
         const res = await fetch(
@@ -116,7 +132,7 @@ export function PlayerSplitsView({
     return () => {
       isMounted = false;
     };
-  }, [selectedPlayerId, playerType, season]);
+  }, [selectedPlayerId, playerType, season, loadingList]);
 
   // Filtrar lista de jugadores según búsqueda y tipo
   const filteredPlayers = useMemo(() => {
@@ -130,8 +146,10 @@ export function PlayerSplitsView({
   }, [playersList, playerType, searchQuery]);
 
   const selectedPlayerMeta = useMemo(() => {
-    return playersList.find((p) => p.id === selectedPlayerId);
-  }, [playersList, selectedPlayerId]);
+    return playersList.find(
+      (p) => p.id === selectedPlayerId && p.type === playerType
+    );
+  }, [playersList, selectedPlayerId, playerType]);
 
   return (
     <div className="space-y-6">
@@ -143,7 +161,7 @@ export function PlayerSplitsView({
             onClick={() => {
               setPlayerType("batter");
               const firstBat = playersList.find((p) => p.type === "batter");
-              setSelectedPlayerId(firstBat ? firstBat.id : 605612);
+              setSelectedPlayerId(firstBat ? firstBat.id : null);
               setCategoryFilter("all");
             }}
             className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
@@ -159,7 +177,7 @@ export function PlayerSplitsView({
             onClick={() => {
               setPlayerType("pitcher");
               const firstPit = playersList.find((p) => p.type === "pitcher");
-              setSelectedPlayerId(firstPit ? firstPit.id : 660508);
+              setSelectedPlayerId(firstPit ? firstPit.id : null);
               setCategoryFilter("all");
             }}
             className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
@@ -209,7 +227,9 @@ export function PlayerSplitsView({
                   </span>
                 </>
               ) : (
-                <span className="text-slate-400">Seleccionar Jugador...</span>
+                <span className="text-slate-400">
+                  {loadingList ? "Cargando jugadores activos..." : "Seleccionar Jugador..."}
+                </span>
               )}
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
@@ -233,7 +253,7 @@ export function PlayerSplitsView({
               <div className="overflow-y-auto space-y-1 flex-1 pr-1 custom-scrollbar">
                 {filteredPlayers.length === 0 ? (
                   <div className="py-4 text-center text-xs text-slate-400">
-                    No se encontraron jugadores.
+                    No se encontraron jugadores activos en esta temporada.
                   </div>
                 ) : (
                   filteredPlayers.map((p) => {
@@ -292,18 +312,18 @@ export function PlayerSplitsView({
       </div>
 
       {/* Contenido Principal de Splits */}
-      {loadingProfile ? (
+      {loadingProfile || loadingList ? (
         <div className="p-16 flex flex-col items-center justify-center space-y-3 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
           <Loader2 className="w-7 h-7 text-[#FDB827] animate-spin" />
           <span className="text-xs font-mono text-slate-400">
-            Cargando splits del jugador...
+            Cargando splits oficiales del jugador...
           </span>
         </div>
       ) : !profile ? (
         <div className="p-12 text-center rounded-xl bg-[#0D152B] border border-[#1E2B4D] space-y-2">
           <ShieldAlert className="w-8 h-8 text-[#FDB827] mx-auto opacity-70" />
           <p className="text-xs font-mono text-slate-400">
-            No se encontraron datos de splits para el jugador seleccionado.
+            No se encontraron datos de splits para el jugador seleccionado en la temporada {season}-{String(season + 1).slice(-2)}.
           </p>
         </div>
       ) : (
@@ -331,7 +351,7 @@ export function PlayerSplitsView({
               </div>
 
               <div className="space-y-1">
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <div className="w-5 h-5 relative shrink-0">
                     <Image
                       src={profile.teamLogo}
@@ -346,6 +366,9 @@ export function PlayerSplitsView({
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#131E3D] border border-[#1E2B4D] text-[#FDB827]">
                     {profile.type === "batter" ? "Bateador" : "Lanzador"}
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#070B19] border border-[#1E2B4D] text-slate-300">
+                    LVBP {profile.season}-{String(profile.season + 1).slice(-2)}
                   </span>
                 </div>
 

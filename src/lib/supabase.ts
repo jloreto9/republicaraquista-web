@@ -27,6 +27,7 @@ interface SupabaseGameRow {
 }
 
 interface RawBattingRow {
+  game_id?: number | null;
   player_id: number;
   team_id: number;
   ab?: number | null;
@@ -44,10 +45,11 @@ interface RawBattingRow {
   sf?: number | null;
   sh?: number | null;
   players?: { full_name?: string | null } | null;
-  games?: { season?: number | null; game_type?: string | null } | null;
+  games?: { season?: number | null; game_type?: string | null; status?: string | null } | null;
 }
 
 interface RawPitchingRow {
+  game_id?: number | null;
   player_id: number;
   team_id: number;
   ip_decimal?: number | null;
@@ -55,10 +57,82 @@ interface RawPitchingRow {
   r?: number | null;
   er?: number | null;
   bb?: number | null;
+  hbp?: number | null;
   so?: number | null;
   hr?: number | null;
   players?: { full_name?: string | null } | null;
-  games?: { season?: number | null; game_type?: string | null } | null;
+  games?: { season?: number | null; game_type?: string | null; status?: string | null } | null;
+}
+
+const UNPLAYED_GAME_STATUSES = new Set([
+  "scheduled",
+  "pre-game",
+  "warmup",
+  "postponed",
+  "cancelled",
+  "canceled",
+]);
+
+/**
+ * Determina si el estado de un juego corresponde a un partido disputado o en curso.
+ */
+export function isPlayedGameStatus(status?: string | null): boolean {
+  if (!status) return true;
+  return !UNPLAYED_GAME_STATUSES.has(status.trim().toLowerCase());
+}
+
+/**
+ * Determina si una fila de `batting_stats` refleja participación real en el juego
+ * (excluye filas de roster/banca en cero y lanzadores listados sin apariciones al plato).
+ */
+export function hasBatterAppearance(row: {
+  ab?: number | null;
+  bb?: number | null;
+  hbp?: number | null;
+  sf?: number | null;
+  sh?: number | null;
+  r?: number | null;
+  sb?: number | null;
+  cs?: number | null;
+}): boolean {
+  const pa =
+    Number(row.ab || 0) +
+    Number(row.bb || 0) +
+    Number(row.hbp || 0) +
+    Number(row.sf || 0) +
+    Number(row.sh || 0);
+  return (
+    pa > 0 ||
+    Number(row.r || 0) > 0 ||
+    Number(row.sb || 0) > 0 ||
+    Number(row.cs || 0) > 0
+  );
+}
+
+/**
+ * Determina si una fila de `pitching_stats` refleja participación real en el juego
+ * (excluye filas de bullpen sin ver acción con 0.0 IP y todos los conteos en cero).
+ */
+export function hasPitcherAppearance(row: {
+  ip_decimal?: number | null;
+  h?: number | null;
+  r?: number | null;
+  er?: number | null;
+  bb?: number | null;
+  hbp?: number | null;
+  so?: number | null;
+  hr?: number | null;
+}): boolean {
+  return (
+    Number(row.ip_decimal || 0) > 0 ||
+    Number(row.h || 0) > 0 ||
+    Number(row.r || 0) > 0 ||
+    Number(row.er || 0) > 0 ||
+    Number(row.bb || 0) > 0 ||
+    Number(row.hbp || 0) > 0 ||
+    Number(row.so || 0) > 0 ||
+    Number(row.hr || 0) > 0
+  );
 }
 
 function sanitizeSupabaseUrl(url?: string): string {
@@ -504,9 +578,10 @@ export async function getBattingStats(
   let query = supabase
     .from("batting_stats")
     .select(
-      "player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players!inner(full_name), games!inner(season, game_type)"
+      "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players!inner(full_name), games!inner(season, game_type, status)"
     )
-    .eq("games.season", season);
+    .eq("games.season", season)
+    .limit(10000);
 
   if (phase && phase !== "all") {
     const targetTypes =
@@ -535,7 +610,8 @@ export async function getBattingStats(
     return [];
   }
 
-  // Agrupar por player_id
+  // Agrupar por player_id filtrando únicamente juegos con participación real
+  const seenPlayerGame = new Set<string>();
   const playerMap: Record<
     number,
     {
@@ -561,8 +637,19 @@ export async function getBattingStats(
   > = {};
 
   (rawData as unknown as RawBattingRow[]).forEach((row: RawBattingRow) => {
+    const gObj = Array.isArray(row.games) ? row.games[0] : row.games;
+    if (!isPlayedGameStatus(gObj?.status)) return;
+    if (!hasBatterAppearance(row)) return;
+
     const pId = Number(row.player_id);
-    const pName = row.players?.full_name || "Desconocido";
+    if (row.game_id != null) {
+      const pgKey = `${pId}-${row.game_id}`;
+      if (seenPlayerGame.has(pgKey)) return;
+      seenPlayerGame.add(pgKey);
+    }
+
+    const pObj = Array.isArray(row.players) ? row.players[0] : row.players;
+    const pName = pObj?.full_name || "Desconocido";
     const tId = Number(row.team_id);
 
     if (!playerMap[pId]) {
@@ -690,9 +777,10 @@ export async function getPitchingStats(
   let query = supabase
     .from("pitching_stats")
     .select(
-      "player_id, team_id, ip_decimal, h, r, er, bb, so, hr, players!inner(full_name), games!inner(season, game_type)"
+      "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players!inner(full_name), games!inner(season, game_type, status)"
     )
-    .eq("games.season", season);
+    .eq("games.season", season)
+    .limit(10000);
 
   if (phase && phase !== "all") {
     const targetTypes =
@@ -721,7 +809,8 @@ export async function getPitchingStats(
     return [];
   }
 
-  // Agrupar por player_id
+  // Agrupar por player_id filtrando únicamente juegos con participación real
+  const seenPitcherGame = new Set<string>();
   const pitcherMap: Record<
     number,
     {
@@ -740,8 +829,19 @@ export async function getPitchingStats(
   > = {};
 
   (rawData as unknown as RawPitchingRow[]).forEach((row: RawPitchingRow) => {
+    const gObj = Array.isArray(row.games) ? row.games[0] : row.games;
+    if (!isPlayedGameStatus(gObj?.status)) return;
+    if (!hasPitcherAppearance(row)) return;
+
     const pId = Number(row.player_id);
-    const pName = row.players?.full_name || "Desconocido";
+    if (row.game_id != null) {
+      const pgKey = `${pId}-${row.game_id}`;
+      if (seenPitcherGame.has(pgKey)) return;
+      seenPitcherGame.add(pgKey);
+    }
+
+    const pObj = Array.isArray(row.players) ? row.players[0] : row.players;
+    const pName = pObj?.full_name || "Desconocido";
     const tId = Number(row.team_id);
 
     if (!pitcherMap[pId]) {
@@ -844,4 +944,3 @@ export async function getTeamGamesMap(
   const maxGames = Math.max(...standings.map((s) => s.gamesPlayed), 0);
   return { teamGamesMap, maxGames };
 }
-

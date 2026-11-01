@@ -1,5 +1,10 @@
-import { supabase } from "./supabase";
-import { ACTIVE_SEASON, LVBP_TEAMS, LVBP_TEAM_IDS, getTeam, getPlayerHeadshotUrl } from "./constants";
+import {
+  supabase,
+  hasBatterAppearance,
+  hasPitcherAppearance,
+  isPlayedGameStatus,
+} from "./supabase";
+import { ACTIVE_SEASON, LVBP_TEAM_IDS, getTeam, getPlayerHeadshotUrl } from "./constants";
 import { isDayGame, getVenezuelanDate } from "./utils";
 import {
   PlayerSplitRow,
@@ -9,8 +14,10 @@ import {
   SplitCategory,
 } from "@/types/player-splits";
 import { getLeonesSituationalData } from "./situational-engine";
+import { getDynamicSituationalData } from "./game-feed-service";
 
 export interface RawGameBattingRow {
+  game_id?: number | null;
   player_id: number;
   team_id: number;
   ab: number | null;
@@ -43,6 +50,7 @@ export interface RawGameBattingRow {
 }
 
 export interface RawGamePitchingRow {
+  game_id?: number | null;
   player_id: number;
   team_id: number;
   ip_decimal: number | null;
@@ -50,6 +58,7 @@ export interface RawGamePitchingRow {
   r: number | null;
   er: number | null;
   bb: number | null;
+  hbp?: number | null;
   so: number | null;
   hr: number | null;
   games_started?: number | null;
@@ -68,13 +77,17 @@ export interface RawGamePitchingRow {
   } | null;
 }
 
-// In-memory Cache con TTL de 15 minutos para perfiles calculados
+// Cache en memoria con TTL de 10 minutos para perfiles reales verificados
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
 }
 const splitsCache = new Map<string, CacheEntry<PlayerSplitsProfile>>();
-const CACHE_TTL_MS = 15 * 60 * 1000;
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+export function clearPlayerSplitsCache(): void {
+  splitsCache.clear();
+}
 
 export function formatRate(val: number): string {
   if (isNaN(val) || !isFinite(val)) return ".000";
@@ -87,23 +100,42 @@ export function formatEraWhip(val: number): string {
   return val.toFixed(2);
 }
 
-export function formatInnings(ipDecimal: number): string {
-  if (!ipDecimal || ipDecimal <= 0) return "0.0";
-  const whole = Math.floor(ipDecimal);
-  const frac = ipDecimal - whole;
+export function decimalInningsToOuts(val: number): number {
+  if (!val || val <= 0) return 0;
+  const whole = Math.floor(val + 1e-6);
+  const frac = val - whole;
   let outs = 0;
-  if (frac >= 0.6) outs = 2;
+  if (frac >= 0.55) outs = 2;
   else if (frac >= 0.25) outs = 1;
-  return `${whole}.${outs}`;
+  else if (Math.abs(frac - 0.2) < 0.04) outs = 2;
+  else if (Math.abs(frac - 0.1) < 0.04) outs = 1;
+  return whole * 3 + outs;
+}
+
+export function parseInningsStringToOuts(ipVal?: string | number | null): number {
+  if (ipVal === undefined || ipVal === null || ipVal === "") return 0;
+  if (typeof ipVal === "number") return decimalInningsToOuts(ipVal);
+  const parts = String(ipVal).trim().split(".");
+  const whole = parseInt(parts[0], 10) || 0;
+  const fracStr = parts[1] || "0";
+  if (fracStr.length === 1) {
+    const outs = parseInt(fracStr, 10) || 0;
+    return whole * 3 + Math.min(2, Math.max(0, outs));
+  }
+  return decimalInningsToOuts(parseFloat(String(ipVal)) || 0);
+}
+
+export function outsToInningsDisplay(outs: number): string {
+  if (!outs || outs <= 0) return "0.0";
+  return `${Math.floor(outs / 3)}.${outs % 3}`;
+}
+
+export function formatInnings(ipDecimal: number): string {
+  return outsToInningsDisplay(decimalInningsToOuts(ipDecimal));
 }
 
 export function parseInningsToDecimal(ipVal: string | number): number {
-  if (typeof ipVal === "number") return ipVal;
-  if (!ipVal) return 0;
-  const parts = String(ipVal).split(".");
-  const whole = parseInt(parts[0], 10) || 0;
-  const outs = parseInt(parts[1], 10) || 0;
-  return whole + (outs === 1 ? 0.333 : outs === 2 ? 0.667 : 0);
+  return parseInningsStringToOuts(ipVal) / 3;
 }
 
 /**
@@ -114,7 +146,7 @@ export function isNightGame(gameDatetime?: string, isDayGameFlag?: boolean): boo
 }
 
 /**
- * Cálculo sabermétrico estándar FanGraphs para bateadores:
+ * Cálculo de tasas ofensivas para bateadores:
  * AVG, OBP, SLG, OPS, ISO, BABIP, BB% y K%.
  */
 export function computeBatterFanGraphsMetrics(
@@ -165,7 +197,7 @@ export function computeBatterFanGraphsMetrics(
 }
 
 /**
- * Cálculo sabermétrico estándar FanGraphs para lanzadores:
+ * Cálculo de tasas monticulares para lanzadores:
  * ERA, WHIP, BAA, OBP Rival, SLG Rival, OPS Rival, K/9, BB/9, K/BB, K%, BB%, BABIP y HR/9.
  */
 export function computePitcherFanGraphsMetrics(
@@ -242,7 +274,7 @@ export function computePitcherFanGraphsMetrics(
 }
 
 /**
- * Agrega filas de bateo y construye una fila estándar `PlayerSplitRow`.
+ * Agrega únicamente filas con participación real de bateo y deduplica por `game_id`.
  */
 export function buildBatterSplitRow(
   splitName: string,
@@ -250,7 +282,8 @@ export function buildBatterSplitRow(
   badge: string | undefined,
   rows: RawGameBattingRow[]
 ): PlayerSplitRow {
-  let games = rows.length;
+  const seenGames = new Set<number>();
+  let games = 0;
   let ab = 0;
   let r = 0;
   let h = 0;
@@ -262,9 +295,20 @@ export function buildBatterSplitRow(
   let so = 0;
   let hbp = 0;
   let sf = 0;
+  let sh = 0;
   let sb = 0;
 
   for (const row of rows) {
+    if (!isPlayedGameStatus(row.games?.status)) continue;
+    if (!hasBatterAppearance(row)) continue;
+
+    const gid = row.games?.id ?? row.game_id ?? undefined;
+    if (gid !== undefined && gid !== null) {
+      if (seenGames.has(Number(gid))) continue;
+      seenGames.add(Number(gid));
+    }
+
+    games += 1;
     ab += row.ab || 0;
     r += row.r || 0;
     h += row.h || 0;
@@ -276,10 +320,12 @@ export function buildBatterSplitRow(
     so += row.so || 0;
     hbp += row.hbp || 0;
     sf += row.sf || 0;
+    sh += row.sh || 0;
     sb += row.sb || 0;
   }
 
-  const metrics = computeBatterFanGraphsMetrics(ab, h, doubles, triples, hr, bb, so, hbp, sf);
+  const rawPa = ab + bb + hbp + sf + sh;
+  const metrics = computeBatterFanGraphsMetrics(ab, h, doubles, triples, hr, bb, so, hbp, sf, rawPa);
 
   return {
     splitName,
@@ -303,7 +349,7 @@ export function buildBatterSplitRow(
 }
 
 /**
- * Agrega filas de pitcheo y construye una fila estándar `PitcherSplitRow`.
+ * Agrega únicamente filas con participación real de pitcheo y deduplica por `game_id`.
  */
 export function buildPitcherSplitRow(
   splitName: string,
@@ -311,9 +357,10 @@ export function buildPitcherSplitRow(
   badge: string | undefined,
   rows: RawGamePitchingRow[]
 ): PitcherSplitRow {
-  let games = rows.length;
+  const seenGames = new Set<number>();
+  let games = 0;
   let starts = 0;
-  let ip = 0;
+  let totalOuts = 0;
   let h = 0;
   let r = 0;
   let er = 0;
@@ -322,8 +369,18 @@ export function buildPitcherSplitRow(
   let hr = 0;
 
   for (const row of rows) {
+    if (!isPlayedGameStatus(row.games?.status)) continue;
+    if (!hasPitcherAppearance(row)) continue;
+
+    const gid = row.games?.id ?? row.game_id ?? undefined;
+    if (gid !== undefined && gid !== null) {
+      if (seenGames.has(Number(gid))) continue;
+      seenGames.add(Number(gid));
+    }
+
+    games += 1;
     if (row.games_started) starts++;
-    ip += row.ip_decimal || 0;
+    totalOuts += decimalInningsToOuts(row.ip_decimal || 0);
     h += row.h || 0;
     r += row.r || 0;
     er += row.er || 0;
@@ -332,6 +389,7 @@ export function buildPitcherSplitRow(
     hr += row.hr || 0;
   }
 
+  const ip = totalOuts / 3;
   const metrics = computePitcherFanGraphsMetrics(ip, h, er, bb, so, hr);
 
   return {
@@ -341,7 +399,7 @@ export function buildPitcherSplitRow(
     games,
     starts,
     ip,
-    ipDisplay: formatInnings(ip),
+    ipDisplay: outsToInningsDisplay(totalOuts),
     h,
     r,
     er,
@@ -353,198 +411,9 @@ export function buildPitcherSplitRow(
 }
 
 /**
- * Construye filas sintéticas proporcionales para splits situacionales de bateadores (PBP)
- */
-function buildSituationalBatterRows(
-  totalRow: PlayerSplitRow
-): {
-  situationalSplits: PlayerSplitRow[];
-  platoonSplits: PlayerSplitRow[];
-  countSplits: PlayerSplitRow[];
-  inningSplits: PlayerSplitRow[];
-  outsSplits: PlayerSplitRow[];
-} {
-  const p = totalRow;
-
-  // 1. Situaciones en Base
-  const basesLimpias = scaleBatterRow(p, "Bases Limpias", "situational", "Bases Vacías", 0.55, 0.98, 0.96);
-  const hombresEnBase = scaleBatterRow(p, "Corredores en Base", "situational", "Tráfico", 0.45, 1.04, 1.05);
-  const risp = scaleBatterRow(p, "Posición Anotadora (RISP)", "situational", "Oportunidad", 0.27, 1.08, 1.10);
-  const risp2Outs = scaleBatterRow(p, "RISP con 2 Outs (Clutch)", "situational", "Alta Presión", 0.11, 1.02, 1.08);
-  const basesLlenas = scaleBatterRow(p, "Bases Llenas", "situational", "Llenas", 0.035, 1.15, 1.25);
-  const leadoff = scaleBatterRow(p, "Abriendo Entrada (Leadoff)", "situational", "Leadoff", 0.25, 1.01, 1.00);
-  const situationalSplits = [basesLimpias, hombresEnBase, risp, risp2Outs, basesLlenas, leadoff];
-
-  // 2. Platoon
-  const vsRhp = scaleBatterRow(p, "vs Lanzadores Derechos (RHP)", "platoon", "vs RHP", 0.72, 1.02, 1.03);
-  const vsLhp = scaleBatterRow(p, "vs Lanzadores Zurdos (LHP)", "platoon", "vs LHP", 0.28, 0.95, 0.92);
-  const platoonSplits = [vsRhp, vsLhp];
-
-  // 3. Conteos Clave
-  const fp = scaleBatterRow(p, "Primer Pitcheo (0-0)", "count", "0-0", 0.25, 1.12, 1.15);
-  const twoStrikes = scaleBatterRow(p, "Con 2 Strikes", "count", "2 Strikes", 0.45, 0.75, 0.72);
-  const fullCount = scaleBatterRow(p, "Cuenta Completa (3-2)", "count", "3-2", 0.15, 0.95, 0.98);
-  const countSplits = [fp, twoStrikes, fullCount];
-
-  // 4. Segmentos de Entradas
-  const early = scaleBatterRow(p, "Entradas Tempranas (1 al 3)", "inning", "Apertura", 0.35, 1.01, 1.00);
-  const middle = scaleBatterRow(p, "Entradas Medias (4 al 6)", "inning", "Desarrollo", 0.34, 1.03, 1.05);
-  const late = scaleBatterRow(p, "Entradas Tardías / Clutch (7 al 9+)", "inning", "Definición", 0.31, 0.96, 0.95);
-  const inningSplits = [early, middle, late];
-
-  // 5. Outs
-  const outs0 = scaleBatterRow(p, "Con 0 Outs", "outs", "0 Outs", 0.35, 1.04, 1.02);
-  const outs1 = scaleBatterRow(p, "Con 1 Out", "outs", "1 Out", 0.33, 1.00, 1.00);
-  const outs2 = scaleBatterRow(p, "Con 2 Outs", "outs", "2 Outs", 0.32, 0.96, 0.98);
-  const outsSplits = [outs0, outs1, outs2];
-
-  return { situationalSplits, platoonSplits, countSplits, inningSplits, outsSplits };
-}
-
-function scaleBatterRow(
-  base: PlayerSplitRow,
-  splitName: string,
-  category: SplitCategory,
-  badge: string,
-  share: number,
-  avgMultiplier: number,
-  slgMultiplier: number
-): PlayerSplitRow {
-  const pa = Math.max(1, Math.round(base.pa * share));
-  const ab = Math.max(1, Math.round(base.ab * share));
-  const avgNum = Math.min(0.5, Math.max(0.0, base.avgNum * avgMultiplier));
-  const h = Math.round(ab * avgNum);
-  const doubles = Math.round(base.doubles * share * slgMultiplier);
-  const triples = Math.round(base.triples * share);
-  const hr = Math.round(base.hr * share * slgMultiplier);
-  const bb = Math.round(base.bb * share);
-  const so = Math.round(base.so * share);
-  const rbi = Math.round(base.rbi * share * (category === "situational" ? 1.5 : 1.0));
-  const r = Math.round(base.r * share);
-  const hbp = Math.round((base.hbp || 0) * share);
-  const sf = Math.round((base.sf || 0) * share);
-  const sb = Math.round((base.sb || 0) * share);
-
-  const metrics = computeBatterFanGraphsMetrics(ab, h, doubles, triples, hr, bb, so, hbp, sf, pa);
-
-  return {
-    splitName,
-    category,
-    badge,
-    games: Math.max(1, Math.round((base.games || 1) * share)),
-    ab,
-    r,
-    h,
-    doubles,
-    triples,
-    hr,
-    rbi,
-    bb,
-    so,
-    hbp,
-    sf,
-    sb,
-    ...metrics,
-  };
-}
-
-/**
- * Escala una fila base de lanzador para generar splits sintéticos calibrados
- */
-function scalePitcherRow(
-  base: PitcherSplitRow,
-  splitName: string,
-  category: SplitCategory,
-  badge: string,
-  share: number,
-  eraMultiplier: number,
-  whipMultiplier: number
-): PitcherSplitRow {
-  const ip = +(base.ip * share).toFixed(1);
-  const h = Math.round(base.h * share * whipMultiplier);
-  const r = Math.round(base.r * share * eraMultiplier);
-  const er = Math.round(base.er * share * eraMultiplier);
-  const bb = Math.round(base.bb * share * whipMultiplier);
-  const so = Math.round(base.so * share * (category === "count" && badge === "2 Strikes" ? 1.35 : 1.0));
-  const hr = Math.round(base.hr * share * eraMultiplier);
-  const starts = category === "role" && badge === "Abridor" ? base.starts : category === "role" ? 0 : Math.round(base.starts * share);
-  const games = category === "role" && badge === "Abridor" ? base.starts : Math.max(1, Math.round((base.games || 1) * share));
-
-  const metrics = computePitcherFanGraphsMetrics(ip, h, er, bb, so, hr);
-
-  return {
-    splitName,
-    category,
-    badge,
-    games,
-    starts,
-    ip,
-    ipDisplay: formatInnings(ip),
-    h,
-    r,
-    er,
-    bb,
-    so,
-    hr,
-    ...metrics,
-  };
-}
-
-/**
- * Construye filas sintéticas proporcionales para lanzadores cuando no existen splits PBP en API
- */
-function buildSituationalPitcherRows(totalRow: PitcherSplitRow) {
-  const p = totalRow;
-
-  // 1. Situaciones en Base
-  const basesLimpias = scalePitcherRow(p, "Bases Limpias", "situational", "Bases Vacías", 0.55, 0.94, 0.95);
-  const hombresEnBase = scalePitcherRow(p, "Corredores en Base", "situational", "Tráfico", 0.45, 1.08, 1.06);
-  const risp = scalePitcherRow(p, "Posición Anotadora (RISP)", "situational", "Oportunidad", 0.27, 1.12, 1.1);
-  const risp2Outs = scalePitcherRow(p, "RISP con 2 Outs (Clutch)", "situational", "Alta Presión", 0.11, 1.04, 1.05);
-  const basesLlenas = scalePitcherRow(p, "Bases Llenas", "situational", "Llenas", 0.035, 1.25, 1.2);
-  const leadoff = scalePitcherRow(p, "Abriendo Entrada (Leadoff)", "situational", "Leadoff", 0.25, 0.98, 0.96);
-  const pitcherSituationalSplits = [basesLimpias, hombresEnBase, risp, risp2Outs, basesLlenas, leadoff];
-
-  // 2. Platoon
-  const vsRhb = scalePitcherRow(p, "vs Bateadores Derechos (RHB)", "platoon", "vs RHB", 0.65, 0.95, 0.96);
-  const vsLhb = scalePitcherRow(p, "vs Bateadores Zurdos (LHB)", "platoon", "vs LHB", 0.35, 1.08, 1.06);
-  const pitcherPlatoonSplits = [vsRhb, vsLhb];
-
-  // 3. Conteos Clave
-  const fp = scalePitcherRow(p, "Primer Pitcheo (0-0)", "count", "0-0", 0.28, 0.9, 0.92);
-  const twoStrikes = scalePitcherRow(p, "Con 2 Strikes", "count", "2 Strikes", 0.48, 0.6, 0.7);
-  const fullCount = scalePitcherRow(p, "Cuenta Completa (3-2)", "count", "3-2", 0.15, 1.3, 1.25);
-  const pitcherCountSplits = [fp, twoStrikes, fullCount];
-
-  // 4. Outs
-  const outs0 = scalePitcherRow(p, "Con 0 Outs", "outs", "0 Outs", 0.35, 1.02, 1.01);
-  const outs1 = scalePitcherRow(p, "Con 1 Out", "outs", "1 Out", 0.33, 1.0, 1.0);
-  const outs2 = scalePitcherRow(p, "Con 2 Outs", "outs", "2 Outs", 0.32, 0.98, 0.99);
-  const pitcherOutsSplits = [outs0, outs1, outs2];
-
-  // 5. Entradas
-  const innEarly = scalePitcherRow(p, "Entradas Tempranas (1 al 3)", "inning", "Apertura", 0.35, 0.97, 0.98);
-  const innMid = scalePitcherRow(p, "Entradas Medias (4 al 6)", "inning", "Desarrollo", 0.35, 1.04, 1.03);
-  const innLate = scalePitcherRow(p, "Entradas Tardías (7 al 9+)", "inning", "Definición", 0.3, 1.02, 1.01);
-  const pitcherInningSplits = [innEarly, innMid, innLate];
-
-  // 6. Rol
-  const spRow = scalePitcherRow(p, "Como Abridor (SP)", "role", "Abridor", p.starts > 0 ? 0.75 : 0, 1.0, 1.0);
-  const rpRow = scalePitcherRow(p, "Como Relevista (RP)", "role", "Relevista", p.starts > 0 ? 0.25 : 1.0, 0.95, 0.96);
-  const pitcherRoleSplits = p.starts > 0 ? [spRow, rpRow] : [rpRow];
-
-  return {
-    pitcherSituationalSplits,
-    pitcherPlatoonSplits,
-    pitcherCountSplits,
-    pitcherOutsSplits,
-    pitcherInningSplits,
-    pitcherRoleSplits,
-  };
-}
-
-/**
- * Consulta la API oficial de MLB Stats (`statSplits`) con timeout defensivo
+ * Consulta la API oficial de MLB Stats (`statSplits`) filtrando estrictamente
+ * Liga Venezolana de Béisbol Profesional (`sportId=17&leagueId=135`) y la temporada exacta solicitada.
+ * Jamás mezcla Grandes Ligas (`sportId=1`), otras ligas invernales ni temporadas anteriores.
  */
 export async function fetchMlbStatSplits(
   playerId: number,
@@ -554,40 +423,170 @@ export async function fetchMlbStatSplits(
   const SIT_CODES =
     "vl,vr,r0,ron,risp,risp2,r123,lo,fp,2s,fc,o0,o1,o2,i01,i02,i03,i04,i05,i06,i07,i08,i09,h,a,d,n,twn,tls,sp,rp";
 
-  const seasonsToTry = [season];
-  if (season >= 2026) seasonsToTry.push(season - 1);
-  if (season >= 2025 && !seasonsToTry.includes(2024)) seasonsToTry.push(2024);
+  try {
+    const url = `https://statsapi.mlb.com/api/v1/people/${playerId}/stats?stats=statSplits&sitCodes=${SIT_CODES}&group=${group}&season=${season}&sportId=17&leagueId=135`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const splits = data.stats?.[0]?.splits;
+    if (!Array.isArray(splits) || splits.length === 0) return [];
 
-  for (const s of seasonsToTry) {
-    try {
-      const url = `https://statsapi.mlb.com/api/v1/people/${playerId}/stats?stats=statSplits&sitCodes=${SIT_CODES}&group=${group}&season=${s}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const splits = data.stats?.[0]?.splits;
-      if (Array.isArray(splits) && splits.length > 0) {
-        return splits;
-      }
-    } catch {
-      // Continuar al siguiente intento de temporada si hay fallo
-    }
+    return splits.filter((s: any) => {
+      if (s.season && String(s.season) !== String(season)) return false;
+      if (s.sport?.id && Number(s.sport.id) !== 17) return false;
+      if (s.league?.id && Number(s.league.id) !== 135) return false;
+      if (s.team?.id && !LVBP_TEAM_IDS.includes(Number(s.team.id))) return false;
+      return true;
+    });
+  } catch {
+    return [];
   }
-  return [];
 }
 
 /**
- * Elige la mejor entrada de split para un código situacional (preferir la fila total combinada sin teamId)
+ * Combina una lista de entradas crudas de MLB `statSplits` sumando sus conteos exactos
+ * (útil cuando un pelotero jugó con más de un club LVBP en el mismo torneo o al sumar Local + Visitante).
  */
-function getBestSplitForCode(splits: any[], code: string): any | null {
+function combineMlbRawSplits(entries: any[], group: "hitting" | "pitching"): any | null {
+  if (!entries || entries.length === 0) return null;
+  if (entries.length === 1) return entries[0];
+
+  if (group === "hitting") {
+    let gamesPlayed = 0;
+    let hasGames = false;
+    let plateAppearances = 0;
+    let atBats = 0;
+    let runs = 0;
+    let hits = 0;
+    let doubles = 0;
+    let triples = 0;
+    let homeRuns = 0;
+    let rbi = 0;
+    let baseOnBalls = 0;
+    let strikeOuts = 0;
+    let hitByPitch = 0;
+    let sacFlies = 0;
+    let stolenBases = 0;
+
+    for (const item of entries) {
+      const st = item?.stat || {};
+      if (st.gamesPlayed !== undefined && st.gamesPlayed !== null) {
+        gamesPlayed += Number(st.gamesPlayed) || 0;
+        hasGames = true;
+      }
+      plateAppearances += Number(st.plateAppearances) || 0;
+      atBats += Number(st.atBats) || 0;
+      runs += Number(st.runs) || 0;
+      hits += Number(st.hits) || 0;
+      doubles += Number(st.doubles) || 0;
+      triples += Number(st.triples) || 0;
+      homeRuns += Number(st.homeRuns) || 0;
+      rbi += Number(st.rbi) || 0;
+      baseOnBalls += Number(st.baseOnBalls) || 0;
+      strikeOuts += Number(st.strikeOuts) || 0;
+      hitByPitch += Number(st.hitByPitch) || 0;
+      sacFlies += Number(st.sacFlies) || 0;
+      stolenBases += Number(st.stolenBases) || 0;
+    }
+
+    return {
+      ...entries[entries.length - 1],
+      stat: {
+        gamesPlayed: hasGames ? gamesPlayed : undefined,
+        plateAppearances,
+        atBats,
+        runs,
+        hits,
+        doubles,
+        triples,
+        homeRuns,
+        rbi,
+        baseOnBalls,
+        strikeOuts,
+        hitByPitch,
+        sacFlies,
+        stolenBases,
+      },
+    };
+  }
+
+  let gamesPlayed = 0;
+  let gamesStarted = 0;
+  let totalOuts = 0;
+  let hits = 0;
+  let runs = 0;
+  let earnedRuns = 0;
+  let baseOnBalls = 0;
+  let strikeOuts = 0;
+  let homeRuns = 0;
+  let battersFaced = 0;
+  let atBats = 0;
+  let hitByPitch = 0;
+  let sacFlies = 0;
+  let doubles = 0;
+  let triples = 0;
+
+  for (const item of entries) {
+    const st = item?.stat || {};
+    gamesPlayed += Number(st.gamesPlayed ?? st.gamesPitched ?? 0) || 0;
+    gamesStarted += Number(st.gamesStarted) || 0;
+    totalOuts += parseInningsStringToOuts(st.inningsPitched);
+    hits += Number(st.hits) || 0;
+    runs += Number(st.runs) || 0;
+    earnedRuns += Number(st.earnedRuns) || 0;
+    baseOnBalls += Number(st.baseOnBalls) || 0;
+    strikeOuts += Number(st.strikeOuts) || 0;
+    homeRuns += Number(st.homeRuns) || 0;
+    battersFaced += Number(st.battersFaced) || 0;
+    atBats += Number(st.atBats) || 0;
+    hitByPitch += Number(st.hitByPitch) || 0;
+    sacFlies += Number(st.sacFlies) || 0;
+    doubles += Number(st.doubles) || 0;
+    triples += Number(st.triples) || 0;
+  }
+
+  const obpDen = atBats + baseOnBalls + hitByPitch + sacFlies;
+  const oppObp = obpDen > 0 ? (hits + baseOnBalls + hitByPitch) / obpDen : undefined;
+  const singles = Math.max(0, hits - (doubles + triples + homeRuns));
+  const tb = singles + 2 * doubles + 3 * triples + 4 * homeRuns;
+  const oppSlg = atBats > 0 ? tb / atBats : undefined;
+  const oppOps = oppObp !== undefined && oppSlg !== undefined ? oppObp + oppSlg : undefined;
+
+  return {
+    ...entries[entries.length - 1],
+    stat: {
+      gamesPlayed,
+      gamesStarted,
+      inningsPitched: outsToInningsDisplay(totalOuts),
+      hits,
+      runs,
+      earnedRuns,
+      baseOnBalls,
+      strikeOuts,
+      homeRuns,
+      battersFaced: battersFaced > 0 ? battersFaced : undefined,
+      atBats: atBats > 0 ? atBats : undefined,
+      obp: oppObp,
+      slg: oppSlg,
+      ops: oppOps,
+    },
+  };
+}
+
+/**
+ * Obtiene la entrada oficial LVBP para un código situacional, combinando clubes LVBP
+ * si el pelotero cambió de equipo durante la misma temporada.
+ */
+function getBestSplitForCode(
+  splits: any[],
+  code: string,
+  group: "hitting" | "pitching"
+): any | null {
   const matching = splits.filter((s) => s.split?.code === code);
   if (matching.length === 0) return null;
   const combined = matching.find((s) => !s.team?.id);
   if (combined) return combined;
-  return matching.sort((a, b) => {
-    const aVol = a.stat?.plateAppearances || a.stat?.battersFaced || a.stat?.atBats || 0;
-    const bVol = b.stat?.plateAppearances || b.stat?.battersFaced || b.stat?.atBats || 0;
-    return bVol - aVol;
-  })[0];
+  return combineMlbRawSplits(matching, group);
 }
 
 /**
@@ -638,8 +637,9 @@ function parseMlbBatterSplit(raw: any, category: SplitCategory, splitName: strin
  */
 function parseMlbPitcherSplit(raw: any, category: SplitCategory, splitName: string, badge?: string): PitcherSplitRow {
   const stat = raw.stat || {};
-  const ipStr = stat.inningsPitched ?? "0.0";
-  const ip = parseInningsToDecimal(ipStr);
+  const totalOuts = parseInningsStringToOuts(stat.inningsPitched);
+  const ip = totalOuts / 3;
+  const ipStr = outsToInningsDisplay(totalOuts);
   const h = stat.hits ?? 0;
   const r = stat.runs ?? 0;
   const er = stat.earnedRuns ?? 0;
@@ -675,9 +675,12 @@ function parseMlbPitcherSplit(raw: any, category: SplitCategory, splitName: stri
 }
 
 /**
- * Resuelve metadatos básicos de un jugador consultando MLB People API si no está en Supabase
+ * Resuelve metadatos básicos de un jugador consultando MLB People API si no está aún en Supabase
  */
-async function fetchMlbPersonMeta(playerId: number): Promise<{ fullName: string; teamId: number; teamName: string; teamAbbr: string } | null> {
+async function fetchMlbPersonMeta(
+  playerId: number,
+  fallbackTeamId: number = 695
+): Promise<{ fullName: string; teamId: number; teamName: string; teamAbbr: string } | null> {
   try {
     const res = await fetch(`https://statsapi.mlb.com/api/v1/people/${playerId}`, {
       signal: AbortSignal.timeout(3000),
@@ -686,11 +689,12 @@ async function fetchMlbPersonMeta(playerId: number): Promise<{ fullName: string;
     const d = await res.json();
     const p = d.people?.[0];
     if (!p) return null;
+    const team = getTeam(fallbackTeamId);
     return {
       fullName: p.fullName || `Jugador #${playerId}`,
-      teamId: 695,
-      teamName: "Leones del Caracas",
-      teamAbbr: "CAR",
+      teamId: team.id,
+      teamName: team.name,
+      teamAbbr: team.abbreviation,
     };
   } catch {
     return null;
@@ -698,7 +702,8 @@ async function fetchMlbPersonMeta(playerId: number): Promise<{ fullName: string;
 }
 
 /**
- * Genera el perfil exhaustivo de splits de un jugador (bateador o lanzador)
+ * Genera el perfil verificado de splits de un jugador (bateador o lanzador)
+ * exclusivamente con datos reales de la temporada solicitada en la LVBP.
  */
 export async function getPlayerSplitsProfile(
   playerId: number,
@@ -712,8 +717,8 @@ export async function getPlayerSplitsProfile(
   }
 
   try {
-    // 1. Consultar MLB Stats API para splits situacionales oficiales
-    const mlbSplitsPromise = fetchMlbStatSplits(playerId, type === "batter" ? "hitting" : "pitching", season);
+    const group = type === "batter" ? "hitting" : "pitching";
+    const mlbSplitsPromise = fetchMlbStatSplits(playerId, group, season);
 
     if (type === "batter") {
       let rawRows: any[] = [];
@@ -721,7 +726,7 @@ export async function getPlayerSplitsProfile(
         const { data, error } = await supabase
           .from("batting_stats")
           .select(`
-            player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh,
+            game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh,
             players ( full_name ),
             games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
           `)
@@ -729,38 +734,43 @@ export async function getPlayerSplitsProfile(
           .eq("games.season", season);
 
         if (!error && data) rawRows = data;
-
-        // Si no hay registros en la temporada solicitada y es 2026, buscar en 2025 como respaldo defensivo
-        if (rawRows.length === 0 && season >= 2026) {
-          const { data: prevData, error: prevErr } = await supabase
-            .from("batting_stats")
-            .select(`
-              player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh,
-              players ( full_name ),
-              games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
-            `)
-            .eq("player_id", playerId)
-            .eq("games.season", 2025);
-          if (!prevErr && prevData && prevData.length > 0) rawRows = prevData;
-        }
       }
 
+      const seenGameIds = new Set<number>();
       const validRows: RawGameBattingRow[] = [];
       for (const r of rawRows) {
         const g = Array.isArray(r.games) ? r.games[0] : r.games;
-        if (!g) continue;
+        if (!g || !isPlayedGameStatus(g.status)) continue;
+        if (!hasBatterAppearance(r)) continue;
+        if (g.id != null) {
+          if (seenGameIds.has(Number(g.id))) continue;
+          seenGameIds.add(Number(g.id));
+        }
         const p = Array.isArray(r.players) ? r.players[0] : r.players;
         validRows.push({ ...r, games: g, players: p });
       }
 
-      // Si no hay datos en Supabase, resolver metadatos desde MLB People API
+      validRows.sort((a, b) =>
+        (a.games?.game_date || "").localeCompare(b.games?.game_date || "")
+      );
+
+      const mlbSplits = await mlbSplitsPromise;
+
+      if (validRows.length === 0 && mlbSplits.length === 0) {
+        return null;
+      }
+
+      const mlbTeamIdRaw = Number(mlbSplits.find((s) => s.team?.id)?.team?.id || 0);
+      const fallbackTeamId = LVBP_TEAM_IDS.includes(mlbTeamIdRaw) ? mlbTeamIdRaw : 695;
+
       let playerName = `Bateador #${playerId}`;
-      let teamId = 695;
+      let teamId = fallbackTeamId;
       if (validRows.length > 0) {
-        playerName = validRows[0].players?.full_name || playerName;
-        teamId = validRows[0].team_id || teamId;
+        const latestRow = validRows[validRows.length - 1];
+        playerName = latestRow.players?.full_name || validRows[0].players?.full_name || playerName;
+        teamId = latestRow.team_id || teamId;
       } else {
-        const meta = await fetchMlbPersonMeta(playerId);
+        const meta = await fetchMlbPersonMeta(playerId, fallbackTeamId);
         if (meta) {
           playerName = meta.fullName;
           teamId = meta.teamId;
@@ -768,7 +778,7 @@ export async function getPlayerSplitsProfile(
       }
       const team = getTeam(teamId);
 
-      // Particiones de Contexto, Rival y Calendario desde Supabase
+      // Particiones de Contexto, Rival y Calendario desde juegos reales en Supabase
       const homeRows: RawGameBattingRow[] = [];
       const awayRows: RawGameBattingRow[] = [];
       const dayRows: RawGameBattingRow[] = [];
@@ -785,7 +795,8 @@ export async function getPlayerSplitsProfile(
       for (const row of validRows) {
         const g = row.games;
         if (!g) continue;
-        const isHome = g.home_team_id === teamId;
+        const rowTeamId = row.team_id || teamId;
+        const isHome = g.home_team_id === rowTeamId;
         const opponentId = isHome ? g.away_team_id : g.home_team_id;
         const teamScore = isHome ? g.home_score || 0 : g.away_score || 0;
         const oppScore = isHome ? g.away_score || 0 : g.home_score || 0;
@@ -800,6 +811,7 @@ export async function getPlayerSplitsProfile(
         if (isWin) winRows.push(row);
         else lossRows.push(row);
 
+        if (!rivalMap[opponentId] && opponentId !== teamId) rivalMap[opponentId] = [];
         if (rivalMap[opponentId]) rivalMap[opponentId].push(row);
 
         const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
@@ -812,72 +824,51 @@ export async function getPlayerSplitsProfile(
         }
       }
 
-      const mlbSplits = await mlbSplitsPromise;
+      // Total oficial de temporada: preferir suma exacta Local+Visitante de MLB LVBP si está al día
+      const mlbHomeAway = [
+        getBestSplitForCode(mlbSplits, "h", "hitting"),
+        getBestSplitForCode(mlbSplits, "a", "hitting"),
+      ].filter(Boolean);
+      const mlbCombinedRaw = combineMlbRawSplits(mlbHomeAway, "hitting");
+      const mlbTotalRow = mlbCombinedRaw
+        ? parseMlbBatterSplit(mlbCombinedRaw, "context", "Total Temporada", "General")
+        : null;
+      const supaTotalRow =
+        validRows.length > 0
+          ? buildBatterSplitRow("Total Temporada", "context", "General", validRows)
+          : null;
 
       let totalRow: PlayerSplitRow;
-      if (validRows.length > 0) {
-        totalRow = buildBatterSplitRow("Total Temporada", "context", "General", validRows);
+      if (mlbTotalRow && (mlbTotalRow.games || 0) >= (supaTotalRow?.games || 0)) {
+        totalRow = mlbTotalRow;
+      } else if (supaTotalRow) {
+        totalRow = supaTotalRow;
       } else if (mlbSplits.length > 0) {
-        // Usar suma o total de MLB
-        const hSplit = getBestSplitForCode(mlbSplits, "h");
-        const aSplit = getBestSplitForCode(mlbSplits, "a");
-        if (hSplit && aSplit) {
-          const ab = (hSplit.stat?.atBats || 0) + (aSplit.stat?.atBats || 0);
-          const h = (hSplit.stat?.hits || 0) + (aSplit.stat?.hits || 0);
-          const doubles = (hSplit.stat?.doubles || 0) + (aSplit.stat?.doubles || 0);
-          const triples = (hSplit.stat?.triples || 0) + (aSplit.stat?.triples || 0);
-          const hr = (hSplit.stat?.homeRuns || 0) + (aSplit.stat?.homeRuns || 0);
-          const bb = (hSplit.stat?.baseOnBalls || 0) + (aSplit.stat?.baseOnBalls || 0);
-          const so = (hSplit.stat?.strikeOuts || 0) + (aSplit.stat?.strikeOuts || 0);
-          const r = (hSplit.stat?.runs || 0) + (aSplit.stat?.runs || 0);
-          const rbi = (hSplit.stat?.rbi || 0) + (aSplit.stat?.rbi || 0);
-          const pa = (hSplit.stat?.plateAppearances || 0) + (aSplit.stat?.plateAppearances || 0);
-          const metrics = computeBatterFanGraphsMetrics(ab, h, doubles, triples, hr, bb, so, 0, 0, pa);
-          totalRow = {
-            splitName: "Total Temporada",
-            category: "context",
-            badge: "General",
-            games: (hSplit.stat?.gamesPlayed || 0) + (aSplit.stat?.gamesPlayed || 0),
-            ab,
-            r,
-            h,
-            doubles,
-            triples,
-            hr,
-            rbi,
-            bb,
-            so,
-            ...metrics,
-          };
-        } else {
-          totalRow = parseMlbBatterSplit(mlbSplits[0], "context", "Total Temporada", "General");
-        }
+        totalRow = parseMlbBatterSplit(mlbSplits[0], "context", "Total Temporada", "General");
       } else {
         return null;
       }
 
-      // Desglose de Platoon, Situacional, Conteos, Outs, Entradas
-      let platoonSplits: PlayerSplitRow[] = [];
-      let situationalSplits: PlayerSplitRow[] = [];
-      let countSplits: PlayerSplitRow[] = [];
-      let outsSplits: PlayerSplitRow[] = [];
-      let inningSplits: PlayerSplitRow[] = [];
+      // Desglose oficial de Platoon, Situacional, Conteos, Outs, Entradas y Contexto (0% sintético)
+      const platoonSplits: PlayerSplitRow[] = [];
+      const situationalSplits: PlayerSplitRow[] = [];
+      const countSplits: PlayerSplitRow[] = [];
+      const outsSplits: PlayerSplitRow[] = [];
+      const inningSplits: PlayerSplitRow[] = [];
       let contextSplits: PlayerSplitRow[] = [];
 
       if (mlbSplits.length > 0) {
-        // Platoon
-        const vl = getBestSplitForCode(mlbSplits, "vl");
-        const vr = getBestSplitForCode(mlbSplits, "vr");
+        const vr = getBestSplitForCode(mlbSplits, "vr", "hitting");
+        const vl = getBestSplitForCode(mlbSplits, "vl", "hitting");
         if (vr) platoonSplits.push(parseMlbBatterSplit(vr, "platoon", "vs Lanzadores Derechos (RHP)", "vs RHP"));
         if (vl) platoonSplits.push(parseMlbBatterSplit(vl, "platoon", "vs Lanzadores Zurdos (LHP)", "vs LHP"));
 
-        // Situacionales
-        const r0 = getBestSplitForCode(mlbSplits, "r0");
-        const ron = getBestSplitForCode(mlbSplits, "ron");
-        const risp = getBestSplitForCode(mlbSplits, "risp");
-        const risp2 = getBestSplitForCode(mlbSplits, "risp2");
-        const r123 = getBestSplitForCode(mlbSplits, "r123");
-        const lo = getBestSplitForCode(mlbSplits, "lo");
+        const r0 = getBestSplitForCode(mlbSplits, "r0", "hitting");
+        const ron = getBestSplitForCode(mlbSplits, "ron", "hitting");
+        const risp = getBestSplitForCode(mlbSplits, "risp", "hitting");
+        const risp2 = getBestSplitForCode(mlbSplits, "risp2", "hitting");
+        const r123 = getBestSplitForCode(mlbSplits, "r123", "hitting");
+        const lo = getBestSplitForCode(mlbSplits, "lo", "hitting");
         if (r0) situationalSplits.push(parseMlbBatterSplit(r0, "situational", "Bases Limpias", "Bases Vacías"));
         if (ron) situationalSplits.push(parseMlbBatterSplit(ron, "situational", "Corredores en Base", "Tráfico"));
         if (risp) situationalSplits.push(parseMlbBatterSplit(risp, "situational", "Posición Anotadora (RISP)", "RISP"));
@@ -885,53 +876,39 @@ export async function getPlayerSplitsProfile(
         if (r123) situationalSplits.push(parseMlbBatterSplit(r123, "situational", "Bases Llenas", "Llenas"));
         if (lo) situationalSplits.push(parseMlbBatterSplit(lo, "situational", "Abriendo Entrada (Leadoff)", "Leadoff"));
 
-        // Conteos
-        const fp = getBestSplitForCode(mlbSplits, "fp");
-        const twoS = getBestSplitForCode(mlbSplits, "2s");
-        const fc = getBestSplitForCode(mlbSplits, "fc");
+        const fp = getBestSplitForCode(mlbSplits, "fp", "hitting");
+        const twoS = getBestSplitForCode(mlbSplits, "2s", "hitting");
+        const fc = getBestSplitForCode(mlbSplits, "fc", "hitting");
         if (fp) countSplits.push(parseMlbBatterSplit(fp, "count", "Primer Pitcheo (0-0)", "0-0"));
         if (twoS) countSplits.push(parseMlbBatterSplit(twoS, "count", "Con 2 Strikes", "2 Strikes"));
         if (fc) countSplits.push(parseMlbBatterSplit(fc, "count", "Cuenta Completa (3-2)", "3-2"));
 
-        // Outs
-        const o0 = getBestSplitForCode(mlbSplits, "o0");
-        const o1 = getBestSplitForCode(mlbSplits, "o1");
-        const o2 = getBestSplitForCode(mlbSplits, "o2");
+        const o0 = getBestSplitForCode(mlbSplits, "o0", "hitting");
+        const o1 = getBestSplitForCode(mlbSplits, "o1", "hitting");
+        const o2 = getBestSplitForCode(mlbSplits, "o2", "hitting");
         if (o0) outsSplits.push(parseMlbBatterSplit(o0, "outs", "Con 0 Outs", "0 Outs"));
         if (o1) outsSplits.push(parseMlbBatterSplit(o1, "outs", "Con 1 Out", "1 Out"));
         if (o2) outsSplits.push(parseMlbBatterSplit(o2, "outs", "Con 2 Outs", "2 Outs"));
 
-        // Entradas
         const innCodes = ["i01", "i02", "i03", "i04", "i05", "i06", "i07", "i08", "i09"];
         const innLabels = ["1ra Entrada", "2da Entrada", "3ra Entrada", "4ta Entrada", "5ta Entrada", "6ta Entrada", "7ma Entrada", "8va Entrada", "9na Entrada+"];
         innCodes.forEach((code, idx) => {
-          const raw = getBestSplitForCode(mlbSplits, code);
+          const raw = getBestSplitForCode(mlbSplits, code, "hitting");
           if (raw) inningSplits.push(parseMlbBatterSplit(raw, "inning", innLabels[idx], `${idx + 1}ra`));
         });
 
-        // Contexto
-        const h = getBestSplitForCode(mlbSplits, "h");
-        const a = getBestSplitForCode(mlbSplits, "a");
-        const d = getBestSplitForCode(mlbSplits, "d");
-        const n = getBestSplitForCode(mlbSplits, "n");
-        const twn = getBestSplitForCode(mlbSplits, "twn");
-        const tls = getBestSplitForCode(mlbSplits, "tls");
+        const h = getBestSplitForCode(mlbSplits, "h", "hitting");
+        const a = getBestSplitForCode(mlbSplits, "a", "hitting");
+        const d = getBestSplitForCode(mlbSplits, "d", "hitting");
+        const n = getBestSplitForCode(mlbSplits, "n", "hitting");
+        const twn = getBestSplitForCode(mlbSplits, "twn", "hitting");
+        const tls = getBestSplitForCode(mlbSplits, "tls", "hitting");
         if (h) contextSplits.push(parseMlbBatterSplit(h, "context", "En Casa (Local)", "Local"));
         if (a) contextSplits.push(parseMlbBatterSplit(a, "context", "En la Carretera (Visitante)", "Visitante"));
         if (n) contextSplits.push(parseMlbBatterSplit(n, "context", "De Noche (≥ 6:00 PM)", "Nocturno"));
         if (d) contextSplits.push(parseMlbBatterSplit(d, "context", "De Día (< 6:00 PM)", "Diurno"));
         if (twn) contextSplits.push(parseMlbBatterSplit(twn, "context", "En Victorias", "Victorias"));
         if (tls) contextSplits.push(parseMlbBatterSplit(tls, "context", "En Derrotas", "Derrotas"));
-      }
-
-      // Si MLB no trajo splits de alguna categoría o si el jugador es exclusivo de LVBP, usar el motor calibrado
-      if (situationalSplits.length === 0 || platoonSplits.length === 0) {
-        const synth = buildSituationalBatterRows(totalRow);
-        if (situationalSplits.length === 0) situationalSplits = synth.situationalSplits;
-        if (platoonSplits.length === 0) platoonSplits = synth.platoonSplits;
-        if (countSplits.length === 0) countSplits = synth.countSplits;
-        if (inningSplits.length === 0) inningSplits = synth.inningSplits;
-        if (outsSplits.length === 0) outsSplits = synth.outsSplits;
       }
 
       if (contextSplits.length === 0 && validRows.length > 0) {
@@ -942,20 +919,19 @@ export async function getPlayerSplitsProfile(
           buildBatterSplitRow("De Día (< 6:00 PM)", "context", "Diurno", dayRows),
           buildBatterSplitRow("En Victorias", "context", "Triunfos", winRows),
           buildBatterSplitRow("En Derrotas", "context", "Reveses", lossRows),
-        ];
+        ].filter((r) => (r.games || 0) > 0);
       }
 
-      // Rivales de la LVBP
+      // Rivales reales de la LVBP
       const opponentSplits: PlayerSplitRow[] = Object.keys(rivalMap)
         .map((idStr) => {
           const oppId = parseInt(idStr, 10);
           const oppTeam = getTeam(oppId);
-          const list = rivalMap[oppId];
-          return buildBatterSplitRow(`vs ${oppTeam.name}`, "opponent", oppTeam.abbreviation, list);
+          return buildBatterSplitRow(`vs ${oppTeam.name}`, "opponent", oppTeam.abbreviation, rivalMap[oppId]);
         })
-        .filter((r) => r.pa > 0);
+        .filter((r) => (r.games || 0) > 0);
 
-      // Calendario
+      // Calendario real
       const monthNames: Record<number, string> = { 10: "Octubre", 11: "Noviembre", 12: "Diciembre", 1: "Enero" };
       const dayNames = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
       const calendarSplits: PlayerSplitRow[] = [];
@@ -972,11 +948,27 @@ export async function getPlayerSplitsProfile(
         }
       });
 
-      // LOB Tracker
-      const situData = getLeonesSituationalData(season);
-      const lobEntry = situData.lobBatterRanking.find(
-        (b) => b.batterId === playerId || b.batterName.toLowerCase().includes(playerName.toLowerCase())
-      );
+      // LOB Tracker verificado (dinámico para campaña activa de Leones, histórico cerrado para 2025)
+      let lobStats: PlayerSplitsProfile["lobStats"] = undefined;
+      if (teamId === 695) {
+        try {
+          const situData =
+            season >= ACTIVE_SEASON
+              ? await getDynamicSituationalData(season)
+              : getLeonesSituationalData(season);
+          const lobEntry = situData.lobBatterRanking.find((b) => b.batterId === playerId);
+          if (lobEntry) {
+            lobStats = {
+              lobEnding: lobEntry.lobEnding,
+              rispLobEnding: lobEntry.rispLobEnding,
+              rispLobMid: lobEntry.rispLobMid,
+              totalRispLob: lobEntry.totalRispLob,
+            };
+          }
+        } catch {
+          // Omitir LOB si el feed en vivo no responde dentro del umbral
+        }
+      }
 
       const profile: PlayerSplitsProfile = {
         playerId,
@@ -988,7 +980,7 @@ export async function getPlayerSplitsProfile(
         teamLogo: team.logoUrl,
         type: "batter",
         season,
-        totalGames: totalRow.games || validRows.length,
+        totalGames: totalRow.games ?? validRows.length,
         overview: {
           kpiPrimary: totalRow.ops,
           labelPrimary: "OPS",
@@ -1004,14 +996,7 @@ export async function getPlayerSplitsProfile(
         countSplits,
         inningSplits,
         outsSplits,
-        lobStats: lobEntry
-          ? {
-              lobEnding: lobEntry.lobEnding,
-              rispLobEnding: lobEntry.rispLobEnding,
-              rispLobMid: lobEntry.rispLobMid,
-              totalRispLob: lobEntry.totalRispLob,
-            }
-          : undefined,
+        lobStats,
       };
 
       splitsCache.set(cacheKey, { data: profile, timestamp: Date.now() });
@@ -1023,7 +1008,7 @@ export async function getPlayerSplitsProfile(
         const { data, error } = await supabase
           .from("pitching_stats")
           .select(`
-            player_id, team_id, ip_decimal, h, r, er, bb, so, hr,
+            game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr,
             players ( full_name ),
             games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
           `)
@@ -1031,37 +1016,43 @@ export async function getPlayerSplitsProfile(
           .eq("games.season", season);
 
         if (!error && data) rawRows = data;
-
-        // Si no hay registros en la temporada solicitada y es 2026, buscar en 2025 como respaldo defensivo
-        if (rawRows.length === 0 && season >= 2026) {
-          const { data: prevData, error: prevErr } = await supabase
-            .from("pitching_stats")
-            .select(`
-              player_id, team_id, ip_decimal, h, r, er, bb, so, hr,
-              players ( full_name ),
-              games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
-            `)
-            .eq("player_id", playerId)
-            .eq("games.season", 2025);
-          if (!prevErr && prevData && prevData.length > 0) rawRows = prevData;
-        }
       }
 
+      const seenGameIds = new Set<number>();
       const validRows: RawGamePitchingRow[] = [];
       for (const r of rawRows) {
         const g = Array.isArray(r.games) ? r.games[0] : r.games;
-        if (!g) continue;
+        if (!g || !isPlayedGameStatus(g.status)) continue;
+        if (!hasPitcherAppearance(r)) continue;
+        if (g.id != null) {
+          if (seenGameIds.has(Number(g.id))) continue;
+          seenGameIds.add(Number(g.id));
+        }
         const p = Array.isArray(r.players) ? r.players[0] : r.players;
         validRows.push({ ...r, games: g, players: p });
       }
 
+      validRows.sort((a, b) =>
+        (a.games?.game_date || "").localeCompare(b.games?.game_date || "")
+      );
+
+      const mlbSplits = await mlbSplitsPromise;
+
+      if (validRows.length === 0 && mlbSplits.length === 0) {
+        return null;
+      }
+
+      const mlbTeamIdRaw = Number(mlbSplits.find((s) => s.team?.id)?.team?.id || 0);
+      const fallbackTeamId = LVBP_TEAM_IDS.includes(mlbTeamIdRaw) ? mlbTeamIdRaw : 695;
+
       let playerName = `Lanzador #${playerId}`;
-      let teamId = 695;
+      let teamId = fallbackTeamId;
       if (validRows.length > 0) {
-        playerName = validRows[0].players?.full_name || playerName;
-        teamId = validRows[0].team_id || teamId;
+        const latestRow = validRows[validRows.length - 1];
+        playerName = latestRow.players?.full_name || validRows[0].players?.full_name || playerName;
+        teamId = latestRow.team_id || teamId;
       } else {
-        const meta = await fetchMlbPersonMeta(playerId);
+        const meta = await fetchMlbPersonMeta(playerId, fallbackTeamId);
         if (meta) {
           playerName = meta.fullName;
           teamId = meta.teamId;
@@ -1085,7 +1076,8 @@ export async function getPlayerSplitsProfile(
       for (const row of validRows) {
         const g = row.games;
         if (!g) continue;
-        const isHome = g.home_team_id === teamId;
+        const rowTeamId = row.team_id || teamId;
+        const isHome = g.home_team_id === rowTeamId;
         const opponentId = isHome ? g.away_team_id : g.home_team_id;
         const teamScore = isHome ? g.home_score || 0 : g.away_score || 0;
         const oppScore = isHome ? g.away_score || 0 : g.home_score || 0;
@@ -1100,6 +1092,7 @@ export async function getPlayerSplitsProfile(
         if (isWin) winRows.push(row);
         else lossRows.push(row);
 
+        if (!rivalMap[opponentId] && opponentId !== teamId) rivalMap[opponentId] = [];
         if (rivalMap[opponentId]) rivalMap[opponentId].push(row);
 
         const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
@@ -1112,73 +1105,62 @@ export async function getPlayerSplitsProfile(
         }
       }
 
-      const mlbSplits = await mlbSplitsPromise;
+      // Total oficial de temporada: preferir suma exacta Local+Visitante de MLB LVBP (incluye JI reales)
+      const mlbHomeAway = [
+        getBestSplitForCode(mlbSplits, "h", "pitching"),
+        getBestSplitForCode(mlbSplits, "a", "pitching"),
+      ].filter(Boolean);
+      const mlbRolePair = [
+        getBestSplitForCode(mlbSplits, "sp", "pitching"),
+        getBestSplitForCode(mlbSplits, "rp", "pitching"),
+      ].filter(Boolean);
+      const mlbCombinedRaw = combineMlbRawSplits(
+        mlbHomeAway.length > 0 ? mlbHomeAway : mlbRolePair,
+        "pitching"
+      );
+      const mlbTotalRow = mlbCombinedRaw
+        ? parseMlbPitcherSplit(mlbCombinedRaw, "context", "Total Temporada", "General")
+        : null;
+      const supaTotalRow =
+        validRows.length > 0
+          ? buildPitcherSplitRow("Total Temporada", "context", "General", validRows)
+          : null;
 
       let totalRow: PitcherSplitRow;
-      if (validRows.length > 0) {
-        totalRow = buildPitcherSplitRow("Total Temporada", "context", "General", validRows);
+      if (mlbTotalRow && (mlbTotalRow.games || 0) >= (supaTotalRow?.games || 0)) {
+        totalRow = mlbTotalRow;
+      } else if (supaTotalRow) {
+        totalRow = {
+          ...supaTotalRow,
+          starts: Math.max(supaTotalRow.starts, mlbTotalRow?.starts || 0),
+        };
       } else if (mlbSplits.length > 0) {
-        const spSplit = getBestSplitForCode(mlbSplits, "sp");
-        const rpSplit = getBestSplitForCode(mlbSplits, "rp");
-        if (spSplit && rpSplit) {
-          const ipSp = parseInningsToDecimal(spSplit.stat?.inningsPitched);
-          const ipRp = parseInningsToDecimal(rpSplit.stat?.inningsPitched);
-          const ipTot = ipSp + ipRp;
-          const er = (spSplit.stat?.earnedRuns || 0) + (rpSplit.stat?.earnedRuns || 0);
-          const h = (spSplit.stat?.hits || 0) + (rpSplit.stat?.hits || 0);
-          const bb = (spSplit.stat?.baseOnBalls || 0) + (rpSplit.stat?.baseOnBalls || 0);
-          const so = (spSplit.stat?.strikeOuts || 0) + (rpSplit.stat?.strikeOuts || 0);
-          const hr = (spSplit.stat?.homeRuns || 0) + (rpSplit.stat?.homeRuns || 0);
-          const r = (spSplit.stat?.runs || 0) + (rpSplit.stat?.runs || 0);
-          const starts = (spSplit.stat?.gamesStarted || 0) + (rpSplit.stat?.gamesStarted || 0);
-          const games = (spSplit.stat?.gamesPlayed || 0) + (rpSplit.stat?.gamesPlayed || 0);
-          const metrics = computePitcherFanGraphsMetrics(ipTot, h, er, bb, so, hr);
-          totalRow = {
-            splitName: "Total Temporada",
-            category: "context",
-            badge: "General",
-            games,
-            starts,
-            ip: ipTot,
-            ipDisplay: formatInnings(ipTot),
-            h,
-            r,
-            er,
-            bb,
-            so,
-            hr,
-            ...metrics,
-          };
-        } else {
-          totalRow = parseMlbPitcherSplit(mlbSplits[0], "context", "Total Temporada", "General");
-        }
+        totalRow = parseMlbPitcherSplit(mlbSplits[0], "context", "Total Temporada", "General");
       } else {
         return null;
       }
 
-      // Desglose de Platoon, Situacional, Conteos, Outs, Entradas, Rol y Contexto
-      let pitcherPlatoonSplits: PitcherSplitRow[] = [];
-      let pitcherSituationalSplits: PitcherSplitRow[] = [];
-      let pitcherCountSplits: PitcherSplitRow[] = [];
-      let pitcherOutsSplits: PitcherSplitRow[] = [];
-      let pitcherInningSplits: PitcherSplitRow[] = [];
-      let pitcherRoleSplits: PitcherSplitRow[] = [];
+      // Desglose oficial de Platoon, Situacional, Conteos, Outs, Entradas, Rol y Contexto (0% sintético)
+      const pitcherPlatoonSplits: PitcherSplitRow[] = [];
+      const pitcherSituationalSplits: PitcherSplitRow[] = [];
+      const pitcherCountSplits: PitcherSplitRow[] = [];
+      const pitcherOutsSplits: PitcherSplitRow[] = [];
+      const pitcherInningSplits: PitcherSplitRow[] = [];
+      const pitcherRoleSplits: PitcherSplitRow[] = [];
       let pitcherContextSplits: PitcherSplitRow[] = [];
 
       if (mlbSplits.length > 0) {
-        // Platoon
-        const vr = getBestSplitForCode(mlbSplits, "vr");
-        const vl = getBestSplitForCode(mlbSplits, "vl");
+        const vr = getBestSplitForCode(mlbSplits, "vr", "pitching");
+        const vl = getBestSplitForCode(mlbSplits, "vl", "pitching");
         if (vr) pitcherPlatoonSplits.push(parseMlbPitcherSplit(vr, "platoon", "vs Bateadores Derechos (RHB)", "vs RHB"));
         if (vl) pitcherPlatoonSplits.push(parseMlbPitcherSplit(vl, "platoon", "vs Bateadores Zurdos (LHB)", "vs LHB"));
 
-        // Situacionales
-        const r0 = getBestSplitForCode(mlbSplits, "r0");
-        const ron = getBestSplitForCode(mlbSplits, "ron");
-        const risp = getBestSplitForCode(mlbSplits, "risp");
-        const risp2 = getBestSplitForCode(mlbSplits, "risp2");
-        const r123 = getBestSplitForCode(mlbSplits, "r123");
-        const lo = getBestSplitForCode(mlbSplits, "lo");
+        const r0 = getBestSplitForCode(mlbSplits, "r0", "pitching");
+        const ron = getBestSplitForCode(mlbSplits, "ron", "pitching");
+        const risp = getBestSplitForCode(mlbSplits, "risp", "pitching");
+        const risp2 = getBestSplitForCode(mlbSplits, "risp2", "pitching");
+        const r123 = getBestSplitForCode(mlbSplits, "r123", "pitching");
+        const lo = getBestSplitForCode(mlbSplits, "lo", "pitching");
         if (r0) pitcherSituationalSplits.push(parseMlbPitcherSplit(r0, "situational", "Bases Limpias", "Bases Vacías"));
         if (ron) pitcherSituationalSplits.push(parseMlbPitcherSplit(ron, "situational", "Corredores en Base", "Tráfico"));
         if (risp) pitcherSituationalSplits.push(parseMlbPitcherSplit(risp, "situational", "Posición Anotadora (RISP)", "RISP"));
@@ -1186,60 +1168,44 @@ export async function getPlayerSplitsProfile(
         if (r123) pitcherSituationalSplits.push(parseMlbPitcherSplit(r123, "situational", "Bases Llenas", "Llenas"));
         if (lo) pitcherSituationalSplits.push(parseMlbPitcherSplit(lo, "situational", "Abriendo Entrada (Leadoff)", "Leadoff"));
 
-        // Conteos
-        const fp = getBestSplitForCode(mlbSplits, "fp");
-        const twoS = getBestSplitForCode(mlbSplits, "2s");
-        const fc = getBestSplitForCode(mlbSplits, "fc");
+        const fp = getBestSplitForCode(mlbSplits, "fp", "pitching");
+        const twoS = getBestSplitForCode(mlbSplits, "2s", "pitching");
+        const fc = getBestSplitForCode(mlbSplits, "fc", "pitching");
         if (fp) pitcherCountSplits.push(parseMlbPitcherSplit(fp, "count", "Primer Pitcheo (0-0)", "0-0"));
         if (twoS) pitcherCountSplits.push(parseMlbPitcherSplit(twoS, "count", "Con 2 Strikes", "2 Strikes"));
         if (fc) pitcherCountSplits.push(parseMlbPitcherSplit(fc, "count", "Cuenta Completa (3-2)", "3-2"));
 
-        // Outs
-        const o0 = getBestSplitForCode(mlbSplits, "o0");
-        const o1 = getBestSplitForCode(mlbSplits, "o1");
-        const o2 = getBestSplitForCode(mlbSplits, "o2");
+        const o0 = getBestSplitForCode(mlbSplits, "o0", "pitching");
+        const o1 = getBestSplitForCode(mlbSplits, "o1", "pitching");
+        const o2 = getBestSplitForCode(mlbSplits, "o2", "pitching");
         if (o0) pitcherOutsSplits.push(parseMlbPitcherSplit(o0, "outs", "Con 0 Outs", "0 Outs"));
         if (o1) pitcherOutsSplits.push(parseMlbPitcherSplit(o1, "outs", "Con 1 Out", "1 Out"));
         if (o2) pitcherOutsSplits.push(parseMlbPitcherSplit(o2, "outs", "Con 2 Outs", "2 Outs"));
 
-        // Entradas
         const innCodes = ["i01", "i02", "i03", "i04", "i05", "i06", "i07", "i08", "i09"];
         const innLabels = ["1ra Entrada", "2da Entrada", "3ra Entrada", "4ta Entrada", "5ta Entrada", "6ta Entrada", "7ma Entrada", "8va Entrada", "9na Entrada+"];
         innCodes.forEach((code, idx) => {
-          const raw = getBestSplitForCode(mlbSplits, code);
+          const raw = getBestSplitForCode(mlbSplits, code, "pitching");
           if (raw) pitcherInningSplits.push(parseMlbPitcherSplit(raw, "inning", innLabels[idx], `${idx + 1}ra`));
         });
 
-        // Roles
-        const sp = getBestSplitForCode(mlbSplits, "sp");
-        const rp = getBestSplitForCode(mlbSplits, "rp");
+        const sp = getBestSplitForCode(mlbSplits, "sp", "pitching");
+        const rp = getBestSplitForCode(mlbSplits, "rp", "pitching");
         if (sp) pitcherRoleSplits.push(parseMlbPitcherSplit(sp, "role", "Como Abridor (SP)", "Abridor"));
         if (rp) pitcherRoleSplits.push(parseMlbPitcherSplit(rp, "role", "Como Relevista (RP)", "Relevista"));
 
-        // Contexto
-        const h = getBestSplitForCode(mlbSplits, "h");
-        const a = getBestSplitForCode(mlbSplits, "a");
-        const d = getBestSplitForCode(mlbSplits, "d");
-        const n = getBestSplitForCode(mlbSplits, "n");
-        const twn = getBestSplitForCode(mlbSplits, "twn");
-        const tls = getBestSplitForCode(mlbSplits, "tls");
+        const h = getBestSplitForCode(mlbSplits, "h", "pitching");
+        const a = getBestSplitForCode(mlbSplits, "a", "pitching");
+        const d = getBestSplitForCode(mlbSplits, "d", "pitching");
+        const n = getBestSplitForCode(mlbSplits, "n", "pitching");
+        const twn = getBestSplitForCode(mlbSplits, "twn", "pitching");
+        const tls = getBestSplitForCode(mlbSplits, "tls", "pitching");
         if (h) pitcherContextSplits.push(parseMlbPitcherSplit(h, "context", "En Casa (Local)", "Local"));
         if (a) pitcherContextSplits.push(parseMlbPitcherSplit(a, "context", "En la Carretera (Visitante)", "Visitante"));
         if (n) pitcherContextSplits.push(parseMlbPitcherSplit(n, "context", "De Noche (≥ 6:00 PM)", "Nocturno"));
         if (d) pitcherContextSplits.push(parseMlbPitcherSplit(d, "context", "De Día (< 6:00 PM)", "Diurno"));
         if (twn) pitcherContextSplits.push(parseMlbPitcherSplit(twn, "context", "En Victorias del Equipo", "Victorias"));
         if (tls) pitcherContextSplits.push(parseMlbPitcherSplit(tls, "context", "En Derrotas del Equipo", "Derrotas"));
-      }
-
-      // Fallback calibrado si no vinieron splits de MLB
-      if (pitcherSituationalSplits.length === 0 || pitcherPlatoonSplits.length === 0) {
-        const synth = buildSituationalPitcherRows(totalRow);
-        if (pitcherSituationalSplits.length === 0) pitcherSituationalSplits = synth.pitcherSituationalSplits;
-        if (pitcherPlatoonSplits.length === 0) pitcherPlatoonSplits = synth.pitcherPlatoonSplits;
-        if (pitcherCountSplits.length === 0) pitcherCountSplits = synth.pitcherCountSplits;
-        if (pitcherOutsSplits.length === 0) pitcherOutsSplits = synth.pitcherOutsSplits;
-        if (pitcherInningSplits.length === 0) pitcherInningSplits = synth.pitcherInningSplits;
-        if (pitcherRoleSplits.length === 0) pitcherRoleSplits = synth.pitcherRoleSplits;
       }
 
       if (pitcherContextSplits.length === 0 && validRows.length > 0) {
@@ -1250,20 +1216,19 @@ export async function getPlayerSplitsProfile(
           buildPitcherSplitRow("De Día (< 6:00 PM)", "context", "Diurno", dayRows),
           buildPitcherSplitRow("En Victorias del Equipo", "context", "Triunfos", winRows),
           buildPitcherSplitRow("En Derrotas del Equipo", "context", "Reveses", lossRows),
-        ];
+        ].filter((r) => r.games > 0);
       }
 
-      // Rivales de la LVBP
+      // Rivales reales de la LVBP
       const pitcherOpponentSplits: PitcherSplitRow[] = Object.keys(rivalMap)
         .map((idStr) => {
           const oppId = parseInt(idStr, 10);
           const oppTeam = getTeam(oppId);
-          const list = rivalMap[oppId];
-          return buildPitcherSplitRow(`vs ${oppTeam.name}`, "opponent", oppTeam.abbreviation, list);
+          return buildPitcherSplitRow(`vs ${oppTeam.name}`, "opponent", oppTeam.abbreviation, rivalMap[oppId]);
         })
-        .filter((r) => r.ip > 0 || r.games > 0);
+        .filter((r) => r.games > 0);
 
-      // Calendario
+      // Calendario real
       const monthNames: Record<number, string> = { 10: "Octubre", 11: "Noviembre", 12: "Diciembre", 1: "Enero" };
       const dayNames = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
       const pitcherCalendarSplits: PitcherSplitRow[] = [];
@@ -1280,7 +1245,6 @@ export async function getPlayerSplitsProfile(
         }
       });
 
-      // Colección combinada para retrocompatibilidad
       const pitcherSplits: PitcherSplitRow[] = [
         totalRow,
         ...pitcherContextSplits,
@@ -1340,198 +1304,237 @@ export async function getPlayerSplitsProfile(
 }
 
 /**
- * Obtiene la lista completa de jugadores elegibles para el selector de splits
+ * Obtiene la lista de jugadores elegibles que realmente han visto acción en `season` (LVBP),
+ * sin listas hardcodeadas ni jugadores inactivos.
  */
 export async function getAllAvailablePlayersForSplits(
   season: number = ACTIVE_SEASON
 ): Promise<PlayerSelectorItem[]> {
-  const items: PlayerSelectorItem[] = [];
-  const seen = new Set<string>();
+  if (!supabase) return [];
 
-  // Jugadores insignia de Leones del Caracas (LVBP)
-  const featuredStars: PlayerSelectorItem[] = [
-    {
-      id: 605612,
-      name: "Harold Castro",
-      avatarUrl: getPlayerHeadshotUrl(605612),
-      teamId: 695,
-      teamAbbr: "CAR",
-      teamLogo: getTeam(695).logoUrl,
-      type: "batter",
-      subtitle: "CAR • .312 AVG • 5 HR • .820 OPS",
-    },
-    {
-      id: 672580,
-      name: "Aldrem Corredor",
-      avatarUrl: getPlayerHeadshotUrl(672580),
-      teamId: 695,
-      teamAbbr: "CAR",
-      teamLogo: getTeam(695).logoUrl,
-      type: "batter",
-      subtitle: "CAR • .295 AVG • 7 HR • .840 OPS",
-    },
-    {
-      id: 602922,
-      name: "José Rondón",
-      avatarUrl: getPlayerHeadshotUrl(602922),
-      teamId: 695,
-      teamAbbr: "CAR",
-      teamLogo: getTeam(695).logoUrl,
-      type: "batter",
-      subtitle: "CAR • .280 AVG • 8 HR • .850 OPS",
-    },
-    {
-      id: 682674,
-      name: "Víctor Bericoto",
-      avatarUrl: getPlayerHeadshotUrl(682674),
-      teamId: 695,
-      teamAbbr: "CAR",
-      teamLogo: getTeam(695).logoUrl,
-      type: "batter",
-      subtitle: "CAR • .285 AVG • 6 HR • .810 OPS",
-    },
-    {
-      id: 660508,
-      name: "Norwith Gudiño",
-      avatarUrl: getPlayerHeadshotUrl(660508),
-      teamId: 695,
-      teamAbbr: "CAR",
-      teamLogo: getTeam(695).logoUrl,
-      type: "pitcher",
-      subtitle: "CAR • 47.4 IP • 54 K • 3.80 ERA",
-    },
-    {
-      id: 612797,
-      name: "Erick Leal",
-      avatarUrl: getPlayerHeadshotUrl(612797),
-      teamId: 695,
-      teamAbbr: "CAR",
-      teamLogo: getTeam(695).logoUrl,
-      type: "pitcher",
-      subtitle: "CAR • Abridor • 4.0 ERA",
-    },
-    {
-      id: 682845,
-      name: "Rito Lugo",
-      avatarUrl: getPlayerHeadshotUrl(682845),
-      teamId: 695,
-      teamAbbr: "CAR",
-      teamLogo: getTeam(695).logoUrl,
-      type: "pitcher",
-      subtitle: "CAR • Lanzador Zurdo",
-    },
-    {
-      id: 687849,
-      name: "Zak Kent",
-      avatarUrl: getPlayerHeadshotUrl(687849),
-      teamId: 695,
-      teamAbbr: "CAR",
-      teamLogo: getTeam(695).logoUrl,
-      type: "pitcher",
-      subtitle: "CAR • 9.2 IP • 8 K",
-    },
-  ];
+  const scoredItems: Array<{ item: PlayerSelectorItem; sortVolume: number }> = [];
 
-  for (const star of featuredStars) {
-    seen.add(`${star.type}-${star.id}`);
-    items.push(star);
-  }
+  try {
+    const [batRes, pitRes] = await Promise.all([
+      supabase
+        .from("batting_stats")
+        .select(
+          "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players(full_name), games!inner(id, season, status, game_date)"
+        )
+        .eq("games.season", season)
+        .limit(10000),
+      supabase
+        .from("pitching_stats")
+        .select(
+          "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players(full_name), games!inner(id, season, status, game_date)"
+        )
+        .eq("games.season", season)
+        .limit(10000),
+    ]);
 
-  if (supabase) {
-    try {
-      const minAb = 1;
-      const minIp = 0.1;
+    if (batRes.data && batRes.data.length > 0) {
+      const seenBatGame = new Set<string>();
+      const batGroup: Record<
+        number,
+        {
+          name: string;
+          teamId: number;
+          latestDate: string;
+          games: number;
+          ab: number;
+          h: number;
+          doubles: number;
+          triples: number;
+          hr: number;
+          rbi: number;
+          bb: number;
+          so: number;
+          hbp: number;
+          sf: number;
+          sh: number;
+        }
+      > = {};
 
-      const [batRes, pitRes] = await Promise.all([
-        supabase
-          .from("batting_stats")
-          .select("player_id, team_id, ab, h, hr, rbi, avg, ops, players(full_name), games!inner(season)")
-          .eq("games.season", season)
-          .limit(5000),
-        supabase
-          .from("pitching_stats")
-          .select("player_id, team_id, ip_decimal, so, era, whip, players(full_name), games!inner(season)")
-          .eq("games.season", season)
-          .limit(5000),
-      ]);
+      for (const row of batRes.data as any[]) {
+        const gObj = Array.isArray(row.games) ? row.games[0] : row.games;
+        if (!isPlayedGameStatus(gObj?.status)) continue;
+        if (!hasBatterAppearance(row)) continue;
 
-      if (batRes.data && batRes.data.length > 0) {
-        const batGroup: Record<number, { name: string; teamId: number; ab: number; h: number; hr: number; rbi: number }> = {};
-        for (const row of batRes.data) {
-          const pid = row.player_id;
-          const name = (row.players as { full_name?: string })?.full_name || `Jugador #${pid}`;
-          if (!batGroup[pid]) {
-            batGroup[pid] = { name, teamId: row.team_id, ab: 0, h: 0, hr: 0, rbi: 0 };
-          }
-          batGroup[pid].ab += row.ab || 0;
-          batGroup[pid].h += row.h || 0;
-          batGroup[pid].hr += row.hr || 0;
-          batGroup[pid].rbi += row.rbi || 0;
+        const pid = Number(row.player_id);
+        const gid = gObj?.id ?? row.game_id;
+        if (gid != null) {
+          const pgKey = `${pid}-${gid}`;
+          if (seenBatGame.has(pgKey)) continue;
+          seenBatGame.add(pgKey);
         }
 
-        for (const [pidStr, b] of Object.entries(batGroup)) {
-          const pid = parseInt(pidStr, 10);
-          if (b.ab < minAb) continue;
-          const key = `batter-${pid}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            const team = getTeam(b.teamId);
-            const avg = b.ab > 0 ? (b.h / b.ab).toFixed(3).replace(/^0\./, ".") : ".000";
-            items.push({
-              id: pid,
-              name: b.name,
-              avatarUrl: getPlayerHeadshotUrl(pid),
-              teamId: b.teamId,
-              teamAbbr: team.abbreviation,
-              teamLogo: team.logoUrl,
-              type: "batter",
-              subtitle: `${team.abbreviation} • ${avg} AVG • ${b.hr} HR • ${b.rbi} CI`,
-            });
-          }
+        const pObj = Array.isArray(row.players) ? row.players[0] : row.players;
+        const name = pObj?.full_name || `Jugador #${pid}`;
+        const gDate = gObj?.game_date || "";
+
+        if (!batGroup[pid]) {
+          batGroup[pid] = {
+            name,
+            teamId: Number(row.team_id),
+            latestDate: gDate,
+            games: 0,
+            ab: 0,
+            h: 0,
+            doubles: 0,
+            triples: 0,
+            hr: 0,
+            rbi: 0,
+            bb: 0,
+            so: 0,
+            hbp: 0,
+            sf: 0,
+            sh: 0,
+          };
+        } else if (gDate >= batGroup[pid].latestDate) {
+          batGroup[pid].teamId = Number(row.team_id);
+          batGroup[pid].latestDate = gDate;
         }
+
+        const b = batGroup[pid];
+        b.games += 1;
+        b.ab += Number(row.ab || 0);
+        b.h += Number(row.h || 0);
+        b.doubles += Number(row.doubles || 0);
+        b.triples += Number(row.triples || 0);
+        b.hr += Number(row.hr || 0);
+        b.rbi += Number(row.rbi || 0);
+        b.bb += Number(row.bb || 0);
+        b.so += Number(row.so || 0);
+        b.hbp += Number(row.hbp || 0);
+        b.sf += Number(row.sf || 0);
+        b.sh += Number(row.sh || 0);
       }
 
-      if (pitRes.data && pitRes.data.length > 0) {
-        const pitGroup: Record<number, { name: string; teamId: number; ip: number; so: number; er: number }> = {};
-        for (const row of pitRes.data) {
-          const pid = row.player_id;
-          const name = (row.players as { full_name?: string })?.full_name || `Lanzador #${pid}`;
-          if (!pitGroup[pid]) {
-            pitGroup[pid] = { name, teamId: row.team_id, ip: 0, so: 0, er: 0 };
-          }
-          pitGroup[pid].ip += row.ip_decimal || 0;
-          pitGroup[pid].so += row.so || 0;
-        }
+      for (const [pidStr, b] of Object.entries(batGroup)) {
+        const pid = parseInt(pidStr, 10);
+        const pa = b.ab + b.bb + b.hbp + b.sf + b.sh;
+        if (pa < 1) continue;
 
-        for (const [pidStr, p] of Object.entries(pitGroup)) {
-          const pid = parseInt(pidStr, 10);
-          if (p.ip < minIp) continue;
-          const key = `pitcher-${pid}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            const team = getTeam(p.teamId);
-            items.push({
-              id: pid,
-              name: p.name,
-              avatarUrl: getPlayerHeadshotUrl(pid),
-              teamId: p.teamId,
-              teamAbbr: team.abbreviation,
-              teamLogo: team.logoUrl,
-              type: "pitcher",
-              subtitle: `${team.abbreviation} • ${formatInnings(p.ip)} IP • ${p.so} K`,
-            });
-          }
-        }
+        const team = getTeam(b.teamId);
+        const metrics = computeBatterFanGraphsMetrics(
+          b.ab,
+          b.h,
+          b.doubles,
+          b.triples,
+          b.hr,
+          b.bb,
+          b.so,
+          b.hbp,
+          b.sf,
+          pa
+        );
+        scoredItems.push({
+          sortVolume: pa,
+          item: {
+            id: pid,
+            name: b.name,
+            avatarUrl: getPlayerHeadshotUrl(pid),
+            teamId: b.teamId,
+            teamAbbr: team.abbreviation,
+            teamLogo: team.logoUrl,
+            type: "batter",
+            subtitle: `${team.abbreviation} • ${b.games} JJ • ${metrics.avg} AVG • ${b.hr} HR • ${metrics.ops} OPS`,
+          },
+        });
       }
-    } catch (err) {
-      console.error("Error al consultar Supabase en getAllAvailablePlayersForSplits:", err);
     }
+
+    if (pitRes.data && pitRes.data.length > 0) {
+      const seenPitGame = new Set<string>();
+      const pitGroup: Record<
+        number,
+        {
+          name: string;
+          teamId: number;
+          latestDate: string;
+          games: number;
+          outs: number;
+          so: number;
+          er: number;
+        }
+      > = {};
+
+      for (const row of pitRes.data as any[]) {
+        const gObj = Array.isArray(row.games) ? row.games[0] : row.games;
+        if (!isPlayedGameStatus(gObj?.status)) continue;
+        if (!hasPitcherAppearance(row)) continue;
+
+        const pid = Number(row.player_id);
+        const gid = gObj?.id ?? row.game_id;
+        if (gid != null) {
+          const pgKey = `${pid}-${gid}`;
+          if (seenPitGame.has(pgKey)) continue;
+          seenPitGame.add(pgKey);
+        }
+
+        const pObj = Array.isArray(row.players) ? row.players[0] : row.players;
+        const name = pObj?.full_name || `Lanzador #${pid}`;
+        const gDate = gObj?.game_date || "";
+
+        if (!pitGroup[pid]) {
+          pitGroup[pid] = {
+            name,
+            teamId: Number(row.team_id),
+            latestDate: gDate,
+            games: 0,
+            outs: 0,
+            so: 0,
+            er: 0,
+          };
+        } else if (gDate >= pitGroup[pid].latestDate) {
+          pitGroup[pid].teamId = Number(row.team_id);
+          pitGroup[pid].latestDate = gDate;
+        }
+
+        const p = pitGroup[pid];
+        p.games += 1;
+        p.outs += decimalInningsToOuts(Number(row.ip_decimal || 0));
+        p.so += Number(row.so || 0);
+        p.er += Number(row.er || 0);
+      }
+
+      for (const [pidStr, p] of Object.entries(pitGroup)) {
+        const pid = parseInt(pidStr, 10);
+        if (p.games < 1) continue;
+
+        const team = getTeam(p.teamId);
+        const ip = p.outs / 3;
+        const era = ip > 0 ? formatEraWhip((p.er * 9) / ip) : p.er > 0 ? "INF" : "0.00";
+        scoredItems.push({
+          sortVolume: p.outs + p.games * 0.1,
+          item: {
+            id: pid,
+            name: p.name,
+            avatarUrl: getPlayerHeadshotUrl(pid),
+            teamId: p.teamId,
+            teamAbbr: team.abbreviation,
+            teamLogo: team.logoUrl,
+            type: "pitcher",
+            subtitle: `${team.abbreviation} • ${p.games} JJ • ${outsToInningsDisplay(p.outs)} IP • ${p.so} K • ${era} ERA`,
+          },
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Error al consultar Supabase en getAllAvailablePlayersForSplits:", err);
   }
 
-  // Ordenar: primero Leones del Caracas (695), luego alfabéticamente
-  return items.sort((a, b) => {
-    if (a.teamId === 695 && b.teamId !== 695) return -1;
-    if (a.teamId !== 695 && b.teamId === 695) return 1;
-    return a.name.localeCompare(b.name);
-  });
+  // Ordenar: primero Leones del Caracas (695) por volumen real descendente, luego resto de LVBP alfabéticamente
+  return scoredItems
+    .sort((a, b) => {
+      const aCar = a.item.teamId === 695;
+      const bCar = b.item.teamId === 695;
+      if (aCar && !bCar) return -1;
+      if (!aCar && bCar) return 1;
+      if (aCar && bCar && b.sortVolume !== a.sortVolume) {
+        return b.sortVolume - a.sortVolume;
+      }
+      return a.item.name.localeCompare(b.item.name);
+    })
+    .map((entry) => entry.item);
 }
