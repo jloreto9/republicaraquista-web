@@ -82,6 +82,8 @@ export const KNOWN_LVBP_LEFTIES: Set<number> = new Set([
   674450, // Hector Rodriguez
   676600, // Ethan Lindow
   677644, // Brayan Perez
+  678738, // Juan Sánchez
+  689359, // Dale Stanavich
   678789, // Julio Robaina
   679338, // Bryan Warzek
   679892, // Emilio Marquez

@@ -36,6 +36,8 @@ function PitcherThumb({ pitcher }: { pitcher: PitcherProfile }) {
 
 export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingSearchProps) {
   const [query, setQuery] = useState("");
+  const [featuredCaracas, setFeaturedCaracas] =
+    useState<PitcherProfile[]>(CARACAS_FEATURED_PITCHERS);
   const [defaultDirectory, setDefaultDirectory] =
     useState<PitcherProfile[]>(CARACAS_FEATURED_PITCHERS);
   const [results, setResults] = useState<PitcherProfile[]>(CARACAS_FEATURED_PITCHERS);
@@ -48,7 +50,11 @@ export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingS
     fetch("/api/pitching/search")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (active && data?.results?.length) {
+        if (!active || !data) return;
+        if (Array.isArray(data.featuredCaracas) && data.featuredCaracas.length > 0) {
+          setFeaturedCaracas(data.featuredCaracas);
+        }
+        if (Array.isArray(data.results) && data.results.length > 0) {
           setDefaultDirectory(data.results);
           setResults((prev) =>
             prev === CARACAS_FEATURED_PITCHERS ? data.results : prev
@@ -112,7 +118,7 @@ export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingS
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder="Buscar lanzador LVBP o MLB por nombre, club o ID (ej: Erick Leal, Magallanes, Cardenales, Skubal...)"
+          placeholder="Buscar lanzador LVBP o MLB por nombre, club o ID (ej: Erick Leal, Zac Kent, Magallanes, Skubal...)"
           className="w-full bg-transparent border-none text-slate-100 placeholder-slate-400 text-xs sm:text-sm px-3 focus:outline-none"
         />
         {isSearching ? (
@@ -130,13 +136,13 @@ export function PitchingSearch({ onSelectPitcher, selectedPitcherId }: PitchingS
         ) : null}
       </div>
 
-      {/* Quick Access Chips */}
+      {/* Quick Access Chips — Brazos activos de Leones en la temporada actual */}
       <div className="w-full flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mt-3">
         <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium mr-1">
           <Sparkles className="w-3 h-3 text-[#FDB827]" />
           Referentes Caraquistas:
         </span>
-        {CARACAS_FEATURED_PITCHERS.map((p) => {
+        {featuredCaracas.map((p) => {
           const isSelected = p.id === selectedPitcherId;
           return (
             <button

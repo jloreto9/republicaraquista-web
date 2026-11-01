@@ -134,7 +134,7 @@ export function PitchingCardViewer({
 
         {/* Barra de pie dentro del visor */}
         <div className="w-full px-6 py-3 bg-[#0D152B] border-t border-[#1E2B4D] flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 font-mono gap-2 text-center sm:text-left">
-          <span>@republicaraquista • Jorge Leonardo Loreto • Datos: @GilbertoMendez</span>
+          <span>Jorge Leonardo Loreto • @JorgeLoreto • @RepubCaraquista</span>
           <span className="text-[#FDB827]/80">
             Metodología e inspiración visual: Thomas Nestico (@TJStats)
           </span>

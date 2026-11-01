@@ -718,7 +718,7 @@ export async function renderPitchingCardToCanvas(
   ctx.fillStyle = "#64748B";
   ctx.font = "600 19px Inter, sans-serif";
   ctx.fillText(
-    "@republicaraquista • Jorge Leonardo Loreto • @GilbertoMendez",
+    "Jorge Leonardo Loreto • @JorgeLoreto • @RepubCaraquista",
     tblX,
     3118
   );

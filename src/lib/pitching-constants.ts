@@ -92,7 +92,11 @@ export function computeFIP(
 ): number | null {
   if (!stats.outs || stats.outs <= 0) return null;
   const ip = stats.outs / 3;
-  const raw = (13 * (stats.hr || 0) + 3 * ((stats.bb || 0) + (stats.hbp || 0)) - 2 * (stats.so || 0)) / ip;
+  const raw =
+    (13 * (stats.hr || 0) +
+      3 * ((stats.bb || 0) + (stats.hbp || 0)) -
+      2 * (stats.so || 0)) /
+    ip;
   const val = raw + cFip;
   return Number.isFinite(val) ? Number(val.toFixed(2)) : null;
 }
@@ -101,8 +105,12 @@ export function computeFIP(
  * ERA- ajustado al entorno ofensivo de la liga (100 = promedio liga; menor es mejor):
  * ERA- = round(100 * (ERA / lgERA))
  */
-export function computeERAMinus(era: number | null | undefined, lgEra: number): number | null {
-  if (era === null || era === undefined || !Number.isFinite(era) || lgEra <= 0) return null;
+export function computeERAMinus(
+  era: number | null | undefined,
+  lgEra: number
+): number | null {
+  if (era === null || era === undefined || !Number.isFinite(era) || lgEra <= 0)
+    return null;
   return Math.round((era / lgEra) * 100);
 }
 
@@ -137,7 +145,8 @@ export function computeBABIP(stats: {
   so: number;
   sf?: number;
 }): number | null {
-  const denom = (stats.ab || 0) - (stats.so || 0) - (stats.hr || 0) + (stats.sf || 0);
+  const denom =
+    (stats.ab || 0) - (stats.so || 0) - (stats.hr || 0) + (stats.sf || 0);
   if (denom <= 0) return null;
   const num = Math.max(0, (stats.h || 0) - (stats.hr || 0));
   const val = num / denom;
@@ -221,16 +230,16 @@ export function getMetricCellShade(
       if (value >= 11.5) return SHADE_POOR;
       return SHADE_NEUTRAL;
     case "era":
-      if (value <= 3.30) return SHADE_ELITE;
-      if (value >= 4.90) return SHADE_POOR;
+      if (value <= 3.3) return SHADE_ELITE;
+      if (value >= 4.9) return SHADE_POOR;
       return SHADE_NEUTRAL;
     case "whip":
       if (value <= 1.18) return SHADE_ELITE;
-      if (value >= 1.50) return SHADE_POOR;
+      if (value >= 1.5) return SHADE_POOR;
       return SHADE_NEUTRAL;
     case "fip":
-      if (value <= 3.60) return SHADE_ELITE;
-      if (value >= 4.80) return SHADE_POOR;
+      if (value <= 3.6) return SHADE_ELITE;
+      if (value >= 4.8) return SHADE_POOR;
       return SHADE_NEUTRAL;
     case "eraMinus":
       if (value <= 90) return SHADE_ELITE;
@@ -273,8 +282,8 @@ export function getMetricCellShade(
       if (value >= 88) return SHADE_POOR;
       return SHADE_NEUTRAL;
     case "opsAgainst":
-      if (value <= 0.660) return SHADE_ELITE;
-      if (value >= 0.810) return SHADE_POOR;
+      if (value <= 0.66) return SHADE_ELITE;
+      if (value >= 0.81) return SHADE_POOR;
       return SHADE_NEUTRAL;
     default:
       return SHADE_NEUTRAL;
@@ -291,6 +300,9 @@ function makeFeaturedCaracasPitcher(
   };
 }
 
+/**
+ * Brazos activos de Leones del Caracas en la temporada actual (2026-2027).
+ */
 export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
   makeFeaturedCaracasPitcher({
     id: 612797,
@@ -308,21 +320,6 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     weight: 180,
   }),
   makeFeaturedCaracasPitcher({
-    id: 544150,
-    name: "Albert Suárez",
-    position: "RHP",
-    team: "Baltimore Orioles / Leones",
-    throws: "R",
-    hasLvbpHistory: true,
-    hasCaracasHistory: true,
-    lvbpTeamId: 695,
-    lvbpTeamName: "Leones del Caracas",
-    lvbpTeamAbbr: "CAR",
-    age: 35,
-    height: "6' 3\"",
-    weight: 235,
-  }),
-  makeFeaturedCaracasPitcher({
     id: 660508,
     name: "Norwith Gudiño",
     position: "RHP",
@@ -333,13 +330,13 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamId: 695,
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
-    age: 29,
+    age: 30,
     height: "6' 2\"",
-    weight: 200,
+    weight: 202,
   }),
   makeFeaturedCaracasPitcher({
-    id: 468504,
-    name: "Jhoulys Chacín",
+    id: 687849,
+    name: "Zac Kent",
     position: "RHP",
     team: "Leones del Caracas",
     throws: "R",
@@ -348,13 +345,13 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamId: 695,
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
-    age: 37,
+    age: 28,
     height: "6' 3\"",
     weight: 220,
   }),
   makeFeaturedCaracasPitcher({
-    id: 600965,
-    name: "Ricardo Rodríguez",
+    id: 702462,
+    name: "Nic Swanson",
     position: "RHP",
     team: "Leones del Caracas",
     throws: "R",
@@ -363,13 +360,13 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamId: 695,
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
-    age: 33,
+    age: 27,
     height: "6' 2\"",
-    weight: 215,
+    weight: 181,
   }),
   makeFeaturedCaracasPitcher({
-    id: 642570,
-    name: "José Mujica",
+    id: 681854,
+    name: "Connor Van Scoyoc",
     position: "RHP",
     team: "Leones del Caracas",
     throws: "R",
@@ -378,24 +375,39 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamId: 695,
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
-    age: 29,
-    height: "6' 2\"",
-    weight: 250,
+    age: 26,
+    height: "6' 5\"",
+    weight: 220,
   }),
   makeFeaturedCaracasPitcher({
-    id: 646242,
-    name: "Jhonathan Díaz",
-    position: "LHP",
+    id: 681168,
+    name: "Luis Curvelo",
+    position: "RHP",
     team: "Leones del Caracas",
-    throws: "L",
+    throws: "R",
     hasLvbpHistory: true,
     hasCaracasHistory: true,
     lvbpTeamId: 695,
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
-    age: 30,
-    height: "6' 0\"",
-    weight: 170,
+    age: 25,
+    height: "6' 1\"",
+    weight: 183,
+  }),
+  makeFeaturedCaracasPitcher({
+    id: 682624,
+    name: "Sandy Gastón",
+    position: "RHP",
+    team: "Leones del Caracas",
+    throws: "R",
+    hasLvbpHistory: true,
+    hasCaracasHistory: true,
+    lvbpTeamId: 695,
+    lvbpTeamName: "Leones del Caracas",
+    lvbpTeamAbbr: "CAR",
+    age: 24,
+    height: "6' 1\"",
+    weight: 209,
   }),
   makeFeaturedCaracasPitcher({
     id: 672712,
@@ -410,36 +422,36 @@ export const CARACAS_FEATURED_PITCHERS: PitcherProfile[] = [
     lvbpTeamAbbr: "CAR",
     age: 26,
     height: "6' 2\"",
-    weight: 160,
+    weight: 165,
   }),
   makeFeaturedCaracasPitcher({
-    id: 682845,
-    name: "Rito Lugo",
-    position: "LHP",
+    id: 680588,
+    name: "Julio Rodríguez",
+    position: "RHP",
     team: "Leones del Caracas",
-    throws: "L",
+    throws: "R",
     hasLvbpHistory: true,
     hasCaracasHistory: true,
     lvbpTeamId: 695,
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
-    age: 30,
-    height: "5' 10\"",
-    weight: 185,
+    age: 26,
+    height: "6' 3\"",
+    weight: 179,
   }),
   makeFeaturedCaracasPitcher({
-    id: 600526,
-    name: "José Torres",
-    position: "LHP",
+    id: 665859,
+    name: "Wilkel Hernández",
+    position: "RHP",
     team: "Leones del Caracas",
-    throws: "L",
+    throws: "R",
     hasLvbpHistory: true,
     hasCaracasHistory: true,
     lvbpTeamId: 695,
     lvbpTeamName: "Leones del Caracas",
     lvbpTeamAbbr: "CAR",
-    age: 33,
-    height: "6' 2\"",
-    weight: 175,
+    age: 27,
+    height: "6' 4\"",
+    weight: 220,
   }),
 ];

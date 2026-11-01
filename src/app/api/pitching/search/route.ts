@@ -19,10 +19,15 @@ interface LvbpDirectoryEntry {
   profile: PitcherProfile;
   appearances: number;
   latestSeason: number;
+  activeSeasonIp: number;
+  activeSeasonCaracas: boolean;
 }
 
-let lvbpPitcherCache: { expiresAt: number; entries: Map<number, LvbpDirectoryEntry> } | null =
-  null;
+let lvbpPitcherCache: {
+  expiresAt: number;
+  activeSeason: number;
+  entries: Map<number, LvbpDirectoryEntry>;
+} | null = null;
 
 function normalizeText(str: string): string {
   return (str || "")
@@ -33,20 +38,33 @@ function normalizeText(str: string): string {
 }
 
 /**
- * Carga y cachea el directorio completo de lanzadores de los 8 equipos LVBP desde Supabase,
+ * Carga y cachea el directorio completo de lanzadores reales (IP > 0 o BF > 0) de los 8 equipos LVBP,
  * priorizando estrictamente el equipo de Ronda Regular sobre refuerzos de Round Robin / Final (GEMINI.md §1.1.7).
  */
-async function getLvbpPitcherDirectory(): Promise<Map<number, LvbpDirectoryEntry>> {
+async function getLvbpPitcherDirectory(): Promise<{
+  activeSeason: number;
+  entries: Map<number, LvbpDirectoryEntry>;
+}> {
   const now = Date.now();
   if (lvbpPitcherCache && lvbpPitcherCache.expiresAt > now) {
-    return lvbpPitcherCache.entries;
+    return {
+      activeSeason: lvbpPitcherCache.activeSeason,
+      entries: lvbpPitcherCache.entries,
+    };
   }
 
   const map = new Map<number, LvbpDirectoryEntry>();
+  let detectedActiveSeason = 2026;
 
-  // Sembrar destacados de Leones como piso garantizado
+  // Sembrar destacados activos de Leones como piso garantizado
   for (const fp of CARACAS_FEATURED_PITCHERS) {
-    map.set(fp.id, { profile: fp, appearances: 10, latestSeason: 2025 });
+    map.set(fp.id, {
+      profile: fp,
+      appearances: 6,
+      latestSeason: 2026,
+      activeSeasonIp: 8,
+      activeSeasonCaracas: true,
+    });
   }
 
   if (supabase) {
@@ -54,11 +72,19 @@ async function getLvbpPitcherDirectory(): Promise<Map<number, LvbpDirectoryEntry
       const { data: rawRows, error } = await supabase
         .from("pitching_stats")
         .select(
-          "player_id, team_id, players!inner(full_name), games!inner(season, game_type)"
+          "player_id, team_id, ip_decimal, h, bb, r, players!inner(full_name), games!inner(season, game_type)"
         )
-        .in("games.season", [2026, 2025, 2024]);
+        .in("games.season", [2026, 2025, 2024])
+        .or("ip_decimal.gt.0,h.gt.0,bb.gt.0,r.gt.0");
 
       if (!error && Array.isArray(rawRows) && rawRows.length > 0) {
+        const seasonsFound = rawRows
+          .map((r: any) => Number(r.games?.season || 0))
+          .filter((s) => s > 0);
+        if (seasonsFound.length > 0) {
+          detectedActiveSeason = Math.max(...seasonsFound);
+        }
+
         const grouped = new Map<
           number,
           {
@@ -68,6 +94,8 @@ async function getLvbpPitcherDirectory(): Promise<Map<number, LvbpDirectoryEntry
             regTeamCounts: Record<number, number>;
             allTeamCounts: Record<number, number>;
             everCaracas: boolean;
+            activeSeasonIp: number;
+            activeSeasonCaracas: boolean;
           }
         >();
 
@@ -79,6 +107,7 @@ async function getLvbpPitcherDirectory(): Promise<Map<number, LvbpDirectoryEntry
           const gameSeason = Number(r.games?.season || 2025);
           const gameType = String(r.games?.game_type || "R").toUpperCase();
           const isRegular = gameType === "R" || gameType === "REGULAR";
+          const ipDec = Number(r.ip_decimal || 0);
 
           let rec = grouped.get(pId);
           if (!rec) {
@@ -89,6 +118,8 @@ async function getLvbpPitcherDirectory(): Promise<Map<number, LvbpDirectoryEntry
               regTeamCounts: {},
               allTeamCounts: {},
               everCaracas: false,
+              activeSeasonIp: 0,
+              activeSeasonCaracas: false,
             };
             grouped.set(pId, rec);
           }
@@ -105,6 +136,12 @@ async function getLvbpPitcherDirectory(): Promise<Map<number, LvbpDirectoryEntry
           if (teamId === 695) {
             rec.everCaracas = true;
           }
+          if (gameSeason === detectedActiveSeason) {
+            rec.activeSeasonIp += ipDec;
+            if (teamId === 695) {
+              rec.activeSeasonCaracas = true;
+            }
+          }
         }
 
         for (const [pId, rec] of grouped.entries()) {
@@ -120,6 +157,11 @@ async function getLvbpPitcherDirectory(): Promise<Map<number, LvbpDirectoryEntry
               maxGames = cnt;
               primaryTeamId = Number(tidStr);
             }
+          }
+
+          // Si en la temporada activa lanza para Caracas, asegurar identidad actual CAR
+          if (rec.activeSeasonCaracas) {
+            primaryTeamId = 695;
           }
 
           const teamObj = LVBP_TEAMS[primaryTeamId];
@@ -148,6 +190,8 @@ async function getLvbpPitcherDirectory(): Promise<Map<number, LvbpDirectoryEntry
             profile,
             appearances: rec.appearances,
             latestSeason: rec.latestSeason,
+            activeSeasonIp: rec.activeSeasonIp,
+            activeSeasonCaracas: rec.activeSeasonCaracas,
           });
         }
       }
@@ -158,32 +202,48 @@ async function getLvbpPitcherDirectory(): Promise<Map<number, LvbpDirectoryEntry
 
   lvbpPitcherCache = {
     expiresAt: now + 15 * 60 * 1000,
+    activeSeason: detectedActiveSeason,
     entries: map,
   };
-  return map;
+  return { activeSeason: detectedActiveSeason, entries: map };
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.trim() || "";
-  const directory = await getLvbpPitcherDirectory();
+  const { activeSeason, entries: directory } = await getLvbpPitcherDirectory();
 
-  // Sin query: mostrar destacados de Leones + brazos líderes LVBP
+  // Seleccionar dinámicamente los 10 lanzadores activos de Leones del Caracas en la temporada actual
+  const activeCaracasEntries = Array.from(directory.values())
+    .filter((e) => e.activeSeasonCaracas && e.activeSeasonIp > 0)
+    .sort((a, b) => {
+      // Erick Leal y Norwith Gudiño al frente si están activos, luego por IP de la temporada actual
+      const pinScore = (id: number) => (id === 612797 ? 2 : id === 660508 ? 1 : 0);
+      const diffPin = pinScore(b.profile.id) - pinScore(a.profile.id);
+      if (diffPin !== 0) return diffPin;
+      return b.activeSeasonIp - a.activeSeasonIp;
+    })
+    .slice(0, 10)
+    .map((e) => e.profile);
+
+  const featuredCaracas =
+    activeCaracasEntries.length >= 6 ? activeCaracasEntries : CARACAS_FEATURED_PITCHERS;
+
+  // Sin query: mostrar referentes activos de Leones + brazos líderes LVBP de la campaña actual
   if (!q || q.length < 2) {
-    const featuredIds = new Set(CARACAS_FEATURED_PITCHERS.map((p) => p.id));
+    const featuredIds = new Set(featuredCaracas.map((p) => p.id));
     const topLvbpOthers = Array.from(directory.values())
-      .filter((e) => !featuredIds.has(e.profile.id))
-      .sort((a, b) => b.appearances - a.appearances)
+      .filter((e) => !featuredIds.has(e.profile.id) && e.latestSeason === activeSeason)
+      .sort((a, b) => b.activeSeasonIp - a.activeSeasonIp || b.appearances - a.appearances)
       .slice(0, 14)
       .map((e) => e.profile);
 
-    const initialList = [
-      ...CARACAS_FEATURED_PITCHERS.map((p) => directory.get(p.id)?.profile || p),
-      ...topLvbpOthers,
-    ];
+    const initialList = [...featuredCaracas, ...topLvbpOthers];
 
     return NextResponse.json({
       query: q,
+      activeSeason,
+      featuredCaracas,
       count: initialList.length,
       results: initialList,
     });
@@ -203,10 +263,11 @@ export async function GET(request: NextRequest) {
       return false;
     })
     .sort((a, b) => {
+      if (a.latestSeason !== b.latestSeason) return b.latestSeason - a.latestSeason;
       const aCar = a.profile.lvbpTeamId === 695 ? 1 : 0;
       const bCar = b.profile.lvbpTeamId === 695 ? 1 : 0;
       if (aCar !== bCar) return bCar - aCar;
-      return b.appearances - a.appearances;
+      return b.activeSeasonIp - a.activeSeasonIp || b.appearances - a.appearances;
     })
     .map((e) => e.profile);
 
@@ -224,13 +285,13 @@ export async function GET(request: NextRequest) {
         const p = data.people?.[0];
         if (p) {
           const throws: "R" | "L" =
-            p.pitchHand?.code === "L" ? "L" : knownLvbp?.throws || getKnownPitcherHand(numId);
+            p.pitchHand?.code === "L"
+              ? "L"
+              : knownLvbp?.throws || getKnownPitcherHand(numId);
           const singleProfile: PitcherProfile = {
             id: numId,
             name: p.fullName || knownLvbp?.name || `Lanzador #${numId}`,
-            position:
-              knownLvbp?.position ||
-              (throws === "L" ? "LHP" : "RHP"),
+            position: knownLvbp?.position || (throws === "L" ? "LHP" : "RHP"),
             team: knownLvbp?.lvbpTeamName || p.currentTeam?.name || "Agente Libre",
             throws,
             hasLvbpHistory: Boolean(knownLvbp),
@@ -238,7 +299,9 @@ export async function GET(request: NextRequest) {
             lvbpTeamId: knownLvbp?.lvbpTeamId,
             lvbpTeamName: knownLvbp?.lvbpTeamName,
             lvbpTeamAbbr: knownLvbp?.lvbpTeamAbbr,
-            photoUrl: knownLvbp ? getPlayerHeadshotUrl(numId) : getMlbFallbackHeadshotUrl(numId),
+            photoUrl: knownLvbp
+              ? getPlayerHeadshotUrl(numId)
+              : getMlbFallbackHeadshotUrl(numId),
             mlbPhotoUrl: getMlbFallbackHeadshotUrl(numId),
             age: p.currentAge ?? knownLvbp?.age,
             height: p.height ?? knownLvbp?.height,
@@ -275,11 +338,15 @@ export async function GET(request: NextRequest) {
         const pId = Number(p.id);
         if (!pId) continue;
 
-        // Si ya existe en LVBP, enriquecer edad/estatura/peso/mano real
         if (seenIds.has(pId)) {
           const idx = results.findIndex((r) => r.id === pId);
           if (idx >= 0) {
-            const throwsCode = p.pitchHand?.code === "L" ? "L" : p.pitchHand?.code === "R" ? "R" : results[idx].throws;
+            const throwsCode =
+              p.pitchHand?.code === "L"
+                ? "L"
+                : p.pitchHand?.code === "R"
+                ? "R"
+                : results[idx].throws;
             results[idx] = {
               ...results[idx],
               throws: throwsCode,
@@ -317,7 +384,9 @@ export async function GET(request: NextRequest) {
           lvbpTeamId: knownLvbp?.lvbpTeamId,
           lvbpTeamName: knownLvbp?.lvbpTeamName,
           lvbpTeamAbbr: knownLvbp?.lvbpTeamAbbr,
-          photoUrl: knownLvbp ? getPlayerHeadshotUrl(pId) : getMlbFallbackHeadshotUrl(pId),
+          photoUrl: knownLvbp
+            ? getPlayerHeadshotUrl(pId)
+            : getMlbFallbackHeadshotUrl(pId),
           mlbPhotoUrl: getMlbFallbackHeadshotUrl(pId),
           age: p.currentAge,
           height: p.height,
