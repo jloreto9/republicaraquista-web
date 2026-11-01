@@ -32,6 +32,7 @@ const CLEAN_ZERO_STATS: LeonesAdvancedStats = {
   remontados: 0,
   up: "0-0",
   terreneadas: 0,
+  pechofriadas: 0,
   starters: "0-0",
   relievers: "0-0",
   saves: 0,
@@ -80,6 +81,7 @@ const BASELINE_2025_STATS: LeonesAdvancedStats = {
   remontados: 2,
   up: "21-5",
   terreneadas: 2,
+  pechofriadas: 1,
   starters: "7-15",
   relievers: "17-17",
   saves: 12,
@@ -191,6 +193,58 @@ export function isExtraInningGame(
     Number(fallbackCurrentInning || 0)
   );
   return played > scheduled;
+}
+
+/**
+ * Determina si ocurrió una "Pechofriada": Leones llegó a tener una ventaja estrictamente
+ * mayor a 5 carreras (`ventaja >= 6`) en cualquier instante del partido (evaluando jugada a jugada
+ * en `allPlays` y entrada por entrada en `linescore.innings`) y terminó perdiendo el juego.
+ */
+export function isPechofriadaGame(
+  isHome: boolean,
+  won: boolean,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  allPlays?: any[] | null,
+  linescore?: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    innings?: any[];
+  } | null
+): boolean {
+  if (won) return false;
+
+  let maxLead = 0;
+
+  if (Array.isArray(allPlays) && allPlays.length > 0) {
+    for (const p of allPlays) {
+      if (p?.result?.homeScore === undefined && p?.result?.awayScore === undefined) continue;
+      const hR = Number(p.result?.homeScore ?? 0);
+      const aR = Number(p.result?.awayScore ?? 0);
+      const cR = isHome ? hR : aR;
+      const oR = isHome ? aR : hR;
+      const lead = cR - oR;
+      if (lead > maxLead) maxLead = lead;
+    }
+  }
+
+  if (Array.isArray(linescore?.innings)) {
+    let cCum = 0;
+    let oCum = 0;
+    for (const inn of linescore.innings) {
+      const aR = Number(inn?.away?.runs ?? 0);
+      const hR = Number(inn?.home?.runs ?? 0);
+      // Tras la parte alta del inning
+      if (!isHome) cCum += aR;
+      else oCum += aR;
+      if (cCum - oCum > maxLead) maxLead = cCum - oCum;
+
+      // Tras la parte baja del inning
+      if (isHome) cCum += hR;
+      else oCum += hR;
+      if (cCum - oCum > maxLead) maxLead = cCum - oCum;
+    }
+  }
+
+  return maxLead > 5;
 }
 
 /**
@@ -314,6 +368,7 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
     let arribaWins = 0;
     let arribaLosses = 0;
     let terreneadas = 0;
+    let pechofriadas = 0;
     let starterWins = 0;
     let starterLosses = 0;
     let relieverWins = 0;
@@ -387,6 +442,10 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
             terreneadas++;
           }
 
+          if (isPechofriadaGame(isHome, won, allPlays, linescore)) {
+            pechofriadas++;
+          }
+
           // Decisiones oficiales de pitcheo
           const winnerId = dec.winner?.id;
           const loserId = dec.loser?.id;
@@ -429,6 +488,7 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       remontados,
       up: `${arribaWins}-${arribaLosses}`,
       terreneadas,
+      pechofriadas,
       starters: effectiveStarters,
       relievers: effectiveRelievers,
       saves,

@@ -100,6 +100,13 @@ export function LeonesStatsTab({
               <span className="text-slate-400">Terreneadas:</span>
               <span className="font-semibold text-[#FDB827]">{stats.terreneadas}</span>
             </p>
+            <p
+              className="flex justify-between border-b border-[#1E2B4D]/40 pb-1"
+              title="Derrotas tras ir ganando por más de 5 carreras en cualquier momento del juego"
+            >
+              <span className="text-slate-400">Pechofriadas:</span>
+              <span className="font-semibold text-rose-400">{stats.pechofriadas}</span>
+            </p>
             <p className="flex justify-between border-b border-[#1E2B4D]/40 pb-1">
               <span className="text-slate-400">Abridores:</span>
               <span className="font-semibold text-slate-200">{stats.starters}</span>

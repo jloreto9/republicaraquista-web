@@ -16,6 +16,7 @@ export interface LeonesAdvancedStats {
   remontados: number;     // Victorias viniendo de atrás tras el 6to inning (ej: 4)
   up: string;             // Récord ganando tras el 6to inning (ej: 18-2)
   terreneadas: number;    // Walk-off wins en 9na o extras (ej: 2)
+  pechofriadas: number;   // Derrotas tras ir ganando por más de 5 carreras (> 5) en cualquier momento del juego
   starters: string;       // SP ganados-perdidos (ej: 8-12)
   relievers: string;      // RP ganados-perdidos (ej: 9-8)
   saves: number;          // Salvados totales (ej: 11)
