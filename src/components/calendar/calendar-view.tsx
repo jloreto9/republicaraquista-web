@@ -139,7 +139,7 @@ export function CalendarView({ initialData }: CalendarViewProps) {
                     <span>{m.monthName}</span>
                     {isCurrentMonthTab && (
                       <span
-                        className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0"
+                        className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0"
                         title="Mes actual"
                       />
                     )}
@@ -170,10 +170,10 @@ export function CalendarView({ initialData }: CalendarViewProps) {
             {monthNumbers.includes(todayVet.month) && selectedMonth !== todayVet.month && (
               <button
                 onClick={() => setSelectedMonth(todayVet.month)}
-                className="px-2.5 py-1.5 rounded-xl bg-[#070B19] border border-amber-400/50 text-amber-300 hover:bg-amber-400/10 text-xs font-mono font-bold transition-all flex items-center gap-1.5 shadow-[0_0_10px_rgba(251,191,36,0.15)]"
+                className="px-2.5 py-1.5 rounded-xl bg-[#070B19] border border-sky-400/50 text-sky-300 hover:bg-sky-400/10 text-xs font-mono font-bold transition-all flex items-center gap-1.5 shadow-[0_0_10px_rgba(56,189,248,0.2)]"
                 title="Volver al mes actual"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
                 <span>Hoy</span>
               </button>
             )}
@@ -266,9 +266,9 @@ export function CalendarView({ initialData }: CalendarViewProps) {
             </div>
 
             {/* Leyenda Día Actual (Hoy) */}
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#070B19] border border-amber-400/70 shadow-[0_0_8px_rgba(251,191,36,0.2)]">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="font-bold text-amber-300 font-mono text-[10px]">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#070B19] border border-sky-400/70 shadow-[0_0_8px_rgba(56,189,248,0.25)]">
+              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+              <span className="font-bold text-sky-300 font-mono text-[10px]">
                 Día Actual (Hoy)
               </span>
             </div>
