@@ -2,17 +2,15 @@
   "meta": {
     "officialDate": "27/10/2026",
     "pdfUrl": "/documents/Leones_20261027.pdf",
-    "remotePdfUrl": "https://sapven.com/download/Leones_20261027.pdf?expires=1793228306&signature=9eeee9932eed784ef522fde42e22822a8689c75c2fae89371f30b362721e8dee",
+    "remotePdfUrl": "https://sapven.com/download/Leones_20261027.pdf?expires=1793750407&signature=8347334660e977514721988d366394443ae596ab27e266a30ff092af0e358478",
     "maxLimit": 34,
     "totalActive": 34,
     "weekNumber": 3,
     "dateRange": "27 Oct - 02 Nov 2026",
-    "updatedAt": "2026-10-27T22:59:01.656984+00:00",
+    "updatedAt": "2026-11-03T00:05:00.268280+00:00",
     "source": "Liga Venezolana de Béisbol Profesional (LVBP) · TuJonron.com",
     "movements": {
-      "entran": [
-        "Leandro Cedeño"
-      ],
+      "entran": [],
       "salen": []
     }
   },
@@ -282,7 +280,7 @@
       "weight": "80 kg",
       "age": 25,
       "birthDate": "21-04-2001",
-      "birthPlace": "SAN FERNANDO DE APURE, VENEZUELA",
+      "birthPlace": "SAN FERNANDO DE APURE,VENEZUELA",
       "level": "AAA",
       "origin": "criollo",
       "mlbId": 682897,
@@ -333,7 +331,7 @@
       "weight": "78 kg",
       "age": 36,
       "birthDate": "24-02-1990",
-      "birthPlace": "SANTA TERESA DEL TUY ,MIRANDA",
+      "birthPlace": "SANTA TERESA DEL TUY,MIRANDA",
       "level": "OTRO",
       "origin": "criollo",
       "mlbId": 542467,
@@ -384,7 +382,7 @@
       "weight": "92 kg",
       "age": 30,
       "birthDate": "18-04-1996",
-      "birthPlace": "SAN JUAN DE LOS MORROS ,GUARICO",
+      "birthPlace": "SAN JUAN DE LOS MORROS,GUARICO",
       "level": "NINGUNO",
       "origin": "criollo",
       "mlbId": 640902,
@@ -402,7 +400,7 @@
       "age": 31,
       "birthDate": "27-10-1995",
       "birthPlace": "OCUMARE DEL TUY ,MIRANDA",
-      "level": "IND. LEAGUE",
+      "level": "IND.LEAGUE",
       "origin": "criollo",
       "mlbId": 625506,
       "isWeeklyActive": true,
