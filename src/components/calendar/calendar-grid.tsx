@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { CalendarGameEvent } from "@/types/calendar";
+import { getVenezuelanToday } from "@/lib/utils";
 import { CalendarDayCard } from "./calendar-day-card";
 
 interface CalendarGridProps {
@@ -30,6 +31,9 @@ export function CalendarGrid({
     return map;
   }, [events, month, year]);
 
+  // Fecha actual de referencia en Venezuela (VET / UTC-4)
+  const todayVet = useMemo(() => getVenezuelanToday(), []);
+
   // Cálculo del layout del mes
   const gridCells = useMemo(() => {
     // Primer día del mes
@@ -47,6 +51,7 @@ export function CalendarGrid({
     const cells: Array<{
       dayNumber: number;
       isCurrentMonth: boolean;
+      isToday: boolean;
       event?: CalendarGameEvent;
     }> = [];
 
@@ -55,14 +60,21 @@ export function CalendarGrid({
       cells.push({
         dayNumber: daysInPrevMonth - i,
         isCurrentMonth: false,
+        isToday: false,
       });
     }
 
     // Celdas del mes actual
     for (let d = 1; d <= daysInMonth; d++) {
+      const isToday =
+        todayVet.year === year &&
+        todayVet.month === month &&
+        todayVet.day === d;
+
       cells.push({
         dayNumber: d,
         isCurrentMonth: true,
+        isToday,
         event: eventsByDay.get(d),
       });
     }
@@ -74,11 +86,12 @@ export function CalendarGrid({
       cells.push({
         dayNumber: n,
         isCurrentMonth: false,
+        isToday: false,
       });
     }
 
     return cells;
-  }, [year, month, eventsByDay]);
+  }, [year, month, eventsByDay, todayVet]);
 
   return (
     <div className="w-full space-y-3">
@@ -109,6 +122,7 @@ export function CalendarGrid({
             key={`${cell.isCurrentMonth ? "curr" : "pad"}-${cell.dayNumber}-${idx}`}
             dayNumber={cell.dayNumber}
             isCurrentMonth={cell.isCurrentMonth}
+            isToday={cell.isToday}
             event={cell.event}
             onSelectEvent={onSelectEvent}
           />

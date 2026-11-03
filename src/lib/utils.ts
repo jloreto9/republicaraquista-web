@@ -66,3 +66,43 @@ export function getVenezuelanDate(dateStr?: string | null, datetimeStr?: string 
   }
   return dateStr ? String(dateStr).slice(0, 10) : "";
 }
+
+/**
+ * Retorna los componentes de la fecha actual en Venezuela (VET / UTC-4, America/Caracas).
+ * Incluye { year, month, day, dateString }.
+ */
+export function getVenezuelanToday(): {
+  year: number;
+  month: number;
+  day: number;
+  dateString: string;
+} {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Caracas",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const dateString = formatter.format(new Date()); // 'YYYY-MM-DD'
+    const [yearStr, monthStr, dayStr] = dateString.split("-");
+    return {
+      year: parseInt(yearStr, 10),
+      month: parseInt(monthStr, 10),
+      day: parseInt(dayStr, 10),
+      dateString,
+    };
+  } catch {
+    // Fallback defensivo UTC-4 si la plataforma no soporta timeZone
+    const vet = new Date(Date.now() - 4 * 3600 * 1000);
+    const dateString = vet.toISOString().slice(0, 10);
+    const [yearStr, monthStr, dayStr] = dateString.split("-");
+    return {
+      year: parseInt(yearStr, 10),
+      month: parseInt(monthStr, 10),
+      day: parseInt(dayStr, 10),
+      dateString,
+    };
+  }
+}
+

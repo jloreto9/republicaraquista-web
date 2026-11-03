@@ -9,6 +9,7 @@ import { Clock, Tv, MapPin } from "lucide-react";
 interface CalendarDayCardProps {
   dayNumber: number;
   isCurrentMonth: boolean;
+  isToday?: boolean;
   event?: CalendarGameEvent;
   onSelectEvent?: (event: CalendarGameEvent) => void;
 }
@@ -16,6 +17,7 @@ interface CalendarDayCardProps {
 export function CalendarDayCard({
   dayNumber,
   isCurrentMonth,
+  isToday = false,
   event,
   onSelectEvent,
 }: CalendarDayCardProps) {
@@ -33,14 +35,35 @@ export function CalendarDayCard({
   // Día sin juego de Leones (Día Libre / Descanso)
   if (!event) {
     return (
-      <div className="min-h-[110px] sm:min-h-[135px] p-2.5 rounded-xl bg-[#070B19]/60 border border-[#1E2B4D]/40 flex flex-col justify-between transition-colors hover:border-[#1E2B4D]">
+      <div
+        className={`min-h-[110px] sm:min-h-[135px] p-2.5 rounded-xl flex flex-col justify-between transition-colors ${
+          isToday
+            ? "bg-[#0D152B] border-2 border-amber-400 ring-2 ring-amber-400/40 shadow-[0_0_18px_rgba(251,191,36,0.25)]"
+            : "bg-[#070B19]/60 border border-[#1E2B4D]/40 hover:border-[#1E2B4D]"
+        }`}
+      >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-mono font-bold text-slate-400">
-            {dayNumber}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`text-xs font-mono font-bold ${
+                isToday ? "text-amber-400 font-black" : "text-slate-400"
+              }`}
+            >
+              {dayNumber}
+            </span>
+            {isToday && (
+              <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-400 text-[#070B19] tracking-wider animate-pulse shadow-sm">
+                HOY
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center text-center py-2">
-          <span className="text-[10px] text-slate-400 font-mono tracking-wider uppercase">
+          <span
+            className={`text-[10px] font-mono tracking-wider uppercase ${
+              isToday ? "text-amber-300 font-bold" : "text-slate-400"
+            }`}
+          >
             Libre
           </span>
         </div>
@@ -57,6 +80,8 @@ export function CalendarDayCard({
     <div
       onClick={() => onSelectEvent && onSelectEvent(event)}
       className={`min-h-[110px] sm:min-h-[135px] p-2.5 rounded-xl flex flex-col justify-between cursor-pointer transition-all duration-200 select-none group relative overflow-hidden shadow-md ${
+        isToday ? "ring-2 ring-amber-400 shadow-[0_0_22px_rgba(251,191,36,0.35)]" : ""
+      } ${
         isHome
           ? "bg-[#0D152B] border-2 border-white/70 hover:border-white shadow-[0_0_15px_rgba(255,255,255,0.08)] hover:shadow-[0_0_20px_rgba(255,255,255,0.2)]"
           : "bg-[#0D152B] border-2 border-[#FDB827]/70 hover:border-[#FDB827] shadow-[0_0_15px_rgba(253,184,39,0.1)] hover:shadow-[0_0_20px_rgba(253,184,39,0.25)]"
@@ -65,19 +90,26 @@ export function CalendarDayCard({
       {/* Sombra de fondo contextual */}
       <div
         className={`absolute -top-10 -right-10 w-20 h-20 rounded-full blur-2xl pointer-events-none ${
-          isHome ? "bg-white/10" : "bg-[#FDB827]/15"
+          isToday ? "bg-amber-400/20" : isHome ? "bg-white/10" : "bg-[#FDB827]/15"
         }`}
       />
 
       {/* Cabecera de la celda: Número de día y Badge Local/Visita */}
       <div className="flex items-center justify-between z-10">
-        <span
-          className={`text-xs sm:text-sm font-mono font-black ${
-            isHome ? "text-white" : "text-[#FDB827]"
-          }`}
-        >
-          {dayNumber}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`text-xs sm:text-sm font-mono font-black ${
+              isToday ? "text-amber-400 font-black" : isHome ? "text-white" : "text-[#FDB827]"
+            }`}
+          >
+            {dayNumber}
+          </span>
+          {isToday && (
+            <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-400 text-[#070B19] tracking-wider animate-pulse shadow-sm">
+              HOY
+            </span>
+          )}
+        </div>
 
         {/* Badge Canónico: Blanco para Local, Dorado para Visita */}
         <span
