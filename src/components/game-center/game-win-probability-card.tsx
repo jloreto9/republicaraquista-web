@@ -193,11 +193,11 @@ export function GameWinProbabilityCard({
               />
 
               {/* Tooltip / Pill de texto sobre la jugada clave */}
-              <g transform={`translate(${Math.min(svgWidth - 140, Math.max(70, keyX))}, ${Math.max(14, keyY - 26)})`}>
+              <g transform={`translate(${Math.min(svgWidth - 95, Math.max(95, keyX))}, ${Math.max(16, keyY - 26)})`}>
                 <rect
-                  x="-65"
+                  x="-85"
                   y="-12"
-                  width="130"
+                  width="170"
                   height="16"
                   rx="4"
                   fill="#070B19"
@@ -213,7 +213,7 @@ export function GameWinProbabilityCard({
                   fontWeight="bold"
                   fontFamily="monospace"
                 >
-                  {keyPlay.description.slice(0, 16)} • {keyPlay.deltaWpaText}
+                  {keyPlay.description ? `${keyPlay.description.slice(0, 24)} · ${keyPlay.deltaWpaText}` : `Jugada Clave · ${keyPlay.deltaWpaText}`}
                 </text>
               </g>
             </g>

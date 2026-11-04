@@ -678,12 +678,12 @@ export async function getGameCenterData(
 
       for (const p of plays) {
         const absDelta = Math.abs(p.wpa);
-        if (absDelta > maxDelta) {
+        if (p.description && p.description.trim().length > 3 && absDelta > maxDelta && absDelta >= 0.05) {
           maxDelta = absDelta;
           const pct = Math.round(absDelta * 100);
           const sign = p.wpa >= 0 ? "+" : "-";
           keyPlayObj = {
-            description: p.description,
+            description: translateDescriptionToSpanish(p.description),
             deltaWpaText: `${sign}${pct}%`,
             inning: p.inning,
             half: p.halfInning,
@@ -696,7 +696,7 @@ export async function getGameCenterData(
         inning: p.inning,
         half: p.halfInning,
         leonesWp: p.wpAfter,
-        description: p.description,
+        description: translateDescriptionToSpanish(p.description),
         deltaWpa: p.wpa,
         scoreStr: p.scoreStr,
       }));

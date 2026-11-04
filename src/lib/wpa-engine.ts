@@ -178,7 +178,7 @@ export function calculateLeverageIndex(
 export async function processGameWpa(gamePk: number): Promise<GameWpaData | null> {
   try {
     const res = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 15 },
       signal: AbortSignal.timeout(12000),
     });
 
@@ -193,7 +193,15 @@ export async function processGameWpa(gamePk: number): Promise<GameWpaData | null
     const awayTeam = awayTeamInfo.name || "Equipo Visitante";
     const gameDate = feed?.gameData?.datetime?.officialDate || feed?.gameData?.datetime?.originalDate || "";
 
-    const allPlays = feed?.liveData?.plays?.allPlays || [];
+    const statusObj = feed?.gameData?.status || {};
+    const abstractState = statusObj.abstractGameState || "";
+    const statusCode = statusObj.statusCode || "";
+    const isGameOver = abstractState === "Final" || statusCode === "F" || statusCode === "O" || statusCode === "FR";
+
+    const rawPlays = feed?.liveData?.plays?.allPlays || [];
+    // Filtrar jugadas completadas que posean evento registrado (evitar at-bats en curso sin resultado)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const allPlays = rawPlays.filter((p: any) => p.about?.isComplete !== false && p.result?.event);
     if (!allPlays.length) return null;
 
     const plays: WpaPlay[] = [];
@@ -211,16 +219,27 @@ export async function processGameWpa(gamePk: number): Promise<GameWpaData | null
       const inning = about.inning || 1;
       const halfInning = about.halfInning || "top";
       const isBottom = halfInning === "bottom";
-      const outsBefore = count.outs || 0;
 
-      const on1bBefore = Boolean(matchup.postOnFirst);
-      const on2bBefore = Boolean(matchup.postOnSecond);
-      const on3bBefore = Boolean(matchup.postOnThird);
-      const baseStateBefore = encodeBaseState(on1bBefore, on2bBefore, on3bBefore);
+      // Outs y corredores ANTES de la jugada
+      let outsBefore = 0;
+      let baseStateBefore = 0;
+      if (idx > 0) {
+        const prevPlay = allPlays[idx - 1];
+        const prevOuts = prevPlay.count?.outs || 0;
+        if (prevOuts < 3) {
+          outsBefore = prevOuts;
+          baseStateBefore = encodeBaseState(
+            Boolean(prevPlay.matchup?.postOnFirst),
+            Boolean(prevPlay.matchup?.postOnSecond),
+            Boolean(prevPlay.matchup?.postOnThird)
+          );
+        }
+      }
 
       const runners = play.runners || [];
       const runsInPlay = runners.filter(
-        (r: { movement?: { end?: string } }) => r.movement?.end === "score"
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (r: any) => r.movement?.end === "score"
       ).length;
 
       const homeScoreBefore = homeScore;
@@ -235,34 +254,36 @@ export async function processGameWpa(gamePk: number): Promise<GameWpaData | null
       const homeScoreAfter = homeScore;
       const awayScoreAfter = awayScore;
 
+      const outsAtEnd = count.outs || 0;
       let weHomeAfter: number;
-      let liPlay: number;
 
-      if (idx === allPlays.length - 1) {
+      // Solo si el partido concluyó formalmente y es la última jugada del juego
+      if (isGameOver && idx === allPlays.length - 1) {
         const homeWon = homeScore > awayScore;
         weHomeAfter = homeWon ? 1.0 : 0.0;
-        liPlay = calculateLeverageIndex(
-          inning,
-          isBottom,
-          Math.min(2, outsBefore),
-          baseStateBefore,
-          homeScoreBefore,
-          awayScoreBefore
-        );
       } else {
-        const nextPlay = allPlays[idx + 1];
-        const nextAbout = nextPlay.about || {};
-        const nextCount = nextPlay.count || {};
-        const nextMatchup = nextPlay.matchup || {};
+        // En cualquier otra jugada (o juego en vivo), proyectar hacia el próximo turno
+        let nextInn = inning;
+        let nextIsBottom = isBottom;
+        let nextOuts = outsAtEnd;
+        let nextBaseState = 0;
 
-        const nextInn = nextAbout.inning || inning;
-        const nextIsBottom = (nextAbout.halfInning || halfInning) === "bottom";
-        const nextOuts = nextCount.outs || 0;
-        const nextBaseState = encodeBaseState(
-          Boolean(nextMatchup.postOnFirst),
-          Boolean(nextMatchup.postOnSecond),
-          Boolean(nextMatchup.postOnThird)
-        );
+        if (outsAtEnd >= 3) {
+          if (isBottom) {
+            nextInn = inning + 1;
+            nextIsBottom = false;
+          } else {
+            nextIsBottom = true;
+          }
+          nextOuts = 0;
+          nextBaseState = 0;
+        } else {
+          nextBaseState = encodeBaseState(
+            Boolean(matchup.postOnFirst),
+            Boolean(matchup.postOnSecond),
+            Boolean(matchup.postOnThird)
+          );
+        }
 
         weHomeAfter = calculateWinExpectancy(
           nextInn,
@@ -272,15 +293,16 @@ export async function processGameWpa(gamePk: number): Promise<GameWpaData | null
           homeScoreAfter,
           awayScoreAfter
         );
-        liPlay = calculateLeverageIndex(
-          inning,
-          isBottom,
-          Math.min(2, outsBefore),
-          baseStateBefore,
-          homeScoreBefore,
-          awayScoreBefore
-        );
       }
+
+      const liPlay = calculateLeverageIndex(
+        inning,
+        isBottom,
+        Math.min(2, outsBefore),
+        baseStateBefore,
+        homeScoreBefore,
+        awayScoreBefore
+      );
 
       const weLeonesBefore = leonesIsHome ? prevHomeWe : 1.0 - prevHomeWe;
       const weLeonesAfter = leonesIsHome ? weHomeAfter : 1.0 - weHomeAfter;
@@ -343,7 +365,7 @@ export async function processGameWpa(gamePk: number): Promise<GameWpaData | null
 }
 
 /**
- * Obtiene los líderes acumulados de la temporada en WPA para Leones.
+ * Calendario base de partidos
  */
 export const LEONES_2026_GAMES: GameOption[] = [
   {
@@ -399,7 +421,6 @@ export function getSeasonWpaLeaders(season = 2026): SeasonWpaLeader[] {
 
 /**
  * Calendario completo de los 56 juegos de la Temporada Regular 2025 para Leones del Caracas.
- * Ordenado en secuencia cronológica inversa (desde el juego más reciente al primero).
  */
 export const LEONES_ALL_GAMES: GameOption[] = [
   { id: 829871, date: "27 Dic 2025", gameNumber: 56, opponent: "vs Tiburones de La Guaira", score: "4-5", result: "L" },
@@ -496,4 +517,3 @@ export async function fetchSeasonWpaLeaders(season = 2026): Promise<SeasonWpaLea
   }
   return getSeasonWpaLeaders(season);
 }
-
