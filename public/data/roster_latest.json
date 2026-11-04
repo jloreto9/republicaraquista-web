@@ -2,27 +2,16 @@
   "meta": {
     "officialDate": "03/11/2026",
     "pdfUrl": "/documents/Leones_20261103.pdf",
-    "remotePdfUrl": "https://sapven.com/download/Leones_20261103.pdf?expires=1793823725&signature=3d38f90158c50cc5c9cae58f00eb0bdc49bf677a5dbd01b4f02e2be8440b3934",
+    "remotePdfUrl": "https://sapven.com/download/Leones_20261103.pdf?expires=1793840736&signature=62811c0bb58537f590f56da3a25b23db585bc10f0e631992ed4b2d4802f7d66b",
     "maxLimit": 34,
     "totalActive": 34,
     "weekNumber": 1,
     "dateRange": "13 Oct - 19 Oct 2026",
-    "updatedAt": "2026-11-03T20:28:11.881681+00:00",
+    "updatedAt": "2026-11-04T01:10:54.237730+00:00",
     "source": "Liga Venezolana de Béisbol Profesional (LVBP) · TuJonron.com",
     "movements": {
-      "entran": [
-        "Adbert Alzolay",
-        "Jesús Vargas",
-        "Joan Gonzalez",
-        "Simón Leandro"
-      ],
-      "salen": [
-        "Eduardo Figueroa",
-        "Luarbert Arias",
-        "Melvin Pineda",
-        "Wilkel Hernandez",
-        "Yoimer Camacho"
-      ]
+      "entran": [],
+      "salen": []
     }
   },
   "players": [
