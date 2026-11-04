@@ -154,4 +154,29 @@ export interface GameCenterData {
   };
   availableGames: GameCenterAvailableGame[];
   scorecard?: GameCenterScorecard;
+  winProbability?: GameCenterWinProbability;
+}
+
+
+export interface GameCenterWinProbabilityPoint {
+  playIndex: number;
+  inning: number;
+  half: string;
+  leonesWp: number;
+  description: string;
+  deltaWpa: number;
+  scoreStr: string;
+}
+
+export interface GameCenterWinProbability {
+  currentLeonesWp: number;
+  isLeonesHome: boolean;
+  dominantTeamName: string;
+  keyPlay?: {
+    description: string;
+    deltaWpaText: string;
+    inning: number;
+    half: string;
+  };
+  trend: GameCenterWinProbabilityPoint[];
 }

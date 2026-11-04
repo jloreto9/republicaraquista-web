@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { getTeam, getPlayerHeadshotUrl } from "./constants";
 import { buildGameScorecard } from "./scorecard-engine";
+import { processGameWpa } from "./wpa-engine";
 import {
   GameCenterData,
   GameCenterTeam,
@@ -12,6 +13,8 @@ import {
   GameCenterBoxscoreBatter,
   GameCenterBoxscorePitcher,
   GameCenterAvailableGame,
+  GameCenterWinProbability,
+  GameCenterWinProbabilityPoint,
 } from "@/types/game-center";
 
 const LEONES_TEAM_ID = 695;
@@ -661,6 +664,60 @@ export async function getGameCenterData(
     maxInnings
   );
 
+  // ── INTEGRACIÓN CURVA DE PROBABILIDAD DE GANAR (WPA) ──
+  let winProbabilityData: GameCenterWinProbability | undefined;
+  try {
+    const wpaData = await processGameWpa(gamePk);
+    if (wpaData && wpaData.plays && wpaData.plays.length > 0) {
+      const plays = wpaData.plays;
+      const lastPlay = plays[plays.length - 1];
+      const currentLeonesWp = lastPlay ? lastPlay.wpAfter : 0.5;
+
+      let maxDelta = 0;
+      let keyPlayObj: GameCenterWinProbability["keyPlay"] | undefined;
+
+      for (const p of plays) {
+        const absDelta = Math.abs(p.wpa);
+        if (absDelta > maxDelta) {
+          maxDelta = absDelta;
+          const pct = Math.round(absDelta * 100);
+          const sign = p.wpa >= 0 ? "+" : "-";
+          keyPlayObj = {
+            description: p.description,
+            deltaWpaText: `${sign}${pct}%`,
+            inning: p.inning,
+            half: p.halfInning,
+          };
+        }
+      }
+
+      const trend: GameCenterWinProbabilityPoint[] = plays.map((p, idx) => ({
+        playIndex: idx + 1,
+        inning: p.inning,
+        half: p.halfInning,
+        leonesWp: p.wpAfter,
+        description: p.description,
+        deltaWpa: p.wpa,
+        scoreStr: p.scoreStr,
+      }));
+
+      const dominantTeam = currentLeonesWp >= 0.5
+        ? (isHomeLeones ? homeTeam.name : (awayTeam.id === LEONES_TEAM_ID ? awayTeam.name : homeTeam.name))
+        : (isHomeLeones ? awayTeam.name : homeTeam.name);
+
+      winProbabilityData = {
+        currentLeonesWp,
+        isLeonesHome: isHomeLeones,
+        dominantTeamName: dominantTeam,
+        keyPlay: keyPlayObj,
+        trend,
+      };
+    }
+  } catch (wpaErr) {
+    console.error("Error calculando WPA en GameCenter:", wpaErr);
+  }
+
+
   return {
     gamePk,
     season,
@@ -685,6 +742,7 @@ export async function getGameCenterData(
     plays: parsedPlays,
     boxscore: boxscoreData,
     scorecard: scorecardData,
+    winProbability: winProbabilityData,
     availableGames: updatedAvailableGames,
   };
 }

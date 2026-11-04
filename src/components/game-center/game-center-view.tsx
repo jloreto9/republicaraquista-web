@@ -6,6 +6,7 @@ import { GameHeroMatchup } from "./game-hero-matchup";
 import { LiveCount } from "./live-count";
 import { InteractiveDiamond } from "./interactive-diamond";
 import { CurrentMatchupCard } from "./current-matchup-card";
+import { GameWinProbabilityCard } from "./game-win-probability-card";
 import { LinescoreTable } from "./linescore-table";
 import { PlayByPlayFeed } from "./play-by-play-feed";
 import { BoxscoreLineupsTab } from "./boxscore-lineups-tab";
@@ -367,6 +368,13 @@ export function GameCenterView({ initialData }: GameCenterViewProps) {
               linescore={gameData.linescore}
               homeTeam={gameData.homeTeam}
               awayTeam={gameData.awayTeam}
+            />
+
+            <GameWinProbabilityCard
+              data={gameData.winProbability}
+              homeTeamName={gameData.homeTeam.name}
+              awayTeamName={gameData.awayTeam.name}
+              status={gameData.status}
             />
 
             <CurrentMatchupCard
