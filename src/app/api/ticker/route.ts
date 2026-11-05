@@ -44,7 +44,27 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // 2. Rate limiting por IP: máximo 1 petición cada 15s por cliente
+  const { searchParams } = new URL(req.url);
+  const version = searchParams.get("v");
+
+  // 2. Kill-switch para clientes con bundle anterior en bucle infinito o peticiones sin versionar:
+  // Si la petición no incluye v=2, proviene del cliente antiguo en bucle o crawler.
+  // Devolvemos 429 con caché masiva (3600s) para que el cliente antiguo aborte el loop
+  // (al recibir res.ok === false) y Vercel Edge absorba las peticiones sin ejecutar funciones.
+  if (version !== "2") {
+    return NextResponse.json(
+      { success: false, error: "Client version deprecated. Please reload page." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": "3600",
+          "Cache-Control": "public, max-age=3600, s-maxage=3600",
+        },
+      }
+    );
+  }
+
+  // 3. Rate limiting por IP: máximo 1 petición cada 15s por cliente
   if (ip !== "unknown" && isRateLimited(ip)) {
     return NextResponse.json(
       { success: false, error: "Too many requests" },
@@ -59,7 +79,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { searchParams } = new URL(req.url);
     const seasonParam = searchParams.get("season");
     const activeSeason = seasonParam ? Number(seasonParam) : await getActiveSeason();
 

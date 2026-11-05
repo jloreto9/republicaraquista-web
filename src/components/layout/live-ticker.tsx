@@ -22,7 +22,7 @@ export function LiveTicker() {
 
     try {
       isFetchingRef.current = true;
-      const res = await fetch(`/api/ticker?season=${season}`);
+      const res = await fetch(`/api/ticker?season=${season}&v=2`);
       if (res.ok) {
         const json: TickerResponse = await res.json();
         if (json.success && json.games) {
