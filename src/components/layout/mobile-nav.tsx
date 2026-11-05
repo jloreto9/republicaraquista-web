@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
@@ -16,6 +16,22 @@ export function MobileNav() {
   const pathname = usePathname();
 
   const closeDrawer = () => setIsOpen(false);
+
+  useEffect(() => {
+    const handleToggle = () => setIsOpen((prev) => !prev);
+    const handleOpen = () => setIsOpen(true);
+    const handleClose = () => setIsOpen(false);
+
+    window.addEventListener("toggle-mobile-drawer", handleToggle);
+    window.addEventListener("open-mobile-drawer", handleOpen);
+    window.addEventListener("close-mobile-drawer", handleClose);
+
+    return () => {
+      window.removeEventListener("toggle-mobile-drawer", handleToggle);
+      window.removeEventListener("open-mobile-drawer", handleOpen);
+      window.removeEventListener("close-mobile-drawer", handleClose);
+    };
+  }, []);
 
   return (
     <>

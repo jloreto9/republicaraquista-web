@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { BottomNav } from "@/components/layout/bottom-nav";
 import { LiveTicker } from "@/components/layout/live-ticker";
 import { PWARegister } from "@/components/pwa-register";
 import { Footer } from "@/components/layout/footer";
@@ -77,13 +78,14 @@ export default function RootLayout({
             <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
               <MobileNav />
               <LiveTicker />
-              <div className="flex-1 min-w-0 overflow-y-auto pb-28 landscape-content-padding lg:pb-28 px-safe flex flex-col">
+              <div className="flex-1 min-w-0 overflow-y-auto pb-36 landscape-content-padding lg:pb-28 px-safe flex flex-col">
                 <div className="flex-1">
                   {children}
                 </div>
                 <Footer />
               </div>
             </div>
+            <BottomNav />
             <RadioPlayer />
             <Analytics />
           </RadioProvider>

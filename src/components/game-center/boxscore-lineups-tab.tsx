@@ -7,7 +7,8 @@ import {
   GameCenterBoxscoreBatter,
   GameCenterBoxscorePitcher,
 } from "@/types/game-center";
-import { Users } from "lucide-react";
+import { Users, ChevronDown, ChevronUp } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface BoxscoreLineupsTabProps {
   homeTeam: GameCenterTeam;
@@ -30,6 +31,9 @@ export function BoxscoreLineupsTab({
   const [selectedTeamId, setSelectedTeamId] = useState<number>(
     homeTeam.isLeones ? homeTeam.id : awayTeam.id
   );
+
+  const [expandedBatterKey, setExpandedBatterKey] = useState<string | null>(null);
+  const [expandedPitcherId, setExpandedPitcherId] = useState<number | null>(null);
 
   const isHomeSelected = selectedTeamId === homeTeam.id;
   const currentTeam = isHomeSelected ? homeTeam : awayTeam;
@@ -65,14 +69,15 @@ export function BoxscoreLineupsTab({
   return (
     <div className="space-y-6">
       {/* ── SELECTOR DE EQUIPO (TABS) ── */}
-      <div className="flex items-center space-x-2 p-1.5 rounded-xl bg-[#070B19] border border-[#1E2B4D] w-fit">
+      <div className="flex items-center space-x-2 p-1.5 rounded-xl bg-[#070B19] border border-[#1E2B4D] w-full sm:w-fit">
         <button
           onClick={() => setSelectedTeamId(awayTeam.id)}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
+          className={cn(
+            "flex-1 sm:flex-initial flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all active:scale-[0.97]",
             selectedTeamId === awayTeam.id
               ? "bg-[#1E2B4D] text-[#FDB827] shadow-md border border-[#FDB827]/40"
               : "text-slate-400 hover:text-slate-200"
-          }`}
+          )}
         >
           <div className="w-4 h-4 relative shrink-0">
             <Image
@@ -83,7 +88,7 @@ export function BoxscoreLineupsTab({
               className="object-contain"
             />
           </div>
-          <span>{awayTeam.name}</span>
+          <span className="truncate">{awayTeam.name}</span>
           <span className="text-[10px] text-slate-400 font-mono">
             ({awayTeam.abbreviation})
           </span>
@@ -91,11 +96,12 @@ export function BoxscoreLineupsTab({
 
         <button
           onClick={() => setSelectedTeamId(homeTeam.id)}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all ${
+          className={cn(
+            "flex-1 sm:flex-initial flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all active:scale-[0.97]",
             selectedTeamId === homeTeam.id
               ? "bg-[#1E2B4D] text-[#FDB827] shadow-md border border-[#FDB827]/40"
               : "text-slate-400 hover:text-slate-200"
-          }`}
+          )}
         >
           <div className="w-4 h-4 relative shrink-0">
             <Image
@@ -106,7 +112,7 @@ export function BoxscoreLineupsTab({
               className="object-contain"
             />
           </div>
-          <span>{homeTeam.name}</span>
+          <span className="truncate">{homeTeam.name}</span>
           <span className="text-[10px] text-slate-400 font-mono">
             ({homeTeam.abbreviation})
           </span>
@@ -114,20 +120,118 @@ export function BoxscoreLineupsTab({
       </div>
 
       {/* ── TABLA DE BATEO 1-9 (LINEUP) ── */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-[#0D152B] border border-[#1E2B4D] shadow-xl overflow-hidden">
+      <div className="p-3.5 sm:p-5 rounded-2xl bg-[#0D152B] border border-[#1E2B4D] shadow-xl overflow-hidden">
         <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#1E2B4D]">
           <div className="flex items-center space-x-2">
             <Users className="w-4 h-4 text-[#FDB827]" />
-            <h3 className="text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-wider">
-              Alineación Ofensiva • {currentTeam.name}
+            <h3 className="text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-wider truncate">
+              Alineación Ofensiva · {currentTeam.name}
             </h3>
           </div>
-          <span className="text-[10px] font-mono text-slate-400">
-            {currentBatters.length} Bateadores {subsCount > 0 ? `(${startersCount} titulares + ${subsCount} suplente${subsCount > 1 ? "s" : ""})` : "registrados"}
+          <span className="text-[10px] font-mono text-slate-400 shrink-0 ml-2">
+            {currentBatters.length} Bateadores {subsCount > 0 ? `(${startersCount}+${subsCount})` : ""}
           </span>
         </div>
 
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-[#1E2B4D]">
+        {/* ── VISTA MÓVIL ESENCIAL DE BATEO (< md) ── */}
+        <div className="block md:hidden">
+          <div className="bg-[#070B19]/80 text-slate-400 font-mono border-b border-[#1E2B4D] text-[10px] grid grid-cols-12 py-2 px-2 text-center">
+            <span className="col-span-1">#</span>
+            <span className="col-span-5 text-left font-sans font-semibold">Bateador</span>
+            <span className="col-span-1">VB</span>
+            <span className="col-span-1 text-slate-200 font-bold">C</span>
+            <span className="col-span-1 text-[#FDB827] font-bold">H</span>
+            <span className="col-span-1 text-[#FDB827] font-bold">HR</span>
+            <span className="col-span-1 text-amber-400 font-bold">CI</span>
+            <span className="col-span-1">AVG</span>
+          </div>
+
+          <div className="divide-y divide-[#1E2B4D]/60 font-mono text-xs">
+            {currentBatters.map((b) => {
+              const bKey = `m-batter-${b.id}-${b.slot || b.order}-${b.isSubstitute ? "sub" : "main"}`;
+              const isExpanded = expandedBatterKey === bKey;
+
+              return (
+                <div key={bKey} className="flex flex-col">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedBatterKey(isExpanded ? null : bKey)}
+                    className={cn(
+                      "w-full text-left grid grid-cols-12 py-2.5 px-2 items-center text-xs transition-colors active:bg-[#1E2B4D]/40",
+                      b.isSubstitute ? "bg-[#091024]/40" : "hover:bg-[#131F3F]/40"
+                    )}
+                  >
+                    <span className="col-span-1 text-slate-400 font-bold text-center text-[11px]">
+                      {b.isSubstitute ? "" : (b.slot || b.order)}
+                    </span>
+                    <div className="col-span-5 flex items-center space-x-1 truncate pr-1">
+                      {b.isSubstitute && b.note && (
+                        <span className="text-[10px] text-[#FDB827] font-bold">
+                          {b.note}
+                        </span>
+                      )}
+                      <span className={cn("truncate text-xs font-sans", b.isSubstitute ? "text-slate-300" : "text-slate-100 font-bold")}>
+                        {b.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 uppercase font-mono ml-0.5">
+                        {b.position}
+                      </span>
+                    </div>
+                    <span className="col-span-1 text-center text-slate-300">{b.ab}</span>
+                    <span className="col-span-1 text-center text-slate-200">{b.r}</span>
+                    <span className="col-span-1 text-center font-bold text-[#FDB827]">{b.h}</span>
+                    <span className="col-span-1 text-center font-bold text-[#FDB827]">{b.hr}</span>
+                    <span className="col-span-1 text-center font-bold text-amber-400">{b.rbi}</span>
+                    <div className="col-span-1 flex items-center justify-center space-x-0.5 text-slate-400 text-[10px]">
+                      <span>{b.avg}</span>
+                      {isExpanded ? <ChevronUp className="w-2.5 h-2.5 text-[#FDB827]" /> : <ChevronDown className="w-2.5 h-2.5 text-slate-500" />}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="p-2.5 bg-[#070B19]/90 border-t border-b border-[#1E2B4D]/60 animate-in fade-in duration-150 grid grid-cols-5 gap-1.5 text-center text-[10px]">
+                      <div className="p-1 rounded bg-[#0D152B] border border-[#1E2B4D]/60">
+                        <span className="text-slate-400">2B</span>
+                        <p className="font-bold text-slate-200 mt-0.5">{b.doubles}</p>
+                      </div>
+                      <div className="p-1 rounded bg-[#0D152B] border border-[#1E2B4D]/60">
+                        <span className="text-slate-400">3B</span>
+                        <p className="font-bold text-slate-200 mt-0.5">{b.triples}</p>
+                      </div>
+                      <div className="p-1 rounded bg-[#0D152B] border border-[#1E2B4D]/60">
+                        <span className="text-slate-400">BB</span>
+                        <p className="font-bold text-slate-200 mt-0.5">{b.bb}</p>
+                      </div>
+                      <div className="p-1 rounded bg-[#0D152B] border border-[#1E2B4D]/60">
+                        <span className="text-slate-400">SO (K)</span>
+                        <p className="font-bold text-slate-200 mt-0.5">{b.so}</p>
+                      </div>
+                      <div className="p-1 rounded bg-[#0D152B] border border-[#1E2B4D]/60">
+                        <span className="text-slate-400">OPS</span>
+                        <p className="font-bold text-[#FDB827] mt-0.5">{b.ops}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Totales Móvil */}
+            <div className="grid grid-cols-12 py-2 px-2 bg-[#070B19]/90 border-t-2 border-[#1E2B4D] font-bold text-slate-100 text-center text-xs">
+              <span className="col-span-1"></span>
+              <span className="col-span-5 text-left font-sans uppercase text-[11px]">Totales</span>
+              <span className="col-span-1">{teamTotals.ab}</span>
+              <span className="col-span-1">{teamTotals.r}</span>
+              <span className="col-span-1 text-[#FDB827]">{teamTotals.h}</span>
+              <span className="col-span-1 text-[#FDB827]">{teamTotals.hr}</span>
+              <span className="col-span-1 text-amber-400">{teamTotals.rbi}</span>
+              <span className="col-span-1 text-slate-300 text-[10px]">{teamAvg}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── VISTA DESKTOP COMPLETA DE BATEO (>= md) ── */}
+        <div className="hidden md:block overflow-x-auto scrollbar-thin scrollbar-thumb-[#1E2B4D]">
           <table className="w-full min-w-[620px] text-xs font-mono border-collapse">
             <thead>
               <tr className="border-b border-[#1E2B4D] text-slate-400 text-[11px] text-center">
@@ -221,18 +325,87 @@ export function BoxscoreLineupsTab({
       </div>
 
       {/* ── TABLA DE PITCHEO ── */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-[#0D152B] border border-[#1E2B4D] shadow-xl overflow-hidden">
+      <div className="p-3.5 sm:p-5 rounded-2xl bg-[#0D152B] border border-[#1E2B4D] shadow-xl overflow-hidden">
         <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#1E2B4D]">
           <h3 className="text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-wider flex items-center space-x-2">
             <span>⚾</span>
-            <span>Cuerpo de Lanzadores • {currentTeam.name}</span>
+            <span>Cuerpo de Lanzadores · {currentTeam.name}</span>
           </h3>
           <span className="text-[10px] font-mono text-slate-400">
             {currentPitchers.length} Pitchers actuantes
           </span>
         </div>
 
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-[#1E2B4D]">
+        {/* ── VISTA MÓVIL ESENCIAL DE PITCHEO (< md) ── */}
+        <div className="block md:hidden">
+          <div className="bg-[#070B19]/80 text-slate-400 font-mono border-b border-[#1E2B4D] text-[10px] grid grid-cols-12 py-2 px-2 text-center">
+            <span className="col-span-5 text-left font-sans font-semibold">Lanzador</span>
+            <span className="col-span-2 text-slate-200 font-bold">IP</span>
+            <span className="col-span-1">H</span>
+            <span className="col-span-1 text-rose-400 font-bold">CL</span>
+            <span className="col-span-1 text-emerald-400 font-bold">SO</span>
+            <span className="col-span-2">ERA</span>
+          </div>
+
+          <div className="divide-y divide-[#1E2B4D]/60 font-mono text-xs">
+            {currentPitchers.map((p) => {
+              const isExpanded = expandedPitcherId === p.id;
+
+              return (
+                <div key={`m-pitcher-${p.id}`} className="flex flex-col">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedPitcherId(isExpanded ? null : p.id)}
+                    className="w-full text-left grid grid-cols-12 py-2.5 px-2 items-center text-xs transition-colors hover:bg-[#131F3F]/40 active:bg-[#1E2B4D]/40"
+                  >
+                    <div className="col-span-5 flex items-center space-x-1 truncate pr-1">
+                      <span className="font-bold text-slate-100 truncate text-xs font-sans">
+                        {p.name}
+                      </span>
+                      {p.jersey !== "-" && (
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          #{p.jersey}
+                        </span>
+                      )}
+                    </div>
+                    <span className="col-span-2 text-center font-bold text-slate-100">{p.ip}</span>
+                    <span className="col-span-1 text-center text-slate-300">{p.h}</span>
+                    <span className="col-span-1 text-center font-bold text-rose-400">{p.er}</span>
+                    <span className="col-span-1 text-center font-bold text-emerald-400">{p.so}</span>
+                    <div className="col-span-2 flex items-center justify-center space-x-0.5 text-slate-400 text-[10px]">
+                      <span>{p.era}</span>
+                      {isExpanded ? <ChevronUp className="w-2.5 h-2.5 text-[#FDB827]" /> : <ChevronDown className="w-2.5 h-2.5 text-slate-500" />}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="p-2.5 bg-[#070B19]/90 border-t border-b border-[#1E2B4D]/60 animate-in fade-in duration-150 grid grid-cols-4 gap-1.5 text-center text-[10px]">
+                      <div className="p-1 rounded bg-[#0D152B] border border-[#1E2B4D]/60">
+                        <span className="text-slate-400">Carreras (C)</span>
+                        <p className="font-bold text-slate-200 mt-0.5">{p.r}</p>
+                      </div>
+                      <div className="p-1 rounded bg-[#0D152B] border border-[#1E2B4D]/60">
+                        <span className="text-slate-400">Boletos (BB)</span>
+                        <p className="font-bold text-slate-200 mt-0.5">{p.bb}</p>
+                      </div>
+                      <div className="p-1 rounded bg-[#0D152B] border border-[#1E2B4D]/60">
+                        <span className="text-slate-400">Jonrones (HR)</span>
+                        <p className="font-bold text-slate-200 mt-0.5">{p.hr}</p>
+                      </div>
+                      <div className="p-1 rounded bg-[#0D152B] border border-[#1E2B4D]/60">
+                        <span className="text-slate-400">Pitches (P-S)</span>
+                        <p className="font-bold text-[#FDB827] mt-0.5">{p.pitches}-{p.strikes}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── VISTA DESKTOP COMPLETA DE PITCHEO (>= md) ── */}
+        <div className="hidden md:block overflow-x-auto scrollbar-thin scrollbar-thumb-[#1E2B4D]">
           <table className="w-full min-w-[620px] text-xs font-mono border-collapse">
             <thead>
               <tr className="border-b border-[#1E2B4D] text-slate-400 text-[11px] text-center">

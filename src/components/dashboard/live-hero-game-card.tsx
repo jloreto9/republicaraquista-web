@@ -86,7 +86,7 @@ export function LiveHeroGameCard({ game }: LiveHeroGameCardProps) {
   const areaCoords = `0,${svgHeight} ${polylineCoords} ${svgWidth},${svgHeight}`;
 
   return (
-    <section className="rounded-2xl bg-gradient-to-br from-[#0D152B] via-[#101B38] to-[#0D152B] border border-[#1E2B4D] hover:border-[#FDB827]/40 transition-all p-4 sm:p-6 shadow-xl relative overflow-hidden">
+    <section className="rounded-2xl bg-gradient-to-br from-[#0D152B] via-[#101B38] to-[#0D152B] border border-[#1E2B4D] hover:border-[#FDB827]/40 transition-all p-3.5 sm:p-6 shadow-xl relative overflow-hidden">
       {/* ── Encabezado: Estado y Ubicación ── */}
       <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#1E2B4D] text-xs">
         <div className="flex items-center space-x-2">
@@ -372,7 +372,7 @@ export function LiveHeroGameCard({ game }: LiveHeroGameCardProps) {
 
         <Link
           href="/game-center"
-          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#070B19] border border-[#1E2B4D] hover:border-[#FDB827]/40 text-[#FDB827] text-xs font-mono font-bold transition-all shrink-0 hover:bg-[#FDB827]/10"
+          className="flex items-center justify-center space-x-1.5 px-4 py-2 min-h-[44px] rounded-xl bg-[#070B19] border border-[#1E2B4D] hover:border-[#FDB827]/40 text-[#FDB827] text-xs font-mono font-bold transition-all shrink-0 hover:bg-[#FDB827]/10 active:scale-[0.98]"
         >
           <span>Ver en Game Center</span>
           <ExternalLink className="w-3.5 h-3.5" />
