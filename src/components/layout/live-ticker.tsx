@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { TickerGame, TickerResponse } from "@/types/ticker";
 import { useSeason } from "@/context/season-context";
@@ -11,13 +11,35 @@ export function LiveTicker() {
   const [dateLabel, setDateLabel] = useState<string>("Jornada LVBP");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const hasLiveRef = useRef<boolean>(false);
+  const isFetchingRef = useRef<boolean>(false);
+
   const fetchTicker = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      return;
+    }
+
     try {
+      isFetchingRef.current = true;
       const res = await fetch(`/api/ticker?season=${season}`);
       if (res.ok) {
         const json: TickerResponse = await res.json();
         if (json.success && json.games) {
-          setGames(json.games);
+          hasLiveRef.current = json.games.some((g) => g.isLive);
+          setGames((prev) => {
+            const isSame =
+              prev.length === json.games.length &&
+              prev.every(
+                (g, i) =>
+                  g.id === json.games[i].id &&
+                  g.statusLabel === json.games[i].statusLabel &&
+                  g.isLive === json.games[i].isLive &&
+                  g.homeTeam.score === json.games[i].homeTeam.score &&
+                  g.awayTeam.score === json.games[i].awayTeam.score
+              );
+            return isSame ? prev : json.games;
+          });
           if (json.dateLabel) setDateLabel(json.dateLabel);
         }
       }
@@ -25,19 +47,47 @@ export function LiveTicker() {
       console.error("Error al cargar ticker de partidos:", err);
     } finally {
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
   }, [season]);
 
   useEffect(() => {
-    fetchTicker();
+    let timerId: NodeJS.Timeout | null = null;
+    let isMounted = true;
 
-    // Si hay juegos en vivo, consultar cada 20 segundos; si no, cada 2 minutos
-    const hasLive = games.some((g) => g.isLive);
-    const intervalMs = hasLive ? 20000 : 120000;
-    const intervalId = setInterval(fetchTicker, intervalMs);
+    const scheduleNext = () => {
+      if (!isMounted) return;
+      // Intervalo seguro: mínimo 60s si hay juegos en vivo, 120s si no hay
+      const intervalMs = hasLiveRef.current ? 60000 : 120000;
+      timerId = setTimeout(async () => {
+        await fetchTicker();
+        scheduleNext();
+      }, intervalMs);
+    };
 
-    return () => clearInterval(intervalId);
-  }, [fetchTicker, games]);
+    // Carga inicial
+    fetchTicker().then(() => {
+      scheduleNext();
+    });
+
+    // Pausa / reanudación según visibilidad de pestaña
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        if (timerId) clearTimeout(timerId);
+        fetchTicker().then(() => {
+          scheduleNext();
+        });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchTicker]);
 
   if (isLoading && games.length === 0) {
     return (

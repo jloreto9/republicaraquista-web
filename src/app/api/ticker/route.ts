@@ -11,14 +11,11 @@ export async function GET(req: NextRequest) {
     const activeSeason = seasonParam ? Number(seasonParam) : await getActiveSeason();
 
     const data = await getLeagueTickerGames(activeSeason);
-    const hasLive = data.games.some((g) => g.isLive);
 
     return NextResponse.json(data, {
       status: 200,
       headers: {
-        "Cache-Control": hasLive
-          ? "public, s-maxage=20, stale-while-revalidate=40"
-          : "public, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": "public, max-age=30, s-maxage=30, stale-while-revalidate=59",
       },
     });
   } catch (error) {
@@ -30,7 +27,12 @@ export async function GET(req: NextRequest) {
         games: [],
         lastUpdated: new Date().toISOString(),
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
     );
   }
 }
