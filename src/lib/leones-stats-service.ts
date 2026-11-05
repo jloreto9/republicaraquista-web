@@ -640,15 +640,18 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
 
         try {
           const { processGameWpa } = await import("./wpa-engine");
-          const gameWpa = await processGameWpa(g.id);
+          const targetGamePk = Number(g.game_pk || g.id);
+          const gameWpa = await processGameWpa(targetGamePk);
+
+          const gameIdList = [g.id, g.game_pk].filter(Boolean).map(Number);
 
           // 1. Obtener estadísticas de caja de bateo y pitcheo de Leones (team 695)
           const [{ data: batRows }, { data: pitRows }] = await Promise.all([
             supabase
-              ? supabase.from("batting_stats").select("*").eq("game_id", g.id).eq("team_id", 695)
+              ? supabase.from("batting_stats").select("*").in("game_id", gameIdList).eq("team_id", 695)
               : Promise.resolve({ data: null }),
             supabase
-              ? supabase.from("pitching_stats").select("*").eq("game_id", g.id).eq("team_id", 695)
+              ? supabase.from("pitching_stats").select("*").in("game_id", gameIdList).eq("team_id", 695)
               : Promise.resolve({ data: null }),
           ]);
 
@@ -721,7 +724,7 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
             }
           }
 
-          // 3. Evaluar y rankear Bateadores
+          // 3. Evaluar y rankear Bateadores por WPA (criterio sabermétrico primario Tango RE24)
           const rankedBatters = Object.values(batterWpa).map((b) => {
             const stats = batterMap[b.id] || {};
             const h = stats.h ?? 0;
@@ -730,18 +733,28 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
             const rbi = stats.rbi ?? 0;
             const runs = stats.r ?? 0;
             const bb = stats.bb ?? 0;
-            const offensiveScore = (b.wpa * 100) + (hr * 25) + (rbi * 15) + (h * 10) + (runs * 8) + (bb * 5);
+            const tieBreaker = (hr * 10) + (rbi * 5) + (h * 3) + (runs * 2) + bb;
             const statsSummary = ab > 0 ? `${h}-${ab}${hr > 0 ? `, ${hr} HR` : ""}, ${rbi} CI` : `${b.wpa >= 0 ? `+${b.wpa.toFixed(3)}` : b.wpa.toFixed(3)} WPA`;
             return {
               ...b,
               statsSummary,
-              offensiveScore,
+              tieBreaker,
             };
-          }).sort((a, b) => b.offensiveScore - a.offensiveScore);
+          }).sort((a, b) => {
+            // Prioridad absoluta: mayor WPA (Win Probability Added)
+            const diff = b.wpa - a.wpa;
+            if (Math.abs(diff) >= 0.01) {
+              return diff;
+            }
+            // Desempate si el WPA es virtualmente idéntico (< 0.010)
+            return b.tieBreaker - a.tieBreaker;
+          });
 
           if (rankedBatters.length > 0) {
             const bestBat = rankedBatters[0];
-            const headline = `${bestBat.statsSummary} — Mayor aporte ofensivo (${bestBat.wpa >= 0 ? `+${bestBat.wpa.toFixed(3)}` : bestBat.wpa.toFixed(3)} WPA)`;
+            const headline = bestBat.wpa > 0
+              ? `${bestBat.statsSummary} — Mayor impacto de victoria (+${bestBat.wpa.toFixed(3)} WPA)`
+              : `${bestBat.statsSummary} — Destacado ofensivo (${bestBat.wpa >= 0 ? `+${bestBat.wpa.toFixed(3)}` : bestBat.wpa.toFixed(3)} WPA)`;
             topBatter = {
               playerId: bestBat.id,
               playerName: bestBat.name,
@@ -776,19 +789,25 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
 
             const ipString = stats.ip_string || (ipDec > 0 ? `${Math.floor(ipDec)}.${Math.round((ipDec % 1) * 3)}` : "0.0");
             const statsSummary = `${ipString} IP, ${er} CL, ${so} K, ${bb} BB`;
-            const pitchingComposite = (p.wpa * 120) + (gameScore - 40) * 1.5;
-
             return {
               ...p,
               statsSummary,
               gameScore,
-              pitchingComposite,
             };
-          }).sort((a, b) => b.pitchingComposite - a.pitchingComposite);
+          }).sort((a, b) => {
+            // Prioridad: WPA de pitcheo; desempate por Game Score
+            const diff = b.wpa - a.wpa;
+            if (Math.abs(diff) >= 0.01) {
+              return diff;
+            }
+            return b.gameScore - a.gameScore;
+          });
 
           if (rankedPitchers.length > 0) {
             const bestPit = rankedPitchers[0];
-            const headline = `${bestPit.statsSummary} — Game Score ${bestPit.gameScore} (${bestPit.wpa >= 0 ? `+${bestPit.wpa.toFixed(3)}` : bestPit.wpa.toFixed(3)} WPA)`;
+            const headline = bestPit.wpa > 0
+              ? `${bestPit.statsSummary} — Mayor contención (${bestPit.wpa >= 0 ? `+${bestPit.wpa.toFixed(3)}` : bestPit.wpa.toFixed(3)} WPA)`
+              : `${bestPit.statsSummary} — Game Score ${bestPit.gameScore} (${bestPit.wpa >= 0 ? `+${bestPit.wpa.toFixed(3)}` : bestPit.wpa.toFixed(3)} WPA)`;
             topPitcher = {
               playerId: bestPit.id,
               playerName: bestPit.name,
@@ -806,14 +825,21 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
 
           // 5. Determinar MVP / Destacado General
           if (leonesWon) {
-            if (topPitcher && (topPitcher.gameScore ?? 0) >= 60 && (!topBatter || topPitcher.wpaTotal >= topBatter.wpaTotal * 0.7)) {
+            // En victoria: lanzador con salida dominante (Game Score >= 60 y WPA > 0)
+            // o que supere al bateador en WPA
+            if (
+              topPitcher &&
+              topPitcher.wpaTotal > 0 &&
+              ((topPitcher.gameScore ?? 0) >= 60 || !topBatter || topPitcher.wpaTotal >= topBatter.wpaTotal)
+            ) {
               mvp = topPitcher;
             } else {
               mvp = topBatter || topPitcher;
             }
           } else {
-            if (topPitcher && (!topBatter || topPitcher.wpaTotal > topBatter.wpaTotal)) {
-              mvp = topPitcher;
+            // En derrota: el jugador con mayor impacto positivo (WPA)
+            if (topPitcher && topBatter) {
+              mvp = topPitcher.wpaTotal > topBatter.wpaTotal ? topPitcher : topBatter;
             } else {
               mvp = topBatter || topPitcher;
             }

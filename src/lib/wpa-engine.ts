@@ -92,7 +92,7 @@ export function calculateWinExpectancy(
       const lam = Math.max(0.05, reCurr);
       if (needed === 1) {
         const pWinNow = 1.0 - Math.exp(-lam);
-        return Math.min(0.995, Math.max(0.005, pWinNow + (1.0 - pWinNow) * 0.50));
+        return Math.min(0.9999, Math.max(0.0001, pWinNow + (1.0 - pWinNow) * 0.50));
       } else {
         let probUnder = 0;
         for (let k = 0; k < needed; k++) {
@@ -100,7 +100,7 @@ export function calculateWinExpectancy(
         }
         const probHomeWalkoff = 1.0 - probUnder;
         const pTie = (Math.pow(lam, needed - 1) * Math.exp(-lam)) / factorial(needed - 1);
-        return Math.min(0.995, Math.max(0.005, probHomeWalkoff + pTie * 0.50));
+        return Math.min(0.9999, Math.max(0.0001, probHomeWalkoff + pTie * 0.50));
       }
     }
   } else {
@@ -121,7 +121,7 @@ export function calculateWinExpectancy(
         const probHomeWins = 1.0 - probHomeWinsUnder;
         const awayExtra = reCurr;
         const weHome = (probHomeWins + probHomeTies * 0.50) / (1.0 + awayExtra * 0.4);
-        return Math.min(0.995, Math.max(0.005, weHome));
+        return Math.min(0.9999, Math.max(0.0001, weHome));
       }
     }
   }
@@ -134,7 +134,7 @@ export function calculateWinExpectancy(
 
   const z = expDiff / (sigma * 1.15);
   const we = 1.0 / (1.0 + Math.exp(-1.702 * z));
-  return Math.min(0.999, Math.max(0.001, we));
+  return Math.min(0.9999, Math.max(0.0001, we));
 }
 
 /**
