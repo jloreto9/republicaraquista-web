@@ -7,12 +7,12 @@ de 34 jugadores de Leones del Caracas (LVBP 2026-2027).
 
 Operaciones:
 1. Consulta POST a https://stats.lvbp.com/resources/views/roster.php con team_id=695.
-2. Extrae todos los boletines de week-tab-pane y selecciona el más reciente por fecha.
-3. Si detecta un nuevo boletín oficial o variación en la plantilla:
-   - Descarga el nuevo archivo PDF a `public/documents/Leones_YYYYMMDD.pdf`.
+2. Extrae todos los boletines de week-tab-pane y los procesa en orden cronológico.
+3. Para cada boletín:
+   - Descarga el nuevo archivo PDF a `public/documents/Leones_YYYYMMDD.pdf` si no existe.
    - Extrae con alta precisión la nómina oficial (34 peloteros) directamente del PDF firmado.
    - Compara contra la semana previa y calcula altas (ENTRAN) y bajas (SALEN).
-   - Actualiza `public/data/roster_latest.json`.
+4. Genera `public/data/roster_latest.json` con la semana actual activa y el historial completo.
 
 Autor: @republicaraquista • Jorge Leonardo Loreto
 """
@@ -21,8 +21,9 @@ import os
 import sys
 import re
 import json
+import glob
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import urllib.request
 import urllib.error
 from bs4 import BeautifulSoup
@@ -43,6 +44,104 @@ DATA_DIR = os.path.join(BASE_DIR, "public", "data")
 DOCUMENTS_DIR = os.path.join(BASE_DIR, "public", "documents")
 SNAPSHOT_FILE = os.path.join(DATA_DIR, "roster_latest.json")
 
+# Diccionario maestro de mapeo de IDs de MLB para headshots de Leones
+KNOWN_MLB_IDS = {
+    "adbert alzolay": 640470,
+    "wilmer font": 521655,
+    "jesús vargas": 672842,
+    "jesus vargas": 672842,
+    "simón leandro": 814129,
+    "simon leandro": 814129,
+    "joan gonzalez": 802993,
+    "joan gonzález": 802993,
+    "eduardo figueroa": 543163,
+    "wikelman gonzalez": 678824,
+    "wikelman gonzález": 678824,
+    "leandro cedeno": 660681,
+    "leandro cedeño": 660681,
+    "victor bericoto": 682674,
+    "víctor bericoto": 682674,
+    "aldrem corredor": 625506,
+    "marvin alcantara": 800421,
+    "marvin alcántara": 800421,
+    "yoimer camacho": 542467,
+    "melvin pineda": 687849,
+    "luarbert arias": 678215,
+    "wilkel hernandez": 678869,
+    "wilkel hernández": 678869,
+    "ricardo rodriguez": 600965,
+    "ricardo rodríguez": 600965,
+    "steven perez": 800408,
+    "steven pérez": 800408,
+    "jhonny pereda": 640902,
+    "carlos romero": 673395,
+    "mikell manzano": 692350,
+    "gabriel lino": 593449,
+    "touki toussaint": 657053,
+    "connor van scoyoc": 681854,
+    "dale stanavich": 689359,
+    "erick leal": 612797,
+    "juan sánchez": 678738,
+    "juan sanchez": 678738,
+    "julio rodríguez": 680588,
+    "julio rodriguez": 680588,
+    "luis curvelo": 681168,
+    "luis palacios": 672712,
+    "nic swanson": 702462,
+    "norwith gudiño": 660508,
+    "norwith gudino": 660508,
+    "livan soto": 670869,
+    "wilfredo tovar": 541600,
+    "lenyn sosa": 672820,
+    "josé rondón": 602922,
+    "jose rondon": 602922,
+    "brainer bonaci": 682900,
+    "wuilfredo antunez": 686404,
+    "ricardo cova": 699698,
+    "gabriel noriega": 571997,
+    "kenedy corona": 685744,
+}
+
+CANONICAL_NAMES = {
+    "simon leandro": "Simón Leandro",
+    "jesus vargas": "Jesús Vargas",
+    "joan gonzalez": "Joan González",
+    "wikelman gonzalez": "Wikelman González",
+    "leandro cedeno": "Leandro Cedeño",
+    "victor bericoto": "Víctor Bericoto",
+    "marvin alcantara": "Marvin Alcántara",
+    "wilkel hernandez": "Wilkel Hernández",
+    "ricardo rodriguez": "Ricardo Rodríguez",
+    "steven perez": "Steven Pérez",
+    "julio rodriguez": "Julio Rodríguez",
+    "norwith gudino": "Norwith Gudiño",
+    "jose rondon": "José Rondón",
+    "wuilfredo antunez": "Wuilfredo Antúnez",
+}
+
+
+def calculate_week_and_range(date_str: str, filename: str):
+    """Calcula dinámicamente el número de semana LVBP y su rango de fechas."""
+    m = re.search(r"(\d{4})(\d{2})(\d{2})", filename)
+    if m:
+        dt = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    else:
+        try:
+            dt = datetime.strptime(date_str, "%d/%m/%Y")
+        except Exception:
+            dt = datetime.now()
+
+    start_season = datetime(2026, 10, 13)
+    days = (dt - start_season).days
+    week_num = max(1, (days // 7) + 1)
+    end_dt = dt + timedelta(days=6)
+    months = {
+        1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun",
+        7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic"
+    }
+    range_str = f"{dt.day:02d} {months[dt.month]} - {end_dt.day:02d} {months[end_dt.month]} {end_dt.year}"
+    return week_num, range_str
+
 
 def fetch_leones_roster_html() -> str:
     """Envía la petición POST para obtener la vista de Leones del Caracas."""
@@ -61,8 +160,8 @@ def fetch_leones_roster_html() -> str:
         return resp.read().decode("utf-8", "ignore")
 
 
-def parse_pdf_and_date(soup: BeautifulSoup):
-    """Extrae todos los boletines de week-tab-pane y devuelve el más reciente ordenado por fecha."""
+def parse_all_bulletins(soup: BeautifulSoup):
+    """Extrae todos los boletines de week-tab-pane ordenados cronológicamente."""
     bulletins = []
     week_pane = soup.find("div", {"id": "week-tab-pane"})
     if week_pane:
@@ -79,10 +178,7 @@ def parse_pdf_and_date(soup: BeautifulSoup):
             bulletins.append({"url": href, "date": date_str, "date_key": date_key})
 
     bulletins.sort(key=lambda b: b["date_key"])
-    if not bulletins:
-        return None, None
-    latest = bulletins[-1]
-    return latest["url"], latest["date"]
+    return bulletins
 
 
 def parse_players_from_pdf(pdf_path: str, prev_players_dict: dict) -> list:
@@ -125,19 +221,6 @@ def parse_players_from_pdf(pdf_path: str, prev_players_dict: dict) -> list:
         elif cleaned_lines and not any(l.lower().startswith(x) for x in ["liga", "temporada", "roster", "leones", "# pelotero", "peso", "nacimiento", "powered", "peso en"]):
             cleaned_lines[-1] += " " + l
 
-    known_mlb_ids = {
-        "eduardo figueroa": 543163,
-        "wikelman gonzalez": 678824,
-        "wikelman gonzález": 678824,
-        "leandro cedeno": 660681,
-        "leandro cedeño": 660681,
-        "victor bericoto": 682674,
-        "víctor bericoto": 682674,
-        "aldrem corredor": 625506,
-        "marvin alcantara": 703417,
-        "marvin alcántara": 703417,
-    }
-
     players = []
     for line in cleaned_lines:
         lower_line = line.lower()
@@ -175,16 +258,22 @@ def parse_players_from_pdf(pdf_path: str, prev_players_dict: dict) -> list:
             origin = m.group(10).lower()
 
             clean_name = " ".join(word.capitalize() for word in raw_name.split())
+            norm_key = clean_name.lower()
+            if norm_key in CANONICAL_NAMES:
+                clean_name = CANONICAL_NAMES[norm_key]
 
+            # Buscar en jugadores previos
             matched_prev = None
             for p_name, p_data in prev_players_dict.items():
-                if p_name.lower() in clean_name.lower() or clean_name.lower() in p_name.lower() or (p_data.get("number") == num and num not in [0, None]):
+                if p_name.lower() in clean_name.lower() or clean_name.lower() in p_name.lower():
                     matched_prev = p_data
-                    clean_name = p_data["name"]
                     break
 
-            mlb_id = matched_prev.get("mlbId", 0) if matched_prev else known_mlb_ids.get(clean_name.lower(), 0)
-            photo_url = matched_prev.get("photoUrl", "") if matched_prev else (f"https://cdn.tujonron.net/public_photos/custom/{mlb_id}.png" if mlb_id else "")
+            mlb_id = KNOWN_MLB_IDS.get(clean_name.lower(), 0)
+            if not mlb_id and matched_prev:
+                mlb_id = matched_prev.get("mlbId", 0)
+
+            photo_url = f"/assets/players/{mlb_id}.png" if mlb_id else (matched_prev.get("photoUrl", "") if matched_prev else "")
 
             players.append({
                 "number": num,
@@ -204,99 +293,7 @@ def parse_players_from_pdf(pdf_path: str, prev_players_dict: dict) -> list:
                 "photoUrl": photo_url,
             })
 
-    logger.info(f"Jugadores extraídos directamente del PDF: {len(players)}")
-    return players
-
-
-def parse_players(soup: BeautifulSoup):
-    """Fallback: Parsea los peloteros de la sección roster-tab-pane usando BeautifulSoup."""
-    players = []
-    roster_pane = soup.find("div", {"id": "roster-tab-pane"})
-    if not roster_pane:
-        logger.warning("No se localizó 'roster-tab-pane'")
-        return players
-
-    category_map = {
-        "pitchers": ("P", "pitcher"),
-        "catchers": ("C", "catcher"),
-        "infield": ("IF", "infielder"),
-        "infielders": ("IF", "infielder"),
-        "outfield": ("OF", "outfielder"),
-        "outfielders": ("OF", "outfielder"),
-    }
-
-    current_pos_code = "P"
-    current_category = "pitcher"
-
-    for child in roster_pane.children:
-        text = child.get_text(strip=True).lower() if hasattr(child, "get_text") else ""
-        for cat_key, (pos_code, pos_cat) in category_map.items():
-            if cat_key in text:
-                current_pos_code = pos_code
-                current_category = pos_cat
-
-        if child.name == "table":
-            tbody = child.find("tbody")
-            if not tbody:
-                continue
-
-            for row in tbody.find_all("tr"):
-                cols = row.find_all("td")
-                if len(cols) < 8:
-                    continue
-
-                try:
-                    num_text = cols[0].get_text(strip=True)
-                    num = int(num_text) if num_text.isdigit() else 0
-
-                    img_tag = cols[1].find("img")
-                    photo_url = img_tag["src"] if img_tag and "src" in img_tag.attrs else ""
-
-                    link_tag = cols[2].find("a")
-                    name = link_tag.get_text(strip=True) if link_tag else cols[2].get_text(strip=True)
-                    player_id = 0
-                    if link_tag and "href" in link_tag.attrs:
-                        id_match = re.search(r"player_id=(\d+)", link_tag["href"])
-                        if id_match:
-                            player_id = int(id_match.group(1))
-
-                    bats_throws = cols[3].get_text(strip=True)
-                    height = cols[4].get_text(strip=True)
-                    weight = cols[5].get_text(strip=True)
-                    age_text = cols[6].get_text(strip=True)
-                    age = int(age_text) if age_text.isdigit() else 0
-                    birth_place = cols[7].get_text(strip=True)
-
-                    is_venezuelan = any(
-                        v in birth_place.lower()
-                        for v in [
-                            "venezuela", "ven", "caracas", "maracay", "valencia",
-                            "zulia", "monagas", "aragua", "miranda", "anzoategui",
-                            "bolivar", "falcon", "lara", "tachira", "merida", "sucre"
-                        ]
-                    )
-                    origin = "criollo" if is_venezuelan else "importado"
-
-                    players.append({
-                        "number": num,
-                        "name": name,
-                        "position": current_pos_code,
-                        "positionCategory": current_category,
-                        "batsThrows": bats_throws,
-                        "height": f"{height} m" if not height.endswith("m") else height,
-                        "weight": f"{weight} kg" if not weight.endswith("kg") else weight,
-                        "age": age,
-                        "birthDate": "",
-                        "birthPlace": birth_place,
-                        "level": "LVBP",
-                        "origin": origin,
-                        "mlbId": player_id,
-                        "isWeeklyActive": True,
-                        "photoUrl": photo_url,
-                    })
-                except Exception as row_err:
-                    logger.debug(f"Error procesando fila: {row_err}")
-
+    logger.info(f"Jugadores extraídos directamente del PDF ({os.path.basename(pdf_path)}): {len(players)}")
     return players
 
 
@@ -318,114 +315,130 @@ def download_pdf(pdf_url: str, target_filename: str):
 def main():
     logger.info("=== Iniciando Verificación Semanal de Roster de Leones del Caracas ===")
     os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(DOCUMENTS_DIR, exist_ok=True)
 
-    previous_snapshot = {}
-    if os.path.exists(SNAPSHOT_FILE):
-        try:
-            with open(SNAPSHOT_FILE, "r", encoding="utf-8") as f:
-                previous_snapshot = json.load(f)
-        except Exception as e:
-            logger.warning(f"No se pudo leer snapshot anterior: {e}")
-
-    prev_meta = previous_snapshot.get("meta", {})
-    prev_date = prev_meta.get("officialDate", "")
-    prev_pdf = prev_meta.get("remotePdfUrl", "")
-    prev_movements = prev_meta.get("movements", {"entran": [], "salen": []})
-    prev_players = {p["name"]: p for p in previous_snapshot.get("players", [])}
-
+    bulletins = []
     try:
         html = fetch_leones_roster_html()
+        soup = BeautifulSoup(html, "html.parser")
+        bulletins = parse_all_bulletins(soup)
+        logger.info(f"Boletines remotos detectados en LVBP: {len(bulletins)}")
     except Exception as e:
-        logger.error(f"Error al consultar stats.lvbp.com: {e}")
+        logger.warning(f"No se pudo consultar stats.lvbp.com: {e}. Usando PDFs locales...")
+
+    # Si la red falló o hay PDFs locales, asegurar que todos los archivos locales estén incluidos
+    local_pdfs = sorted(glob.glob(os.path.join(DOCUMENTS_DIR, "Leones_*.pdf")))
+    known_keys = {b["date_key"] for b in bulletins}
+    for lp in local_pdfs:
+        bn = os.path.basename(lp)
+        m = re.search(r"Leones_(\d{8})\.pdf", bn)
+        if m and m.group(1) not in known_keys:
+            dk = m.group(1)
+            # Reconstruir fecha formato DD/MM/YYYY
+            ds = f"{dk[6:8]}/{dk[4:6]}/{dk[0:4]}"
+            bulletins.append({
+                "url": f"/documents/{bn}",
+                "date": ds,
+                "date_key": dk
+            })
+            known_keys.add(dk)
+
+    bulletins.sort(key=lambda b: b["date_key"])
+
+    if not bulletins:
+        logger.error("No se encontraron boletines ni locales ni remotos.")
         sys.exit(1)
 
-    soup = BeautifulSoup(html, "html.parser")
-    pdf_url, official_date = parse_pdf_and_date(soup)
-    logger.info(f"Último boletín detectado en LVBP: {official_date} | PDF URL: {pdf_url}")
+    # Procesar secuencialmente cada boletín para construir el historial completo y movimientos
+    weeks_history = []
+    prev_players_dict = {}
 
-    if not official_date or not pdf_url:
-        logger.warning("No se localizó enlace de PDF o fecha en la respuesta.")
-        sys.exit(0)
+    for idx, b in enumerate(bulletins):
+        clean_url = b["url"].split("?")[0]
+        pdf_filename = os.path.basename(clean_url)
+        target_pdf_path = os.path.join(DOCUMENTS_DIR, pdf_filename)
 
-    # Limpiar query string de URLs firmadas (ej: Leones_20261027.pdf?expires=... -> Leones_20261027.pdf)
-    clean_url = pdf_url.split("?")[0]
-    pdf_filename = os.path.basename(clean_url)
+        if not os.path.exists(target_pdf_path) and b["url"].startswith("http"):
+            try:
+                download_pdf(b["url"], pdf_filename)
+            except Exception as dl_err:
+                logger.error(f"Error descargando {b['url']}: {dl_err}")
+                continue
 
-    # Descargar PDF siempre para garantizar su disponibilidad local si no existe
-    target_pdf_path = os.path.join(DOCUMENTS_DIR, pdf_filename)
-    if not os.path.exists(target_pdf_path):
-        try:
-            download_pdf(pdf_url, pdf_filename)
-        except Exception as e:
-            logger.error(f"Error al descargar el PDF: {e}")
+        if not os.path.exists(target_pdf_path):
+            continue
 
-    # Prioridad 1: Extraer la nómina oficial directamente del PDF firmado
-    new_players = parse_players_from_pdf(target_pdf_path, prev_players)
-    if len(new_players) < 25:
-        logger.info("Fallback a tabla HTML de roster-tab-pane...")
-        html_players = parse_players(soup)
-        if len(html_players) > len(new_players):
-            new_players = html_players
+        players = parse_players_from_pdf(target_pdf_path, prev_players_dict)
+        if len(players) < 25:
+            logger.warning(f"No se pudieron extraer jugadores completos de {pdf_filename}")
+            continue
 
-    logger.info(f"Total jugadores extraídos: {len(new_players)}")
+        week_num, date_range = calculate_week_and_range(b["date"], pdf_filename)
+        official_date = b["date"] or f"{pdf_filename[12:14]}/{pdf_filename[10:12]}/{pdf_filename[6:10]}"
 
-    if not new_players:
-        logger.warning("No se pudieron extraer jugadores del roster.")
-        sys.exit(0)
+        # Calcular altas y bajas respecto a la semana anterior
+        curr_names = {p["name"] for p in players}
+        if prev_players_dict:
+            prev_names = set(prev_players_dict.keys())
+            entran = sorted(list(curr_names - prev_names))
+            salen = sorted(list(prev_names - curr_names))
+        else:
+            entran = []
+            salen = []
 
-    current_names = {p["name"] for p in new_players}
-    prev_names = set(prev_players.keys())
-
-    is_new_bulletin = bool((official_date and official_date != prev_date) or (pdf_url and pdf_url != prev_pdf))
-    players_changed = bool(current_names != prev_names)
-
-    # Si no hay nuevo boletín ni cambios en la nómina, mantener snapshot intacto
-    if not is_new_bulletin and not players_changed and prev_players:
-        logger.info("El boletín oficial y la plantilla no presentan cambios. Conservando snapshot y movimientos vigentes.")
-        return
-
-    # Si es nuevo boletín o cambiaron jugadores, calcular altas y bajas
-    if is_new_bulletin or players_changed:
-        entran = sorted(list(current_names - prev_names)) if prev_names else []
-        salen = sorted(list(prev_names - current_names)) if prev_names else []
-    else:
-        entran = prev_movements.get("entran", [])
-        salen = prev_movements.get("salen", [])
-
-    # Calcular weekNumber y dateRange según fecha oficial
-    week_number = 1
-    date_range = "13 Oct - 19 Oct 2026"
-    if "20/10" in official_date or "20261020" in pdf_filename:
-        week_number = 2
-        date_range = "20 Oct - 26 Oct 2026"
-    elif "27/10" in official_date or "20261027" in pdf_filename:
-        week_number = 3
-        date_range = "27 Oct - 02 Nov 2026"
-
-    # Actualizar snapshot
-    new_snapshot = {
-        "meta": {
+        week_obj = {
+            "weekNumber": week_num,
+            "season": "2026-2027",
+            "dateRange": date_range,
             "officialDate": official_date,
             "pdfUrl": f"/documents/{pdf_filename}",
-            "remotePdfUrl": pdf_url,
+            "remotePdfUrl": b["url"],
             "maxLimit": 34,
-            "totalActive": len(new_players),
-            "weekNumber": week_number,
-            "dateRange": date_range,
-            "updatedAt": datetime.now(timezone.utc).isoformat(),
-            "source": "Liga Venezolana de Béisbol Profesional (LVBP) · TuJonron.com",
+            "totalActive": len(players),
             "movements": {
                 "entran": entran,
                 "salen": salen,
             },
+            "players": players,
+        }
+
+        weeks_history.append(week_obj)
+        prev_players_dict = {p["name"]: p for p in players}
+
+    if not weeks_history:
+        logger.error("No se pudo procesar ninguna semana válida.")
+        sys.exit(1)
+
+    # La semana más reciente es la última procesada
+    latest_week = weeks_history[-1]
+
+    # Ordenar historial de más reciente a más antiguo para el selector de UI
+    weeks_reversed = list(reversed(weeks_history))
+
+    snapshot = {
+        "meta": {
+            "officialDate": latest_week["officialDate"],
+            "pdfUrl": latest_week["pdfUrl"],
+            "remotePdfUrl": latest_week["remotePdfUrl"],
+            "maxLimit": latest_week["maxLimit"],
+            "totalActive": latest_week["totalActive"],
+            "weekNumber": latest_week["weekNumber"],
+            "dateRange": latest_week["dateRange"],
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+            "source": "Liga Venezolana de Béisbol Profesional (LVBP) · TuJonron.com",
+            "movements": latest_week["movements"],
         },
-        "players": new_players,
+        "players": latest_week["players"],
+        "weeks": weeks_reversed,
     }
 
     with open(SNAPSHOT_FILE, "w", encoding="utf-8") as f:
-        json.dump(new_snapshot, f, ensure_ascii=False, indent=2)
+        json.dump(snapshot, f, ensure_ascii=False, indent=2)
 
-    logger.info(f"Snapshot semanal guardado exitosamente en {SNAPSHOT_FILE} con {len(new_players)} peloteros. (+{len(entran)} altas / -{len(salen)} bajas)")
+    logger.info(
+        f"✅ Snapshot actualizado exitosamente en {SNAPSHOT_FILE} con {len(weeks_history)} semanas registradas. "
+        f"Semana activa: Semana {latest_week['weekNumber']} ({latest_week['dateRange']}) con {len(latest_week['players'])} jugadores."
+    )
 
 
 if __name__ == "__main__":
