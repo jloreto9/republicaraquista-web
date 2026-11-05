@@ -17,19 +17,36 @@ export function LiveHeroGameCard({ game }: LiveHeroGameCardProps) {
     linescore,
     count,
     bases,
-    currentBatter,
-    currentPitcher,
-    isLive,
-    isFinal,
+    batter,
+    pitcher,
     venue,
     venueCity,
     winProbability,
   } = game;
 
+  // Detección robusta del estado del juego
+  const isLive =
+    game.status === "Live" ||
+    game.statusLabel?.toLowerCase().includes("vivo") ||
+    game.detailedState === "In Progress";
+
+  const isFinal =
+    game.status === "Final" ||
+    game.statusLabel?.toLowerCase().includes("final") ||
+    game.detailedState === "Final";
+
   // Formato de entrada actual para el badge
-  const halfText = linescore?.inningHalf === "Top" ? "ALTA" : linescore?.inningHalf === "Bottom" ? "BAJA" : "";
+  const halfText =
+    linescore?.inningHalf === "Top" || game.inningHalf === "Alta"
+      ? "ALTA"
+      : linescore?.inningHalf === "Bottom" || game.inningHalf === "Baja"
+      ? "BAJA"
+      : "";
+
+  const inningNum = linescore?.currentInning || game.currentInning || 1;
+
   const inningLabel = isLive
-    ? `${halfText} DE LA ${linescore?.currentInning || 1}.ª`
+    ? `${halfText ? `${halfText} DE LA ` : ""}${inningNum}.ª`
     : isFinal
     ? "FINAL"
     : "PRÓXIMO ENCUENTRO";
@@ -38,22 +55,30 @@ export function LiveHeroGameCard({ game }: LiveHeroGameCardProps) {
   const inningsList = linescore?.innings || [];
   const maxInningsToShow = Math.max(
     6,
-    Math.min(9, Math.max(linescore?.currentInning || 0, inningsList.length))
+    Math.min(9, Math.max(inningNum, inningsList.length))
   );
   const displayInnings = Array.from({ length: maxInningsToShow }, (_, i) => i + 1);
 
-  // Puntos para la mini curva de Win Probability SVG
-  const history = winProbability?.history || [];
-  const points = history.length > 1 ? history : [{ idx: 0, weHome: 0.5 }, { idx: 1, weHome: (winProbability?.currentWeHome ?? 50) / 100 }];
+  // Probabilidad de Ganar de Leones
+  const currentLeonesWp = winProbability?.currentLeonesWp ?? 0.5;
+  const currentPct = Math.round(currentLeonesWp * 100);
+  const keyPlay = winProbability?.keyPlay;
+
+  // Puntos para la curva de Win Probability SVG
+  const trend = winProbability?.trend || [];
+  const pointsToRender = trend.length > 0
+    ? trend
+    : [{ leonesWp: 0.5 }, { leonesWp: currentLeonesWp }];
+
   const svgWidth = 400;
   const svgHeight = 44;
 
-  const polylineCoords = points
+  const polylineCoords = pointsToRender
     .map((pt, i) => {
-      const x = (i / Math.max(1, points.length - 1)) * svgWidth;
-      // Probabilidad de Leones (invertir eje Y: 1.0 -> y=4, 0.0 -> y=40)
-      const weLeonesVal = game.homeTeam.isLeones ? pt.weHome : 1.0 - pt.weHome;
-      const y = svgHeight - (weLeonesVal * (svgHeight - 12) + 6);
+      const x = (i / Math.max(1, pointsToRender.length - 1)) * svgWidth;
+      // pt.leonesWp es número entre 0.0 y 1.0; acotamos para asegurar márgenes visuales
+      const clampedWp = Math.max(0.05, Math.min(0.95, pt.leonesWp));
+      const y = svgHeight - (clampedWp * (svgHeight - 10) + 5);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
@@ -281,11 +306,11 @@ export function LiveHeroGameCard({ game }: LiveHeroGameCardProps) {
             <div className="text-[10px] text-slate-300 space-y-0.5 truncate max-w-[160px] sm:max-w-[200px]">
               <p className="truncate">
                 <span className="text-slate-400 font-sans">Bate: </span>
-                <span className="font-bold text-slate-100">{currentBatter?.name || "En espera"}</span>
+                <span className="font-bold text-slate-100">{batter?.name || "En espera"}</span>
               </p>
               <p className="truncate">
                 <span className="text-slate-400 font-sans">Lanza: </span>
-                <span className="font-bold text-slate-100">{currentPitcher?.name || "Por anunciar"}</span>
+                <span className="font-bold text-slate-100">{pitcher?.name || "Por anunciar"}</span>
               </p>
             </div>
           </div>
@@ -300,8 +325,13 @@ export function LiveHeroGameCard({ game }: LiveHeroGameCardProps) {
               Probabilidad de ganar
             </span>
             <span className="text-sm font-extrabold font-mono text-[#FDB827]">
-              {winProbability?.weLeones ?? (homeTeam.isLeones ? 50 : 50)}% Leones
+              {currentPct}% Leones
             </span>
+            {keyPlay && (
+              <span className="text-[10px] text-slate-400 font-mono hidden xl:inline">
+                • {keyPlay.description} ({keyPlay.deltaWpaText})
+              </span>
+            )}
           </div>
 
           {/* Mini Sparkline WPA */}
