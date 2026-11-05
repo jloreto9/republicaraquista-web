@@ -15,7 +15,7 @@ function formatRelativeTime(dateStr: string): string {
     if (diffHours < 1) return 'Hace momentos';
     if (diffHours < 24) return `Hace ${diffHours} h`;
     if (diffDays === 1) return 'Ayer';
-    if (diffDays < 7) return `Hace ${diffDays} días`;
+    if (diffDays < 7) return `Hace ${diffDays} dÃ­as`;
     return date.toLocaleDateString('es-VE', { month: 'short', day: 'numeric' });
   } catch {
     return 'Reciente';
@@ -26,7 +26,7 @@ export async function GET() {
   const notifications: AppNotification[] = [];
 
   try {
-    // 1. Obtener juego más reciente o en vivo de Leones del Caracas desde MLB Stats API
+    // 1. Obtener juego mÃ¡s reciente o en vivo de Leones del Caracas desde MLB Stats API
     try {
       const scheduleRes = await fetch(
         'https://statsapi.mlb.com/api/v1/schedule?sportId=17&leagueId=135&season=2026',
@@ -76,7 +76,7 @@ export async function GET() {
           }
         }
 
-        // Tomar el juego más relevante (el en vivo si hay, o el último jugado)
+        // Tomar el juego mÃ¡s relevante (el en vivo si hay, o el Ãºltimo jugado)
         const activeGame = caracasGames.find((g) => g.isLive) || caracasGames[caracasGames.length - 1];
 
         if (activeGame) {
@@ -91,7 +91,7 @@ export async function GET() {
               category: 'game',
               badge: 'EN VIVO',
               badgeColor: 'emerald',
-              title: `🔴 EN VIVO • Leones ${carScore} - ${oppScore} ${oppName}`,
+              title: `ðŸ”´ EN VIVO â€¢ Leones ${carScore} - ${oppScore} ${oppName}`,
               description: `Partido en desarrollo. Sigue el diamante interactivo, conteo de pitcheos y jugada a jugada oficial en tiempo real.`,
               timestamp: activeGame.date,
               relativeTime: 'Ahora',
@@ -106,7 +106,7 @@ export async function GET() {
               badge: won ? 'VICTORIA' : 'FINAL',
               badgeColor: won ? 'gold' : 'slate',
               title: `Pizarra Final: Leones ${carScore} - ${oppScore} ${oppName}`,
-              description: `Encuentro finalizado (${activeGame.date}). Consulta el boxscore oficial, líneas de bateo y actuaciones del cuerpo de relevistas.`,
+              description: `Encuentro finalizado (${activeGame.date}). Consulta el boxscore oficial, lÃ­neas de bateo y actuaciones del cuerpo de relevistas.`,
               timestamp: activeGame.date,
               relativeTime: formatRelativeTime(activeGame.date),
               actionUrl: `/game-center?gamePk=${activeGame.gamePk}`,
@@ -120,7 +120,7 @@ export async function GET() {
       console.warn('No se pudo cargar juego para notificaciones:', schedErr);
     }
 
-    // 2. Obtener últimas crónicas de NotiCueva desde Supabase
+    // 2. Obtener Ãºltimas crÃ³nicas de NotiCueva desde Supabase
     if (supabase) {
       try {
         const { data: posts } = await supabase
@@ -134,19 +134,19 @@ export async function GET() {
           posts.forEach((p) => {
             const snippet = p.content
               ? p.content.replace(/<[^>]+>/g, '').slice(0, 120) + '...'
-              : 'Nueva crónica de opinión y análisis disponible en La Cueva.';
+              : 'Nueva crÃ³nica de opiniÃ³n y anÃ¡lisis disponible en La Cueva.';
 
             notifications.push({
               id: `post-${p.id}`,
               category: 'news',
               badge: 'NOTICUEVA',
               badgeColor: 'blue',
-              title: p.title || 'Nueva crónica en NotiCueva',
-              description: `${snippet} (Por ${p.author || 'Gilberto Méndez'})`,
+              title: p.title || 'Nueva crÃ³nica en NotiCueva',
+              description: `${snippet} (Por ${p.author || 'Gilberto MÃ©ndez'})`,
               timestamp: p.created_at,
               relativeTime: formatRelativeTime(p.created_at),
               actionUrl: `/noticueva`,
-              actionLabel: 'Leer Crónica',
+              actionLabel: 'Leer CrÃ³nica',
               unread: false,
             });
           });
@@ -156,14 +156,14 @@ export async function GET() {
       }
     }
 
-    // 3. Notificación permanente de Roster Oficial de la Semana
+    // 3. NotificaciÃ³n permanente de Roster Oficial de la Semana
     notifications.push({
       id: 'roster-weekly-active',
       category: 'roster',
       badge: 'ROSTER OFICIAL',
       badgeColor: 'gold',
-      title: 'Nómina Semanal de 34 Activos Confirmada',
-      description: 'Consulta los 34 jugadores autorizados por la LVBP, lanzadores abridores, cuerpo de relevistas y coaching staff de José Alguacil.',
+      title: 'NÃ³mina Semanal de 34 Activos Confirmada',
+      description: 'Consulta los 34 jugadores autorizados por la LVBP, lanzadores abridores, cuerpo de relevistas y coaching staff de JosÃ© Alguacil.',
       timestamp: new Date().toISOString(),
       relativeTime: 'Semana Activa',
       actionUrl: '/roster',
@@ -171,26 +171,34 @@ export async function GET() {
       unread: false,
     });
 
-    // 4. Notificación del Circuito Radial La Mega 107.3 FM
+    // 4. NotificaciÃ³n del Circuito Radial La Mega 107.3 FM
     notifications.push({
       id: 'radio-circuit-active',
       category: 'radio',
       badge: 'CIRCUITO RADIAL',
       badgeColor: 'blue',
-      title: 'Transmisión Oficial en Vivo • La Mega 107.3 FM',
-      description: 'Sintoniza la señal radial de Unión Radio y República Caraquista directamente desde el reproductor flotante sin interrumpir tu navegación.',
+      title: 'TransmisiÃ³n Oficial en Vivo â€¢ La Mega 107.3 FM',
+      description: 'Sintoniza la seÃ±al radial de UniÃ³n Radio y RepÃºblica Caraquista directamente desde el reproductor flotante sin interrumpir tu navegaciÃ³n.',
       timestamp: new Date().toISOString(),
       relativeTime: '24/7',
       actionUrl: '/game-center',
-      actionLabel: 'Sintonizar Señal',
+      actionLabel: 'Sintonizar SeÃ±al',
       unread: false,
     });
 
-    return NextResponse.json({
-      success: true,
-      notifications,
-      count: notifications.length,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        notifications,
+        count: notifications.length,
+      },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=120",
+        },
+      }
+    );
   } catch (error) {
     console.error('Error generando notificaciones de la app:', error);
     return NextResponse.json(
