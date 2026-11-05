@@ -20,6 +20,19 @@ export const config = {
 export function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const userAgent = req.headers.get("user-agent") || "";
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
+
+  // 0. Redirección forzada de *.vercel.app hacia el dominio oficial republicaraquistapp.com (Cloudflare)
+  if (
+    host.includes("republicaraquistapp.vercel.app") ||
+    (process.env.NODE_ENV === "production" && host.endsWith(".vercel.app") && !host.includes("localhost"))
+  ) {
+    const targetUrl = req.nextUrl.clone();
+    targetUrl.host = "republicaraquistapp.com";
+    targetUrl.protocol = "https";
+    targetUrl.port = "";
+    return NextResponse.redirect(targetUrl, { status: 308 });
+  }
 
   // A. Bloqueo fulminante de scanners de vulnerabilidades (ej. /wp-admin/install.php)
   if (MALICIOUS_PATH_PATTERN.test(pathname)) {
