@@ -281,10 +281,11 @@ interface SplitBucket {
   rbi: number;
   hbp: number;
   sf: number;
+  gidp: number;
 }
 
 function emptyBucket(): SplitBucket {
-  return { pa: 0, ab: 0, h: 0, doubles: 0, triples: 0, hr: 0, bb: 0, so: 0, rbi: 0, hbp: 0, sf: 0 };
+  return { pa: 0, ab: 0, h: 0, doubles: 0, triples: 0, hr: 0, bb: 0, so: 0, rbi: 0, hbp: 0, sf: 0, gidp: 0 };
 }
 
 const NON_PA_EVENT_RE =
@@ -315,6 +316,11 @@ function recordPlayInBucket(bucket: SplitBucket, event: string, eventType: strin
   if (eventType.startsWith("strikeout") || event.includes("Strikeout")) bucket.so += 1;
   if (isHBP) bucket.hbp += 1;
   if (isSF) bucket.sf += 1;
+  const isGidp =
+    eventType === "grounded_into_double_play" ||
+    event === "Grounded Into Double Play" ||
+    event.toLowerCase().includes("into double play");
+  if (isGidp) bucket.gidp += 1;
   bucket.rbi += rbi;
 }
 
@@ -329,10 +335,11 @@ interface PitchingBucket {
   so: number;
   er: number;
   outs: number;
+  gidp: number;
 }
 
 function emptyPitchingBucket(): PitchingBucket {
-  return { pa: 0, ab: 0, h: 0, doubles: 0, triples: 0, hr: 0, bb: 0, so: 0, er: 0, outs: 0 };
+  return { pa: 0, ab: 0, h: 0, doubles: 0, triples: 0, hr: 0, bb: 0, so: 0, er: 0, outs: 0, gidp: 0 };
 }
 
 function recordPitchingPlayInBucket(
@@ -366,6 +373,11 @@ function recordPitchingPlayInBucket(
   }
   if (isBB) bucket.bb += 1;
   if (eventType.startsWith("strikeout") || event.includes("Strikeout")) bucket.so += 1;
+  const isGidp =
+    eventType === "grounded_into_double_play" ||
+    event === "Grounded Into Double Play" ||
+    event.toLowerCase().includes("into double play");
+  if (isGidp) bucket.gidp += 1;
   bucket.outs += outsMade;
 }
 
@@ -425,6 +437,7 @@ export function computeSituationalDataFromFeeds(feeds: any[]): SituationalData {
       hRisp: number;
       abRisp: number;
       rbi: number;
+      gidp: number;
       lobEnding: number;
       rispLobEnding: number;
       rispLobMid: number;
@@ -644,6 +657,7 @@ export function computeSituationalDataFromFeeds(feeds: any[]): SituationalData {
                 hRisp: 0,
                 abRisp: 0,
                 rbi: 0,
+                gidp: 0,
                 lobEnding: 0,
                 rispLobEnding: 0,
                 rispLobMid: 0,
@@ -652,6 +666,13 @@ export function computeSituationalDataFromFeeds(feeds: any[]): SituationalData {
             const bRec = batterLobMap[batterId];
             bRec.pa += 1;
             bRec.rbi += rbi;
+            const isGidpPlay =
+              eventType === "grounded_into_double_play" ||
+              event === "Grounded Into Double Play" ||
+              event.toLowerCase().includes("into double play");
+            if (isGidpPlay) {
+              bRec.gidp += 1;
+            }
             if (isRisp) {
               bRec.paRisp += 1;
               if (isAb) bRec.abRisp += 1;
@@ -797,7 +818,7 @@ export function computeSituationalDataFromFeeds(feeds: any[]): SituationalData {
     return {
       situacion: name,
       badge,
-      ...calculateSlashLine(b.pa, b.ab, b.h, b.doubles, b.triples, b.hr, b.bb, b.so, b.rbi, b.hbp, b.sf),
+      ...calculateSlashLine(b.pa, b.ab, b.h, b.doubles, b.triples, b.hr, b.bb, b.so, b.rbi, b.hbp, b.sf, b.gidp),
     };
   };
 
@@ -828,7 +849,8 @@ export function computeSituationalDataFromFeeds(feeds: any[]): SituationalData {
       b.bb,
       b.so,
       b.er,
-      b.outs
+      b.outs,
+      b.gidp
     );
   };
 
@@ -864,6 +886,7 @@ export function computeSituationalDataFromFeeds(feeds: any[]): SituationalData {
         paRisp: d.paRisp,
         rbi: d.rbi,
         avgRisp: formatRate(avgRispNum),
+        gidp: d.gidp,
         lobEnding: d.lobEnding,
         rispLobEnding: d.rispLobEnding,
         rispLobMid: d.rispLobMid,

@@ -8,6 +8,7 @@ import {
   BroadcastChannelRecord,
   HeadToHeadRecord,
   DashboardTabsData,
+  GameMVP,
 } from "@/types/leones-stats";
 import { ACTIVE_SEASON, getTeam, getPlayerHeadshotUrl } from "./constants";
 import { supabase, getBattingStats, getPitchingStats } from "./supabase";

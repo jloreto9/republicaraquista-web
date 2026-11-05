@@ -560,6 +560,38 @@ export async function getSeasonKPIs(season = ACTIVE_SEASON): Promise<SeasonKPIs>
   };
 }
 
+async function fetchMlbSeasonGidpMap(
+  season: number,
+  phase: string,
+  group: "hitting" | "pitching"
+): Promise<Map<number, number>> {
+  const map = new Map<number, number>();
+  try {
+    const gameTypeParam = phase && phase !== "all" ? `&gameType=${phase}` : "";
+    const url = `https://statsapi.mlb.com/api/v1/stats?stats=season&sportId=17&leagueId=135&group=${group}&season=${season}${gameTypeParam}&playerPool=all&limit=1000`;
+    const res = await fetch(url, {
+      next: { revalidate: 300 },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) RepublicaCaraquista/1.0",
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const splits = data.stats?.[0]?.splits || [];
+      for (const s of splits) {
+        const pId = Number(s.player?.id);
+        const gidp = Number(s.stat?.groundIntoDoublePlay ?? 0);
+        if (pId) {
+          map.set(pId, gidp);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`Error fetching MLB season GIDP map (${group}):`, err);
+  }
+  return map;
+}
+
 /**
  * Obtiene estadísticas agregadas de bateo por jugador para una temporada y fase.
  */
@@ -599,7 +631,12 @@ export async function getBattingStats(
     query = query.eq("team_id", Number(teamId));
   }
 
-  const { data: rawData, error } = await query;
+  const [dbResult, gidpMap] = await Promise.all([
+    query,
+    fetchMlbSeasonGidpMap(season, phase, "hitting"),
+  ]);
+
+  const { data: rawData, error } = dbResult;
 
   if (error) {
     console.error("Error al consultar batting_stats:", error);
@@ -741,6 +778,7 @@ export async function getBattingStats(
       strikeouts: p.so,
       stolenBases: p.sb,
       caughtStealing: p.cs,
+      gidp: gidpMap.get(p.playerId) ?? 0,
       hbp: p.hbp,
       sf: p.sf,
       sh: p.sh,
@@ -798,7 +836,12 @@ export async function getPitchingStats(
     query = query.eq("team_id", Number(teamId));
   }
 
-  const { data: rawData, error } = await query;
+  const [dbResult, gidpMap] = await Promise.all([
+    query,
+    fetchMlbSeasonGidpMap(season, phase, "pitching"),
+  ]);
+
+  const { data: rawData, error } = dbResult;
 
   if (error) {
     console.error("Error al consultar pitching_stats:", error);
@@ -913,6 +956,7 @@ export async function getPitchingStats(
       walks: p.walks,
       strikeouts: p.strikeouts,
       homeRuns: p.homeRuns,
+      gidp: gidpMap.get(p.playerId) ?? 0,
       era,
       whip,
       kPer9,

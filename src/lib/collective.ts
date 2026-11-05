@@ -100,6 +100,7 @@ export async function getCollectiveStats(
       doubles: toNum(stat.doubles),
       triples: toNum(stat.triples),
       hr: toNum(stat.homeRuns),
+      gidp: toNum(stat.groundIntoDoublePlay),
       rbi: toNum(stat.rbi),
       bb: toNum(stat.baseOnBalls),
       so: toNum(stat.strikeOuts),
@@ -159,6 +160,7 @@ export async function getCollectiveStats(
       bb: toNum(stat.baseOnBalls),
       so: toNum(stat.strikeOuts),
       hr: toNum(stat.homeRuns),
+      gidp: toNum(stat.groundIntoDoublePlay),
       k9,
       k9Str: k9.toFixed(2),
       bb9,
@@ -293,6 +295,7 @@ function calculateBattingSummary(
   const so = batting.reduce((acc, t) => acc + t.so, 0);
   const sb = batting.reduce((acc, t) => acc + t.sb, 0);
   const lob = batting.reduce((acc, t) => acc + t.lob, 0);
+  const gidp = batting.reduce((acc, t) => acc + t.gidp, 0);
 
   const avg = ab > 0 ? h / ab : 0;
   const obp = pa > 0 ? (h + bb) / pa : 0;
@@ -328,6 +331,7 @@ function calculateBattingSummary(
     slgStr: toPctStr(slg),
     ops,
     opsStr: toPctStr(ops),
+    gidp,
     lob,
     babip,
     babipStr: toPctStr(babip),
@@ -351,6 +355,7 @@ function calculateBattingSummary(
     obpStr: toPctStr(obp),
     slgStr: toPctStr(slg),
     opsStr: toPctStr(ops),
+    gidp: (gidp / uniqueGames).toFixed(1),
     lob: (lob / uniqueGames).toFixed(1),
     babipStr: toPctStr(babip),
   };
@@ -372,6 +377,7 @@ function calculateBattingSummary(
     obpStr: toPctStr(obp),
     slgStr: toPctStr(slg),
     opsStr: toPctStr(ops),
+    gidp: (gidp / teamGamesSafe).toFixed(1),
     lob: (lob / teamGamesSafe).toFixed(1),
     babipStr: toPctStr(babip),
   };
@@ -406,6 +412,7 @@ function calculatePitchingSummary(
   const bb = pitching.reduce((acc, t) => acc + t.bb, 0);
   const so = pitching.reduce((acc, t) => acc + t.so, 0);
   const hr = pitching.reduce((acc, t) => acc + t.hr, 0);
+  const gidp = pitching.reduce((acc, t) => acc + t.gidp, 0);
 
   const era = totalIpDecimal > 0 ? (er * 9) / totalIpDecimal : 0;
   const whip = totalIpDecimal > 0 ? (bb + h) / totalIpDecimal : 0;
@@ -437,6 +444,7 @@ function calculatePitchingSummary(
     bb,
     so,
     hr,
+    gidp,
     k9,
     k9Str: k9.toFixed(2),
     bb9,
@@ -464,6 +472,7 @@ function calculatePitchingSummary(
     bb: (bb / uniqueGames).toFixed(1),
     so: (so / uniqueGames).toFixed(1),
     hr: (hr / uniqueGames).toFixed(1),
+    gidp: (gidp / uniqueGames).toFixed(1),
     k9Str: k9.toFixed(2),
     bb9Str: bb9.toFixed(2),
     kbbStr: kbb.toFixed(2),
@@ -486,6 +495,7 @@ function calculatePitchingSummary(
     bb: (bb / teamGamesSafe).toFixed(1),
     so: (so / teamGamesSafe).toFixed(1),
     hr: (hr / teamGamesSafe).toFixed(1),
+    gidp: (gidp / teamGamesSafe).toFixed(1),
     k9Str: k9.toFixed(2),
     bb9Str: bb9.toFixed(2),
     kbbStr: kbb.toFixed(2),

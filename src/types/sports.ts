@@ -89,6 +89,7 @@ export interface BattingStats {
   strikeouts: number;
   stolenBases: number;
   caughtStealing: number;
+  gidp?: number;
   hbp?: number;
   sf?: number;
   sh?: number;
@@ -118,6 +119,7 @@ export interface PitchingStats {
   walks: number;
   strikeouts: number;
   homeRuns: number;
+  gidp?: number;
   era: number;
   whip: number;
   kPer9: number;

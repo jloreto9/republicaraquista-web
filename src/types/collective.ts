@@ -11,6 +11,7 @@ export interface CollectiveBattingTeam {
   doubles: number;
   triples: number;
   hr: number;
+  gidp: number;
   rbi: number;
   bb: number;
   so: number;
@@ -52,6 +53,7 @@ export interface CollectivePitchingTeam {
   bb: number;
   so: number;
   hr: number;
+  gidp: number;
   k9: number;
   k9Str: string;
   bb9: number;

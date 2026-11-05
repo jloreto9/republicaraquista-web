@@ -125,6 +125,13 @@ export function PitchingTable({ stats, onSelectPlayerForSplits }: PitchingTableP
                 HR
               </th>
               <th
+                onClick={() => handleSort("gidp")}
+                className="py-3 px-2 text-center cursor-pointer hover:text-slate-200"
+                title="Doble Plays Inducidos (GIDP)"
+              >
+                GIDP
+              </th>
+              <th
                 onClick={() => handleSort("era")}
                 className="py-3 px-3 text-center cursor-pointer hover:text-[#FDB827] font-bold text-[#FDB827]"
               >
@@ -247,6 +254,9 @@ export function PitchingTable({ stats, onSelectPlayerForSplits }: PitchingTableP
                     {pitcher.strikeouts}
                   </td>
                   <td className="py-2.5 px-2 text-center">{pitcher.homeRuns}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-300">
+                    {pitcher.gidp ?? 0}
+                  </td>
                   <td className="py-2.5 px-3 text-center font-bold text-[#FDB827]">
                     {pitcher.era.toFixed(2)}
                   </td>

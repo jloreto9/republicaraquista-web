@@ -8,6 +8,7 @@ export interface SlashLine {
   bb: number;
   so: number;
   rbi: number;
+  gidp: number;
   avg: string;
   obp: string;
   slg: string;
@@ -34,6 +35,7 @@ export interface PitchingSituationalSplit {
   hr: number;       // Jonrones permitidos
   bb: number;       // Boletos concedidos
   so: number;       // Ponches propinados
+  gidp: number;     // Doble plays inducidos
   er: number;       // Carreras limpias
   ipDisplay: string;// Innings (ej. "45.1")
   ipDecimal: number;
@@ -62,6 +64,7 @@ export interface BatterLobRecord {
   paRisp: number;
   rbi: number;
   avgRisp: string;
+  gidp: number;
   lobEnding: number;
   rispLobEnding: number;
   rispLobMid: number;

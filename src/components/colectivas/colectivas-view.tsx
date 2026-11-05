@@ -278,6 +278,7 @@ export function ColectivasView({
                     <th className="py-2.5 px-2 text-center">RBI</th>
                     <th className="py-2.5 px-2 text-center">BB</th>
                     <th className="py-2.5 px-2 text-center">SO</th>
+                    <th className="py-2.5 px-2 text-center" title="Bateo para Doble Play (GIDP)">GIDP</th>
                     <th className="py-2.5 px-2 text-center">SB</th>
                     <th className="py-2.5 px-2 text-center text-[#FDB827] font-bold">AVG</th>
                     <th className="py-2.5 px-2 text-center">OBP</th>
@@ -355,6 +356,9 @@ export function ColectivasView({
                         {viewMode === "per_game" ? (t.so / (t.games || 1)).toFixed(1) : t.so}
                       </td>
                       <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.gidp / (t.games || 1)).toFixed(1) : t.gidp}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
                         {viewMode === "per_game" ? (t.sb / (t.games || 1)).toFixed(1) : t.sb}
                       </td>
                       <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{t.avgStr}</td>
@@ -402,6 +406,7 @@ export function ColectivasView({
                       <td className="py-3 px-2 text-center text-slate-200">{data.battingSummary.total.rbi.toLocaleString()}</td>
                       <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.bb.toLocaleString()}</td>
                       <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.so.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.gidp.toLocaleString()}</td>
                       <td className="py-3 px-2 text-center text-slate-400">{data.battingSummary.total.sb.toLocaleString()}</td>
                       <td className="py-3 px-2 text-center font-bold text-[#FDB827]">{data.battingSummary.total.avgStr}</td>
                       <td className="py-3 px-2 text-center text-slate-300">{data.battingSummary.total.obpStr}</td>
@@ -448,6 +453,7 @@ export function ColectivasView({
                       <td className="py-2.5 px-2 text-center text-slate-200">{data.battingSummary.perGame.rbi}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.bb}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.so}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-300">{data.battingSummary.perGame.gidp}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{data.battingSummary.perGame.sb}</td>
                       <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{data.battingSummary.perGame.avgStr}</td>
                       <td className="py-2.5 px-2 text-center text-slate-300">{data.battingSummary.perGame.obpStr}</td>
@@ -490,6 +496,7 @@ export function ColectivasView({
               { value: "bb", label: "Boletos (BB)" },
               { value: "sb", label: "Bases Robadas (SB)" },
               { value: "lob", label: "Dejados en Base (LOB)" },
+              { value: "gidp", label: "Doble Plays Bateados (GIDP)" },
             ]}
           />
 
@@ -508,6 +515,10 @@ export function ColectivasView({
               {
                 term: "LOB (Left On Base)",
                 desc: "Corredores dejados en base que no lograron anotar durante las entradas.",
+              },
+              {
+                term: "GIDP (Grounded Into Double Play)",
+                desc: "Bateo para doble matanza. Cantidad de rodados que provocaron dos outs en la jugada.",
               },
               {
                 term: "BABIP Colectivo",
@@ -582,6 +593,7 @@ export function ColectivasView({
                     <th className="py-2.5 px-2 text-center">BB</th>
                     <th className="py-2.5 px-2 text-center text-[#FDB827] font-bold">SO</th>
                     <th className="py-2.5 px-2 text-center">HR</th>
+                    <th className="py-2.5 px-2 text-center" title="Doble Plays Inducidos (GIDP)">GIDP</th>
                     <th className="py-2.5 px-2 text-center">K/9</th>
                     <th className="py-2.5 px-2 text-center">BB/9</th>
                     <th className="py-2.5 px-2 text-center">K/BB</th>
@@ -669,6 +681,9 @@ export function ColectivasView({
                       <td className="py-2.5 px-2 text-center text-slate-400">
                         {viewMode === "per_game" ? (t.hr / (t.games || 1)).toFixed(1) : t.hr}
                       </td>
+                      <td className="py-2.5 px-2 text-center text-slate-400">
+                        {viewMode === "per_game" ? (t.gidp / (t.games || 1)).toFixed(1) : t.gidp}
+                      </td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{t.k9Str}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{t.bb9Str}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{t.kbbStr}</td>
@@ -714,6 +729,7 @@ export function ColectivasView({
                       <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.bb.toLocaleString()}</td>
                       <td className="py-3 px-2 text-center font-bold text-[#FDB827]">{data.pitchingSummary.total.so.toLocaleString()}</td>
                       <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.hr.toLocaleString()}</td>
+                      <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.gidp.toLocaleString()}</td>
                       <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.k9Str}</td>
                       <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.bb9Str}</td>
                       <td className="py-3 px-2 text-center text-slate-400">{data.pitchingSummary.total.kbbStr}</td>
@@ -761,6 +777,7 @@ export function ColectivasView({
                       <td className="py-2.5 px-2 text-center text-slate-300">{data.pitchingSummary.perGame.bb}</td>
                       <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{data.pitchingSummary.perGame.so}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{data.pitchingSummary.perGame.hr}</td>
+                      <td className="py-2.5 px-2 text-center text-slate-300">{data.pitchingSummary.perGame.gidp}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{data.pitchingSummary.perGame.k9Str}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{data.pitchingSummary.perGame.bb9Str}</td>
                       <td className="py-2.5 px-2 text-center text-slate-400">{data.pitchingSummary.perGame.kbbStr}</td>
@@ -794,6 +811,7 @@ export function ColectivasView({
               { value: "kbb", label: "Relación K/BB" },
               { value: "sv", label: "Juegos Salvados (SV)" },
               { value: "baa", label: "Promedio Bateo Oponente (BAA)" },
+              { value: "gidp", label: "Doble Plays Inducidos (GIDP)" },
             ]}
             inverted={pitchingMetric === "era" || pitchingMetric === "whip" || pitchingMetric === "bb"}
           />
@@ -813,6 +831,10 @@ export function ColectivasView({
               {
                 term: "HLD & BS",
                 desc: "Holds y Blown Saves: miden la retención o pérdida de ventajas del cuerpo de relevistas.",
+              },
+              {
+                term: "GIDP Inducidos",
+                desc: "Doble matanzas inducidas por los lanzadores a los bateadores rivales mediante rodados defensivos.",
               },
               {
                 term: "BAA",

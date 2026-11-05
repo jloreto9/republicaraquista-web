@@ -136,6 +136,13 @@ export function BattingTable({ stats, onSelectPlayerForSplits }: BattingTablePro
                 SO
               </th>
               <th
+                onClick={() => handleSort("gidp")}
+                className="py-3 px-2 text-center cursor-pointer hover:text-slate-200"
+                title="Bateo para Doble Play (GIDP)"
+              >
+                GIDP
+              </th>
+              <th
                 onClick={() => handleSort("stolenBases")}
                 className="py-3 px-2 text-center cursor-pointer hover:text-slate-200"
               >
@@ -266,6 +273,9 @@ export function BattingTable({ stats, onSelectPlayerForSplits }: BattingTablePro
                   <td className="py-2.5 px-2 text-center">{player.walks}</td>
                   <td className="py-2.5 px-2 text-center text-slate-400">
                     {player.strikeouts}
+                  </td>
+                  <td className="py-2.5 px-2 text-center text-slate-400">
+                    {player.gidp ?? 0}
                   </td>
                   <td className="py-2.5 px-2 text-center text-emerald-400">
                     {player.stolenBases}
