@@ -36,7 +36,7 @@ export function MobileNav() {
   return (
     <>
       {/* ── Barra Superior Móvil (Visible solo en < lg) ── */}
-      <header className="lg:hidden h-14 landscape-compact-header bg-[#070B19]/95 backdrop-blur-md border-b border-[#1E2B4D] px-4 px-safe flex items-center justify-between sticky top-0 z-40 shrink-0">
+      <header className="lg:hidden h-[calc(3.5rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] landscape-compact-header bg-[#070B19]/95 backdrop-blur-md border-b border-[#1E2B4D] px-4 px-safe flex items-center justify-between sticky top-0 z-40 shrink-0">
         <Link href="/" className="flex items-center space-x-2.5">
           <div className="relative w-8 h-8 logo-container rounded-lg overflow-hidden border border-[#FDB827]/40 bg-[#0D152B] p-0.5 flex items-center justify-center shrink-0">
             <Image
@@ -81,7 +81,7 @@ export function MobileNav() {
         )}
       >
         {/* Cabecera del Drawer */}
-        <div className="p-4 border-b border-[#1E2B4D] flex items-center justify-between">
+        <div className="p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] border-b border-[#1E2B4D] flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#FDB827]/40 bg-[#0D152B] p-0.5 flex items-center justify-center shrink-0">
               <Image

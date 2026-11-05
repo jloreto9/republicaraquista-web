@@ -21,7 +21,7 @@ export function Header({
   const caracas = getTeam(695);
 
   return (
-    <header className="min-h-14 sm:h-16 border-b border-[#1E2B4D] bg-[#070B19]/90 backdrop-blur-md px-4 sm:px-6 py-2.5 sm:py-0 flex items-center justify-between sticky top-0 z-20">
+    <header className="min-h-14 sm:h-16 border-b border-[#1E2B4D] bg-[#070B19]/90 backdrop-blur-md px-4 sm:px-6 py-2.5 sm:py-0 flex items-center justify-between relative lg:sticky top-0 z-20">
       <div className="flex items-center space-x-3">
         <div>
           <h1 className="text-sm sm:text-base font-bold text-slate-100 tracking-tight flex items-center gap-2">

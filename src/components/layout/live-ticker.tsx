@@ -112,7 +112,7 @@ export function LiveTicker() {
     <div
       role="region"
       aria-label="Marcador en vivo de la LVBP"
-      className="h-9 w-full bg-[#070B19]/95 backdrop-blur-md border-b border-[#1E2B4D]/70 flex items-center px-3 sm:px-4 overflow-x-auto no-scrollbar shrink-0 select-none z-10"
+      className="h-9 w-full bg-[#070B19] border-b border-[#1E2B4D]/80 flex items-center px-3 sm:px-4 overflow-x-auto no-scrollbar shrink-0 select-none z-10 antialiased transform-gpu"
     >
       <div className="flex items-center space-x-3 shrink-0 mr-3 pr-3 border-r border-[#1E2B4D]/80">
         {hasLive ? (
@@ -127,7 +127,7 @@ export function LiveTicker() {
         )}
       </div>
 
-      <div className="flex items-center space-x-2 sm:space-x-3 text-xs font-mono">
+      <div className="flex items-center space-x-2 sm:space-x-3 text-xs font-mono antialiased">
         {games.map((g) => {
           const isCaracas = g.homeTeam.isLeones || g.awayTeam.isLeones;
           const awayWon = g.awayTeam.isWinner;
@@ -137,7 +137,7 @@ export function LiveTicker() {
             <Link
               key={g.id}
               href={`/game-center?gamePk=${g.gamePk}`}
-              className={`flex items-center space-x-2 px-2.5 py-1 rounded-lg transition-all shrink-0 hover:bg-[#131E3D] border ${
+              className={`flex items-center space-x-2 px-2.5 py-1 rounded-lg transition-colors shrink-0 hover:bg-[#131E3D] border ${
                 g.isLive
                   ? "bg-[#0D152B] border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.15)]"
                   : isCaracas

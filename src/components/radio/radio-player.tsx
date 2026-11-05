@@ -128,7 +128,7 @@ export function RadioPlayer() {
       />
 
       {/* ── CONTENEDOR FLOTANTE GLOBAL ── */}
-      <div className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-auto lg:right-6 z-40 max-w-md ml-auto pointer-events-auto">
+      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-6 left-4 right-4 lg:left-auto lg:right-6 z-40 max-w-md ml-auto pointer-events-auto">
         {/* ── MODAL / TARJETA EXPANDIDA ── */}
         {isExpanded && (
           <div className="mb-3 p-4 rounded-2xl bg-[#070B19]/95 backdrop-blur-xl border border-[#1E2B4D] shadow-[0_12px_40px_rgba(0,0,0,0.85)] animate-in fade-in slide-in-from-bottom-4 duration-200">
