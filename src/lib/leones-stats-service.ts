@@ -634,115 +634,192 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
           gameDateFormatted = `${parseInt(parts[2], 10)} de ${months[mIndex]}, ${parts[0]}`;
         }
 
-        let mvp = season === 2025 ? BASELINE_2025_LAST_GAME.mvp : null;
+        let mvp: GameMVP | null = season === 2025 ? BASELINE_2025_LAST_GAME.mvp : null;
+        let topBatter: GameMVP | null = null;
+        let topPitcher: GameMVP | null = null;
+
         try {
-          // Obtener el jugador de mayor impacto de victoria (WPA) en este juego específico
-          const { processGameWpa, fetchSeasonWpaLeaders } = await import("./wpa-engine");
-          let topLeader: {
-            playerId: number;
-            player: string;
-            type: "batter" | "pitcher";
-            wpa: number;
-            clutch: number;
-          } | null = null;
-
+          const { processGameWpa } = await import("./wpa-engine");
           const gameWpa = await processGameWpa(g.id);
-          if (gameWpa && gameWpa.plays && gameWpa.plays.length > 0) {
-            const playerWpa: Record<
-              number,
-              { id: number; name: string; type: "batter" | "pitcher"; wpa: number; clutch: number }
-            > = {};
 
+          // 1. Obtener estadísticas de caja de bateo y pitcheo de Leones (team 695)
+          const [{ data: batRows }, { data: pitRows }] = await Promise.all([
+            supabase
+              ? supabase.from("batting_stats").select("*").eq("game_id", g.id).eq("team_id", 695)
+              : Promise.resolve({ data: null }),
+            supabase
+              ? supabase.from("pitching_stats").select("*").eq("game_id", g.id).eq("team_id", 695)
+              : Promise.resolve({ data: null }),
+          ]);
+
+          const batterMap: Record<number, any> = {};
+          if (batRows) {
+            for (const r of batRows) {
+              batterMap[Number(r.player_id)] = r;
+            }
+          }
+
+          const pitcherMap: Record<number, any> = {};
+          if (pitRows) {
+            for (const r of pitRows) {
+              pitcherMap[Number(r.player_id)] = r;
+            }
+          }
+
+          // 2. Extraer WPA por jugador de Leones en este encuentro
+          const batterWpa: Record<number, { id: number; name: string; wpa: number; clutch: number }> = {};
+          const pitcherWpa: Record<number, { id: number; name: string; wpa: number; clutch: number }> = {};
+
+          if (gameWpa && gameWpa.plays && gameWpa.plays.length > 0) {
             for (const p of gameWpa.plays) {
-              const isBatter = p.leonesBatting;
-              const pId = isBatter ? p.batterId : p.pitcherId;
-              const pName = isBatter ? p.batter : p.pitcher;
-              if (!pId) continue;
-              if (!playerWpa[pId]) {
-                playerWpa[pId] = {
-                  id: pId,
-                  name: pName,
-                  type: isBatter ? "batter" : "pitcher",
+              if (p.leonesBatting) {
+                const bId = p.batterId;
+                if (!bId) continue;
+                if (!batterWpa[bId]) {
+                  batterWpa[bId] = { id: bId, name: p.batter, wpa: 0, clutch: 0 };
+                }
+                batterWpa[bId].wpa += p.wpa;
+                batterWpa[bId].clutch += p.wpa - p.wpaLi;
+              } else {
+                const pId = p.pitcherId;
+                if (!pId) continue;
+                if (!pitcherWpa[pId]) {
+                  pitcherWpa[pId] = { id: pId, name: p.pitcher, wpa: 0, clutch: 0 };
+                }
+                pitcherWpa[pId].wpa += p.wpa;
+                pitcherWpa[pId].clutch += p.wpa - p.wpaLi;
+              }
+            }
+          }
+
+          // Incluir jugadores presentes en boxscore aunque su WPA sea 0
+          if (batRows) {
+            for (const b of batRows) {
+              const bId = Number(b.player_id);
+              if (!batterWpa[bId]) {
+                batterWpa[bId] = {
+                  id: bId,
+                  name: b.player_name || (b.players && b.players.full_name) || "Bateador",
                   wpa: 0,
                   clutch: 0,
                 };
               }
-              playerWpa[pId].wpa += p.wpa;
-              playerWpa[pId].clutch += p.wpa - p.wpaLi;
-            }
-
-            const sorted = Object.values(playerWpa).sort((a, b) => b.wpa - a.wpa);
-            if (sorted.length > 0) {
-              const top = sorted[0];
-              topLeader = {
-                playerId: top.id,
-                player: top.name,
-                type: top.type,
-                wpa: Number(top.wpa.toFixed(3)),
-                clutch: Number(top.clutch.toFixed(3)),
-              };
             }
           }
 
-          if (!topLeader) {
-            const wpaLeaders = await fetchSeasonWpaLeaders(season);
-            if (wpaLeaders && wpaLeaders.length > 0) {
-              const top = [...wpaLeaders].sort((a, b) => b.wpa - a.wpa)[0];
-              topLeader = {
-                playerId: top.playerId,
-                player: top.player,
-                type: top.type,
-                wpa: top.wpa,
-                clutch: top.clutch,
-              };
+          if (pitRows) {
+            for (const p of pitRows) {
+              const pId = Number(p.player_id);
+              if (!pitcherWpa[pId]) {
+                pitcherWpa[pId] = {
+                  id: pId,
+                  name: p.player_name || (p.players && p.players.full_name) || "Lanzador",
+                  wpa: 0,
+                  clutch: 0,
+                };
+              }
             }
           }
 
-          if (topLeader) {
-            let headline = "";
-            if (topLeader.type === "pitcher") {
-              const { data: pitData } = await supabase
-                .from("pitching_stats")
-                .select("ip_string, er, so")
-                .eq("game_id", g.id)
-                .eq("player_id", topLeader.playerId)
-                .limit(1);
+          // 3. Evaluar y rankear Bateadores
+          const rankedBatters = Object.values(batterWpa).map((b) => {
+            const stats = batterMap[b.id] || {};
+            const h = stats.h ?? 0;
+            const ab = stats.ab ?? 0;
+            const hr = stats.hr ?? 0;
+            const rbi = stats.rbi ?? 0;
+            const runs = stats.r ?? 0;
+            const bb = stats.bb ?? 0;
+            const offensiveScore = (b.wpa * 100) + (hr * 25) + (rbi * 15) + (h * 10) + (runs * 8) + (bb * 5);
+            const statsSummary = ab > 0 ? `${h}-${ab}${hr > 0 ? `, ${hr} HR` : ""}, ${rbi} CI` : `${b.wpa >= 0 ? `+${b.wpa.toFixed(3)}` : b.wpa.toFixed(3)} WPA`;
+            return {
+              ...b,
+              statsSummary,
+              offensiveScore,
+            };
+          }).sort((a, b) => b.offensiveScore - a.offensiveScore);
 
-              if (pitData && pitData.length > 0) {
-                const p = pitData[0];
-                headline = `${p.ip_string || "0.0"} IP, ${p.er ?? 0} CL, ${p.so ?? 0} K — Mayor impacto de victoria (+${topLeader.wpa.toFixed(3)} WPA)`;
-              } else {
-                headline = `Líder de WPA de Leones (+${topLeader.wpa.toFixed(3)})`;
-              }
-            } else {
-              const { data: batData } = await supabase
-                .from("batting_stats")
-                .select("ab, h, hr, rbi")
-                .eq("game_id", g.id)
-                .eq("player_id", topLeader.playerId)
-                .limit(1);
-
-              if (batData && batData.length > 0) {
-                const b = batData[0];
-                headline = `${b.h}-${b.ab}${b.hr > 0 ? `, ${b.hr} HR` : ""}, ${b.rbi} CI — Mayor impacto de victoria (+${topLeader.wpa.toFixed(3)} WPA)`;
-              } else {
-                headline = `Líder de WPA de Leones (+${topLeader.wpa.toFixed(3)})`;
-              }
-            }
-
-            mvp = {
-              playerId: topLeader.playerId,
-              playerName: topLeader.player,
-              playerAvatar: getPlayerHeadshotUrl(topLeader.playerId),
-              wpaTotal: topLeader.wpa,
-              wpaBat: topLeader.type === "batter" ? topLeader.wpa : 0.0,
-              wpaPit: topLeader.type === "pitcher" ? topLeader.wpa : 0.0,
-              clutch: topLeader.clutch,
+          if (rankedBatters.length > 0) {
+            const bestBat = rankedBatters[0];
+            const headline = `${bestBat.statsSummary} — Mayor aporte ofensivo (${bestBat.wpa >= 0 ? `+${bestBat.wpa.toFixed(3)}` : bestBat.wpa.toFixed(3)} WPA)`;
+            topBatter = {
+              playerId: bestBat.id,
+              playerName: bestBat.name,
+              playerAvatar: getPlayerHeadshotUrl(bestBat.id),
+              wpaTotal: Number(bestBat.wpa.toFixed(3)),
+              wpaBat: Number(bestBat.wpa.toFixed(3)),
+              wpaPit: 0.0,
+              clutch: Number(bestBat.clutch.toFixed(3)),
               headline,
+              type: "batter",
+              statsSummary: bestBat.statsSummary,
             };
           }
-        } catch {
-          // Mantener MVP base
+
+          // 4. Evaluar y rankear Lanzadores con Tom Tango Game Score v2 y WPA
+          const rankedPitchers = Object.values(pitcherWpa).map((p) => {
+            const stats = pitcherMap[p.id] || {};
+            const ipDec = Number(stats.ip_decimal || 0);
+            const outs = Math.round(ipDec * 3);
+            const so = Number(stats.so || 0);
+            const bb = Number(stats.bb || 0);
+            const h = Number(stats.h || 0);
+            const er = Number(stats.er || 0);
+            const runs = Number(stats.r ?? er);
+            const unearned = Math.max(0, runs - er);
+
+            // Fórmula oficial Tango Game Score v2:
+            // 40 + (2 * outs) + (1 * so) - (2 * bb) - (2 * h) - (3 * er) - (1 * unearned)
+            const gameScore = outs > 0
+              ? Math.max(0, Math.round(40 + (2 * outs) + (1 * so) - (2 * bb) - (2 * h) - (3 * er) - (1 * unearned)))
+              : 40;
+
+            const ipString = stats.ip_string || (ipDec > 0 ? `${Math.floor(ipDec)}.${Math.round((ipDec % 1) * 3)}` : "0.0");
+            const statsSummary = `${ipString} IP, ${er} CL, ${so} K, ${bb} BB`;
+            const pitchingComposite = (p.wpa * 120) + (gameScore - 40) * 1.5;
+
+            return {
+              ...p,
+              statsSummary,
+              gameScore,
+              pitchingComposite,
+            };
+          }).sort((a, b) => b.pitchingComposite - a.pitchingComposite);
+
+          if (rankedPitchers.length > 0) {
+            const bestPit = rankedPitchers[0];
+            const headline = `${bestPit.statsSummary} — Game Score ${bestPit.gameScore} (${bestPit.wpa >= 0 ? `+${bestPit.wpa.toFixed(3)}` : bestPit.wpa.toFixed(3)} WPA)`;
+            topPitcher = {
+              playerId: bestPit.id,
+              playerName: bestPit.name,
+              playerAvatar: getPlayerHeadshotUrl(bestPit.id),
+              wpaTotal: Number(bestPit.wpa.toFixed(3)),
+              wpaBat: 0.0,
+              wpaPit: Number(bestPit.wpa.toFixed(3)),
+              clutch: Number(bestPit.clutch.toFixed(3)),
+              headline,
+              type: "pitcher",
+              gameScore: bestPit.gameScore,
+              statsSummary: bestPit.statsSummary,
+            };
+          }
+
+          // 5. Determinar MVP / Destacado General
+          if (leonesWon) {
+            if (topPitcher && (topPitcher.gameScore ?? 0) >= 60 && (!topBatter || topPitcher.wpaTotal >= topBatter.wpaTotal * 0.7)) {
+              mvp = topPitcher;
+            } else {
+              mvp = topBatter || topPitcher;
+            }
+          } else {
+            if (topPitcher && (!topBatter || topPitcher.wpaTotal > topBatter.wpaTotal)) {
+              mvp = topPitcher;
+            } else {
+              mvp = topBatter || topPitcher;
+            }
+          }
+        } catch (err) {
+          console.warn("Fallo calculando MVP balanceado del último juego:", err);
         }
 
         return {
@@ -762,6 +839,8 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
           isHomeLeones,
           leonesWon,
           mvp,
+          topBatter,
+          topPitcher,
         };
       }
     } catch (err) {

@@ -4,56 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import {
-  Menu,
-  X,
-  LayoutDashboard,
-  Trophy,
-  Users,
-  BarChart3,
-  GitCompare,
-  PieChart,
-  Target,
-  Shield,
-  Activity,
-  Layers,
-  Radio,
-  Calendar,
-  TrendingUp,
-  Newspaper,
-  UserCheck,
-  Tv,
-  LucideIcon,
-} from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACTIVE_SEASON, formatSeason } from "@/lib/constants";
 import { ShareButton } from "./share-button";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-
-interface NavItem {
-  name: string;
-  href: string;
-  icon: LucideIcon;
-  badge?: string;
-}
-
-const navigationItems: NavItem[] = [
-  { name: "Centro de Mando", href: "/", icon: LayoutDashboard },
-  { name: "Game Center (En Vivo)", href: "/game-center", icon: Tv, badge: "LIVE" },
-  { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
-  { name: "Roster Oficial & Staff", href: "/roster", icon: UserCheck, badge: "34" },
-  { name: "Calendario Oficial", href: "/calendario", icon: Calendar },
-  { name: "NotiCueva", href: "/noticueva", icon: Newspaper, badge: "NUEVO" },
-  // { name: "Líneas & Probabilidades", href: "/probabilidades", icon: TrendingUp }, // Temporalmente oculto
-  { name: "Líderes Individuales", href: "/individuales", icon: Users },
-  { name: "Pitching Summary", href: "/pitching", icon: Radio },
-  { name: "Matchup 360 (H2H)", href: "/matchup", icon: GitCompare },
-  { name: "Estadísticas Colectivas", href: "/colectivas", icon: BarChart3 },
-  { name: "Bullpen & Lineups", href: "/bullpen", icon: Shield },
-  { name: "Win Expectancy & WPA", href: "/wpa", icon: Activity },
-  { name: "Splits Situacionales", href: "/situacional", icon: PieChart },
-  { name: "Spray Charts", href: "/spray-charts", icon: Target },
-];
+import { navigationGroups } from "./nav-data";
 
 export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
@@ -124,7 +80,7 @@ export function MobileNav() {
               <span className="font-bold text-xs text-slate-100 uppercase">
                 Menú <span className="text-[#FDB827]">Principal</span>
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">LVBP • Caracas</span>
+              <span className="text-[10px] text-slate-400 font-mono">LVBP · Caracas</span>
             </div>
           </div>
           <button
@@ -136,41 +92,54 @@ export function MobileNav() {
           </button>
         </div>
 
-        {/* Lista de Navegación Completa */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navigationItems.map((item) => {
-            const isActive = pathname === item.href;
-            const Icon = item.icon;
+        {/* Lista de Navegación por Categorías */}
+        <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+          {navigationGroups.map((group, groupIdx) => (
+            <div key={group.category} className="space-y-1">
+              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center justify-between">
+                <span>{group.category}</span>
+                <span className="text-[9px] text-slate-500 font-mono">0{groupIdx + 1}</span>
+              </div>
+              {group.items.map((item) => {
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
 
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={closeDrawer}
-                className={cn(
-                  "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all min-h-[44px]",
-                  isActive
-                    ? "bg-[#1E2B4D] text-[#FDB827] font-semibold border border-[#FDB827]/30 shadow-[0_0_15px_rgba(253,184,39,0.15)]"
-                    : "text-slate-300 hover:text-slate-100 hover:bg-[#0D152B]"
-                )}
-              >
-                <div className="flex items-center space-x-3">
-                  <Icon
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={closeDrawer}
                     className={cn(
-                      "w-4 h-4 shrink-0",
-                      isActive ? "text-[#FDB827]" : "text-slate-400"
+                      "flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all min-h-[40px]",
+                      isActive
+                        ? "bg-[#1E2B4D] text-[#FDB827] font-semibold border border-[#FDB827]/30 shadow-[0_0_15px_rgba(253,184,39,0.15)]"
+                        : "text-slate-300 hover:text-slate-100 hover:bg-[#0D152B]"
                     )}
-                  />
-                  <span>{item.name}</span>
-                </div>
-                {item.badge && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30 font-mono">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Icon
+                        className={cn(
+                          "w-4 h-4 shrink-0",
+                          isActive ? "text-[#FDB827]" : "text-slate-400"
+                        )}
+                      />
+                      <span>{item.name}</span>
+                    </div>
+                    {item.badge && (
+                      <span className={cn(
+                        "text-[9px] font-bold px-1.5 py-0.5 rounded font-mono border",
+                        item.badge === "LIVE"
+                          ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 animate-pulse"
+                          : "bg-[#FDB827]/15 text-[#FDB827] border-[#FDB827]/30"
+                      )}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Footer del Drawer con Créditos */}
@@ -197,7 +166,7 @@ export function MobileNav() {
               >
                 @JorgeLoreto
               </a>
-              <span className="text-[#FDB827]/50">•</span>
+              <span className="text-[#FDB827]/50">·</span>
               <a
                 href="https://x.com/RepubCaraquista"
                 target="_blank"
@@ -210,75 +179,6 @@ export function MobileNav() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* ── Barra de Navegación Inferior (Bottom Bar Móvil) ── */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 landscape-compact-nav bg-[#070B19]/95 backdrop-blur-lg border-t border-[#1E2B4D] px-1 px-safe flex items-center justify-around z-30 pb-safe">
-        <Link
-          href="/"
-          className={cn(
-            "flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium transition-colors min-w-0 text-center",
-            pathname === "/" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
-          )}
-        >
-          <LayoutDashboard className="w-5 h-5 mb-0.5 shrink-0" />
-          <span className="truncate w-full">Mando</span>
-        </Link>
-
-        <Link
-          href="/game-center"
-          className={cn(
-            "flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium transition-colors min-w-0 text-center",
-            pathname === "/game-center" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
-          )}
-        >
-          <div className="relative">
-            <Tv className="w-5 h-5 mb-0.5 shrink-0" />
-            <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          </div>
-          <span className="truncate w-full">Game Center</span>
-        </Link>
-
-        <Link
-          href="/standings"
-          className={cn(
-            "flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium transition-colors min-w-0 text-center",
-            pathname === "/standings" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
-          )}
-        >
-          <Trophy className="w-5 h-5 mb-0.5 shrink-0" />
-          <span className="truncate w-full">Posiciones</span>
-        </Link>
-
-        <Link
-          href="/calendario"
-          className={cn(
-            "flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium transition-colors min-w-0 text-center",
-            pathname === "/calendario" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
-          )}
-        >
-          <Calendar className="w-5 h-5 mb-0.5 shrink-0" />
-          <span className="truncate w-full">Calendario</span>
-        </Link>
-
-        <Link
-          href="/individuales"
-          className={cn(
-            "flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium transition-colors min-w-0 text-center",
-            pathname === "/individuales" ? "text-[#FDB827]" : "text-slate-400 hover:text-slate-200"
-          )}
-        >
-          <Users className="w-5 h-5 mb-0.5 shrink-0" />
-          <span className="truncate w-full">Líderes</span>
-        </Link>
-
-        <button
-          onClick={() => setIsOpen(true)}
-          className="flex flex-col items-center justify-center flex-1 py-1 px-0.5 text-[9.5px] font-medium text-slate-400 hover:text-[#FDB827] transition-colors min-w-0 text-center"
-        >
-          <Layers className="w-5 h-5 mb-0.5 shrink-0" />
-          <span className="truncate w-full">Más</span>
-        </button>
       </div>
     </>
   );

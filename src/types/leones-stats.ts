@@ -58,6 +58,9 @@ export interface GameMVP {
   wpaPit: number;        // Ej: +0.075
   clutch: number;        // Ej: +0.142
   headline: string;      // Resumen narrativo
+  type?: "batter" | "pitcher";
+  gameScore?: number;
+  statsSummary?: string;
 }
 
 export interface LastGameDetail {
@@ -77,6 +80,8 @@ export interface LastGameDetail {
   isHomeLeones: boolean;
   leonesWon: boolean;
   mvp: GameMVP | null;
+  topBatter?: GameMVP | null;
+  topPitcher?: GameMVP | null;
 }
 
 export interface TrendGameItem {

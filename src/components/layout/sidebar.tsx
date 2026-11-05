@@ -3,52 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import {
-  LayoutDashboard,
-  Trophy,
-  Users,
-  BarChart3,
-  GitCompare,
-  PieChart,
-  Target,
-  Shield,
-  Activity,
-  Radio,
-  Calendar,
-  TrendingUp,
-  Newspaper,
-  UserCheck,
-  Tv,
-} from "lucide-react";
-import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACTIVE_SEASON, formatSeason } from "@/lib/constants";
-
-interface NavItem {
-  name: string;
-  href: string;
-  icon: LucideIcon;
-  badge?: string;
-  isPending?: boolean;
-}
-
-const navigationItems: NavItem[] = [
-  { name: "Centro de Mando", href: "/", icon: LayoutDashboard },
-  { name: "Game Center (En Vivo)", href: "/game-center", icon: Tv, badge: "LIVE" },
-  { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
-  { name: "Roster Oficial & Staff", href: "/roster", icon: UserCheck, badge: "34" },
-  { name: "Calendario Oficial", href: "/calendario", icon: Calendar },
-  { name: "NotiCueva", href: "/noticueva", icon: Newspaper, badge: "NUEVO" },
-  // { name: "Líneas & Probabilidades", href: "/probabilidades", icon: TrendingUp }, // Temporalmente oculto
-  { name: "Líderes Individuales", href: "/individuales", icon: Users },
-  { name: "Pitching Summary", href: "/pitching", icon: Radio },
-  { name: "Matchup 360 (H2H)", href: "/matchup", icon: GitCompare },
-  { name: "Estadísticas Colectivas", href: "/colectivas", icon: BarChart3 },
-  { name: "Bullpen & Lineups", href: "/bullpen", icon: Shield },
-  { name: "Win Expectancy & WPA", href: "/wpa", icon: Activity },
-  { name: "Splits Situacionales", href: "/situacional", icon: PieChart },
-  { name: "Spray Charts", href: "/spray-charts", icon: Target },
-];
+import { navigationGroups } from "./nav-data";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -76,47 +33,57 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Navigation List */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-          Menú Principal
-        </div>
-        {navigationItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          const isPending = Boolean(item.isPending);
+      {/* Navigation List Organized by Categories */}
+      <nav className="flex-1 p-3 space-y-4 overflow-y-auto custom-scrollbar">
+        {navigationGroups.map((group, groupIdx) => (
+          <div key={group.category} className="space-y-1">
+            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center justify-between">
+              <span>{group.category}</span>
+              <span className="text-[9px] text-slate-500 font-mono">0{groupIdx + 1}</span>
+            </div>
+            {group.items.map((item) => {
+              const isActive = pathname === item.href;
+              const Icon = item.icon;
+              const isPending = Boolean(item.isPending);
 
-          return (
-            <Link
-              key={item.name}
-              href={isPending ? "#" : item.href}
-              className={cn(
-                "flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all group",
-                isActive
-                  ? "bg-[#0D152B] text-[#FDB827] border border-[#FDB827]/30 shadow-[0_0_12px_rgba(253,184,39,0.1)]"
-                  : "text-slate-300 hover:text-slate-100 hover:bg-[#0D152B]/60",
-                isPending && "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-slate-400"
-              )}
-            >
-              <div className="flex items-center space-x-3">
-                <Icon
+              return (
+                <Link
+                  key={item.name}
+                  href={isPending ? "#" : item.href}
                   className={cn(
-                    "w-4 h-4 transition-colors",
+                    "flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all group",
                     isActive
-                      ? "text-[#FDB827]"
-                      : "text-slate-400 group-hover:text-slate-200"
+                      ? "bg-[#0D152B] text-[#FDB827] border border-[#FDB827]/30 shadow-[0_0_12px_rgba(253,184,39,0.1)] font-semibold"
+                      : "text-slate-300 hover:text-slate-100 hover:bg-[#0D152B]/60",
+                    isPending && "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-slate-400"
                   )}
-                />
-                <span>{item.name}</span>
-              </div>
-              {item.badge && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30 font-mono">
-                  {item.badge}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+                >
+                  <div className="flex items-center space-x-3">
+                    <Icon
+                      className={cn(
+                        "w-4 h-4 transition-colors",
+                        isActive
+                          ? "text-[#FDB827]"
+                          : "text-slate-400 group-hover:text-slate-200"
+                      )}
+                    />
+                    <span>{item.name}</span>
+                  </div>
+                  {item.badge && (
+                    <span className={cn(
+                      "text-[9px] font-bold px-1.5 py-0.5 rounded font-mono border",
+                      item.badge === "LIVE"
+                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 animate-pulse"
+                        : "bg-[#FDB827]/15 text-[#FDB827] border-[#FDB827]/30"
+                    )}>
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Footer Info & Credits */}
@@ -145,7 +112,7 @@ export function Sidebar() {
             >
               @JorgeLoreto
             </a>
-            <span className="text-[#FDB827]/50">•</span>
+            <span className="text-[#FDB827]/50">·</span>
             <a
               href="https://x.com/RepubCaraquista"
               target="_blank"

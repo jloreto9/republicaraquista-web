@@ -1,16 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { LastGameDetail } from "@/types/leones-stats";
 import { Trophy, Calendar, MapPin, Zap, ExternalLink } from "lucide-react";
 import { getMlbFallbackHeadshotUrl } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 interface LastGameTabProps {
   lastGame: LastGameDetail | null;
 }
 
 export function LastGameTab({ lastGame }: LastGameTabProps) {
+  const [viewMode, setViewMode] = useState<"general" | "batting" | "pitching">("general");
+
   if (!lastGame) {
     return (
       <div className="p-8 text-center rounded-2xl bg-[#0D152B] border border-[#1E2B4D] text-slate-400">
@@ -21,6 +25,30 @@ export function LastGameTab({ lastGame }: LastGameTabProps) {
 
   const won = lastGame.leonesWon;
   const mvp = lastGame.mvp;
+  const topBatter = lastGame.topBatter;
+  const topPitcher = lastGame.topPitcher;
+
+  // Jugador activo según la vista seleccionada
+  const activePlayer = viewMode === "batting"
+    ? (topBatter || mvp)
+    : viewMode === "pitching"
+    ? (topPitcher || mvp)
+    : mvp;
+
+  // Título contextual según victoria/derrota y pestaña activa
+  const cardTitle = won
+    ? viewMode === "batting"
+      ? "Líder Ofensivo"
+      : viewMode === "pitching"
+      ? "Líder de Pitcheo"
+      : "⭐ MVP de Leones"
+    : viewMode === "batting"
+    ? "Destacado al Bate"
+    : viewMode === "pitching"
+    ? "Destacado en la Loma"
+    : "⭐ Destacado de Leones";
+
+  const isPitcher = activePlayer?.type === "pitcher" || (viewMode === "pitching" && !topBatter);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -121,81 +149,175 @@ export function LastGameTab({ lastGame }: LastGameTabProps) {
         </div>
       </div>
 
-      {/* ── COLUMNA 3: MVP DE LEONES (WIN PROBABILITY ADDED) ── */}
+      {/* ── COLUMNA 3: MVP / DESTACADO DE LEONES (MODELO EQUITATIVO TANGO RE24) ── */}
       <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-[#0D152B] via-[#131E3D] to-[#0D152B] border border-[#FDB827]/50 shadow-xl flex flex-col justify-between">
         <div>
-          <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#1E2B4D]">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#1E2B4D]">
             <div className="flex items-center space-x-2">
               <Trophy className="w-4 h-4 text-[#FDB827]" />
               <h3 className="text-sm font-bold text-[#FDB827] uppercase tracking-wider">
-                ⭐ MVP de Leones
+                {cardTitle}
               </h3>
             </div>
             <span className="text-[10px] font-mono text-slate-400">
-              Modelo Tango RE24
+              {isPitcher ? "Tango Game Score" : "Modelo Tango RE24"}
             </span>
           </div>
 
-          {mvp ? (
+          {/* Selector de Modo: General / Bateo / Pitcheo */}
+          <div className="flex items-center space-x-1 p-1 bg-[#070B19]/80 rounded-xl border border-[#1E2B4D] text-[10px] font-mono mb-4">
+            <button
+              type="button"
+              onClick={() => setViewMode("general")}
+              className={cn(
+                "flex-1 py-1 px-1.5 rounded-lg font-semibold transition-all text-center",
+                viewMode === "general"
+                  ? "bg-[#FDB827] text-[#070B19] shadow-sm font-bold"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              ⭐ {won ? "MVP" : "General"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("batting")}
+              className={cn(
+                "flex-1 py-1 px-1.5 rounded-lg font-semibold transition-all text-center",
+                viewMode === "batting"
+                  ? "bg-[#FDB827] text-[#070B19] shadow-sm font-bold"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              🏏 Bateo
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("pitching")}
+              className={cn(
+                "flex-1 py-1 px-1.5 rounded-lg font-semibold transition-all text-center",
+                viewMode === "pitching"
+                  ? "bg-[#FDB827] text-[#070B19] shadow-sm font-bold"
+                  : "text-slate-400 hover:text-slate-200"
+              )}
+            >
+              ⚾ Pitcheo
+            </button>
+          </div>
+
+          {activePlayer ? (
             <div className="space-y-4">
               <div className="flex items-center space-x-3.5">
                 <div className="w-14 h-14 rounded-full bg-[#070B19] border-2 border-[#FDB827] overflow-hidden relative shrink-0 shadow-md">
                   <Image
-                    src={mvp.playerAvatar}
-                    alt={mvp.playerName}
+                    src={activePlayer.playerAvatar}
+                    alt={activePlayer.playerName}
                     width={56}
                     height={56}
                     className="object-cover"
                     unoptimized
                     onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = getMlbFallbackHeadshotUrl(mvp.playerId);
+                      (e.currentTarget as HTMLImageElement).src = getMlbFallbackHeadshotUrl(activePlayer.playerId);
                     }}
                   />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-slate-100">
-                    {mvp.playerName}
-                  </h4>
+                  <div className="flex items-center space-x-1.5">
+                    <h4 className="text-base font-bold text-slate-100">
+                      {activePlayer.playerName}
+                    </h4>
+                    <span className={cn(
+                      "text-[9px] px-1.5 py-0.2 rounded font-mono font-bold uppercase",
+                      isPitcher
+                        ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                        : "bg-blue-500/15 text-blue-300 border border-blue-500/30"
+                    )}>
+                      {isPitcher ? "Lanzador" : "Bateador"}
+                    </span>
+                  </div>
                   <div className="flex items-center space-x-1 text-xs text-emerald-400 font-mono font-bold mt-0.5">
                     <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>WPA Total: {mvp.wpaTotal >= 0 ? `+${mvp.wpaTotal.toFixed(3)}` : mvp.wpaTotal.toFixed(3)}</span>
+                    <span>WPA: {activePlayer.wpaTotal >= 0 ? `+${activePlayer.wpaTotal.toFixed(3)}` : activePlayer.wpaTotal.toFixed(3)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Métricas Desglosadas del MVP */}
-              <div className="grid grid-cols-3 gap-2 text-center font-mono py-2 bg-[#070B19]/60 rounded-xl border border-[#1E2B4D]">
-                <div>
-                  <p className="text-[10px] text-slate-400">Bateo</p>
-                  <p className="text-xs font-bold text-slate-200">
-                    {mvp.wpaBat >= 0 ? `+${mvp.wpaBat.toFixed(3)}` : mvp.wpaBat.toFixed(3)}
-                  </p>
+              {/* Métricas Dinámicas según Bateo o Pitcheo */}
+              {isPitcher ? (
+                <div className="grid grid-cols-3 gap-2 text-center font-mono py-2 bg-[#070B19]/60 rounded-xl border border-[#1E2B4D]">
+                  <div>
+                    <p className="text-[10px] text-slate-400">Game Score</p>
+                    <p className="text-xs font-bold text-[#FDB827]">
+                      {activePlayer.gameScore ?? 50}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400">Pitcheo WPA</p>
+                    <p className="text-xs font-bold text-slate-200">
+                      {activePlayer.wpaPit >= 0 ? `+${activePlayer.wpaPit.toFixed(3)}` : activePlayer.wpaPit.toFixed(3)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400">Clutch</p>
+                    <p className="text-xs font-bold text-slate-200">
+                      {activePlayer.clutch >= 0 ? `+${activePlayer.clutch.toFixed(3)}` : activePlayer.clutch.toFixed(3)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] text-slate-400">Pitcheo</p>
-                  <p className="text-xs font-bold text-slate-200">
-                    {mvp.wpaPit >= 0 ? `+${mvp.wpaPit.toFixed(3)}` : mvp.wpaPit.toFixed(3)}
-                  </p>
+              ) : viewMode === "batting" ? (
+                <div className="grid grid-cols-3 gap-2 text-center font-mono py-2 bg-[#070B19]/60 rounded-xl border border-[#1E2B4D]">
+                  <div>
+                    <p className="text-[10px] text-slate-400">Línea</p>
+                    <p className="text-xs font-bold text-slate-100 truncate px-1">
+                      {activePlayer.statsSummary || `${activePlayer.wpaBat >= 0 ? `+${activePlayer.wpaBat.toFixed(3)}` : activePlayer.wpaBat.toFixed(3)}`}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400">Bateo WPA</p>
+                    <p className="text-xs font-bold text-slate-200">
+                      {activePlayer.wpaBat >= 0 ? `+${activePlayer.wpaBat.toFixed(3)}` : activePlayer.wpaBat.toFixed(3)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400">Clutch</p>
+                    <p className="text-xs font-bold text-[#FDB827]">
+                      {activePlayer.clutch >= 0 ? `+${activePlayer.clutch.toFixed(3)}` : activePlayer.clutch.toFixed(3)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] text-slate-400">Clutch</p>
-                  <p className="text-xs font-bold text-[#FDB827]">
-                    {mvp.clutch >= 0 ? `+${mvp.clutch.toFixed(3)}` : mvp.clutch.toFixed(3)}
-                  </p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 text-center font-mono py-2 bg-[#070B19]/60 rounded-xl border border-[#1E2B4D]">
+                  <div>
+                    <p className="text-[10px] text-slate-400">Bateo</p>
+                    <p className="text-xs font-bold text-slate-200">
+                      {activePlayer.wpaBat >= 0 ? `+${activePlayer.wpaBat.toFixed(3)}` : activePlayer.wpaBat.toFixed(3)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400">Pitcheo</p>
+                    <p className="text-xs font-bold text-slate-200">
+                      {activePlayer.wpaPit >= 0 ? `+${activePlayer.wpaPit.toFixed(3)}` : activePlayer.wpaPit.toFixed(3)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400">Clutch</p>
+                    <p className="text-xs font-bold text-[#FDB827]">
+                      {activePlayer.clutch >= 0 ? `+${activePlayer.clutch.toFixed(3)}` : activePlayer.clutch.toFixed(3)}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <p className="text-[11px] text-slate-300 italic leading-relaxed">
-                "{mvp.headline}"
+                "{activePlayer.headline}"
               </p>
             </div>
           ) : (
-            <p className="text-xs text-slate-400">Sin datos de MVP para este partido.</p>
+            <p className="text-xs text-slate-400">Sin datos disponibles para esta categoría.</p>
           )}
         </div>
 
         <div className="pt-3 border-t border-[#1E2B4D] text-[10px] text-slate-500 font-mono text-center">
-          Win Probability Added • Aporte a la Probabilidad de Victoria
+          {won ? "Aporte a la Victoria" : "Mayor Rendimiento Individual"} • Win Probability Added
         </div>
       </div>
     </div>

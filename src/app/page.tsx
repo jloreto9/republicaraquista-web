@@ -4,8 +4,10 @@ import { KPISummary } from "@/components/dashboard/kpi-summary";
 import { Scoreboard } from "@/components/dashboard/scoreboard";
 import { StandingsTable } from "@/components/standings/standings-table";
 import { DashboardTabs } from "@/components/dashboard/dashboard-tabs";
+import { LiveHeroGameCard } from "@/components/dashboard/live-hero-game-card";
 import { getSeasonKPIs, getRecentGames, getStandings } from "@/lib/supabase";
 import { getDashboardTabsData } from "@/lib/leones-stats-service";
+import { getGameCenterData } from "@/lib/game-center-service";
 import { getActiveSeason, SEASON_LABELS } from "@/lib/constants";
 import { ArrowRight, Trophy, Calendar } from "lucide-react";
 
@@ -13,11 +15,12 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const activeSeason = await getActiveSeason();
-  const [kpis, recentGames, standings, tabsData] = await Promise.all([
+  const [kpis, recentGames, standings, tabsData, liveGame] = await Promise.all([
     getSeasonKPIs(activeSeason),
     getRecentGames(activeSeason, 6),
     getStandings(activeSeason, "regular"),
     getDashboardTabsData(activeSeason),
+    getGameCenterData(undefined, activeSeason).catch(() => null),
   ]);
 
   return (
@@ -29,6 +32,11 @@ export default async function DashboardPage() {
       />
 
       <main className="flex-1 p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
+        {/* Tarjeta Hero Resumida del Juego en Vivo o Reciente */}
+        {liveGame && (
+          <LiveHeroGameCard game={liveGame} />
+        )}
+
         {/* Banner Temporada Oficial 2026-2027 */}
         <section className="p-4 rounded-2xl bg-gradient-to-r from-[#0D152B] via-[#131E3D] to-[#0D152B] border border-[#FDB827]/40 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center space-x-3">
@@ -58,6 +66,7 @@ export default async function DashboardPage() {
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </section>
+
         {/* Resumen de Temporada (KPIs) */}
         <section className="space-y-2">
           <div className="flex items-center justify-between">
