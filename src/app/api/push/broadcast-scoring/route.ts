@@ -8,17 +8,40 @@ const broadcastHistory = new Map<string, number>();
 
 export async function POST(request: NextRequest) {
   try {
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    const xAdminKey = request.headers.get("x-admin-key") || "";
+    const cronSecret = process.env.CRON_SECRET;
+    const adminPassword = process.env.NOTICUEVA_ADMIN_PASSWORD;
+
+    const isPrivileged = Boolean(
+      (cronSecret && token === cronSecret) ||
+      (adminPassword && (token === adminPassword || xAdminKey === adminPassword))
+    );
+
     const body = await request.json();
     const { gamePk, homeScore, awayScore, title, body: messageBody } = body;
 
-    if (!gamePk || homeScore === undefined || awayScore === undefined) {
+    const numGamePk = Number(gamePk);
+    const numHomeScore = Number(homeScore);
+    const numAwayScore = Number(awayScore);
+
+    if (
+      !numGamePk ||
+      Number.isNaN(numGamePk) ||
+      numGamePk <= 0 ||
+      Number.isNaN(numHomeScore) ||
+      numHomeScore < 0 ||
+      Number.isNaN(numAwayScore) ||
+      numAwayScore < 0
+    ) {
       return NextResponse.json(
-        { success: false, error: "Datos incompletos de la jugada" },
+        { success: false, error: "Parámetros numéricos de jugada inválidos o incompletos." },
         { status: 400 }
       );
     }
 
-    const broadcastKey = `game-${gamePk}-${homeScore}-${awayScore}`;
+    const broadcastKey = `game-${numGamePk}-${numHomeScore}-${numAwayScore}`;
     const now = Date.now();
     const lastSent = broadcastHistory.get(broadcastKey);
 
@@ -40,14 +63,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Para clientes no privilegiados, forzar título, cuerpo y URL canónicos para neutralizar inyecciones de phishing o spam
+    const safeTitle = isPrivileged && title && typeof title === "string"
+      ? title.slice(0, 100)
+      : "🦁 ¡Carrera en el Game Center!";
+    const safeBody = isPrivileged && messageBody && typeof messageBody === "string"
+      ? messageBody.slice(0, 200)
+      : `Nuevo marcador en vivo: ${numAwayScore} - ${numHomeScore}`;
+
     const payload = {
       topic: "scoring_plays" as const,
-      title: title || "🦁 ¡Carrera en el Game Center!",
-      body: messageBody || `Nuevo marcador: ${awayScore} - ${homeScore}`,
+      title: safeTitle,
+      body: safeBody,
       icon: "/icon-512.png",
       badge: "/favicon.ico",
-      url: `/game-center?gamePk=${gamePk}`,
-      tag: `scoring-${gamePk}-${homeScore}-${awayScore}`,
+      url: `/game-center?gamePk=${numGamePk}`,
+      tag: `scoring-${numGamePk}-${numHomeScore}-${numAwayScore}`,
     };
 
     const pushResult = await sendPushToTopic(payload);

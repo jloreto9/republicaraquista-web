@@ -42,7 +42,9 @@ export function PushBroadcastPanel({ adminPassword = '' }: PushBroadcastPanelPro
   const checkDb = async () => {
     try {
       setDbStatus((prev) => (prev ? { ...prev, loading: true } : { loading: true, ready: false, tableExists: false, sqlMigration: '' }));
-      const res = await fetch('/api/push/status');
+      const res = await fetch('/api/push/status', {
+        headers: (password || adminPassword) ? { 'x-admin-key': password || adminPassword } : {},
+      });
       const data = await res.json();
       setDbStatus({
         loading: false,

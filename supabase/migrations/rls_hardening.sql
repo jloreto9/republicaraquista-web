@@ -52,10 +52,10 @@ CREATE POLICY "Lectura publica de noticueva_posts" ON public.noticueva_posts FOR
 --   utilizan el rol 'service_role' (que se salta RLS automáticamente).
 --
 -- Para noticueva_posts:
--- Permitir gestión protegida (filtrada por contraseña en la API de Next.js)
+-- Gestión administrativa reservada exclusivamente a service_role (backend de Next.js)
 DROP POLICY IF EXISTS "Permitir gestion de noticueva_posts" ON public.noticueva_posts;
 CREATE POLICY "Permitir gestion de noticueva_posts" 
 ON public.noticueva_posts 
 FOR ALL 
-USING (true) 
-WITH CHECK (true);
+USING (auth.role() = 'service_role') 
+WITH CHECK (auth.role() = 'service_role');

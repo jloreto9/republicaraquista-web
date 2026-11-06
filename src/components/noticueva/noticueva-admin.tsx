@@ -70,7 +70,9 @@ export function NotiCuevaAdmin() {
   const checkDatabaseStatus = async () => {
     try {
       setDbStatus((prev) => (prev ? { ...prev, loading: true } : { loading: true, ready: false, postsTableExists: false, sqlMigration: "" }));
-      const res = await fetch("/api/noticueva/status");
+      const res = await fetch("/api/noticueva/status", {
+        headers: password ? { "x-admin-key": password } : {},
+      });
       const data = await res.json();
       setDbStatus({
         loading: false,
@@ -277,7 +279,7 @@ export function NotiCuevaAdmin() {
     }
 
     try {
-      const res = await fetch(`/api/noticueva/${id}?password=${encodeURIComponent(password)}`, {
+      const res = await fetch(`/api/noticueva/${id}`, {
         method: "DELETE",
         headers: { "x-admin-key": password },
       });

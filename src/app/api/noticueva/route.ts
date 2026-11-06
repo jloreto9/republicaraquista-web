@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get("x-admin-key") || "";
     const body = await request.json();
-    const password = body.password || authHeader;
+    const password = (authHeader || body.password || "").trim();
 
-    if (password !== NOTICUEVA_ADMIN_PASSWORD) {
+    if (!NOTICUEVA_ADMIN_PASSWORD || !password || password !== NOTICUEVA_ADMIN_PASSWORD) {
       return NextResponse.json(
         { success: false, error: "No autorizado. Clave de redactor requerida." },
         { status: 401 }

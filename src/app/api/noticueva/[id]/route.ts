@@ -16,9 +16,9 @@ export async function PUT(
     const { id } = await params;
     const authHeader = request.headers.get("x-admin-key") || "";
     const body = await request.json();
-    const password = body.password || authHeader;
+    const password = (authHeader || body.password || "").trim();
 
-    if (password !== NOTICUEVA_ADMIN_PASSWORD) {
+    if (!NOTICUEVA_ADMIN_PASSWORD || !password || password !== NOTICUEVA_ADMIN_PASSWORD) {
       return NextResponse.json(
         { success: false, error: "No autorizado." },
         { status: 401 }
@@ -61,11 +61,14 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const authHeader = request.headers.get("x-admin-key") || "";
+    const authHeader =
+      request.headers.get("x-admin-key") ||
+      request.headers.get("authorization")?.replace("Bearer ", "") ||
+      "";
     const url = new URL(request.url);
-    const password = url.searchParams.get("password") || authHeader;
+    const password = (authHeader || url.searchParams.get("password") || "").trim();
 
-    if (password !== NOTICUEVA_ADMIN_PASSWORD) {
+    if (!NOTICUEVA_ADMIN_PASSWORD || !password || password !== NOTICUEVA_ADMIN_PASSWORD) {
       return NextResponse.json(
         { success: false, error: "No autorizado." },
         { status: 401 }

@@ -35,5 +35,5 @@ USING (true);
 CREATE POLICY "Permitir gestion de noticueva_posts" 
 ON public.noticueva_posts 
 FOR ALL 
-USING (true) 
-WITH CHECK (true);
+USING (auth.role() = 'service_role') 
+WITH CHECK (auth.role() = 'service_role');

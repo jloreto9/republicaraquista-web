@@ -53,12 +53,21 @@ function renderInline(text: string): React.ReactNode {
     // Enlace: [texto](url)
     const linkMatch = part.match(/^\[(.*?)\]\((.*?)\)$/);
     if (linkMatch) {
+      const rawUrl = (linkMatch[2] || "").trim();
+      const lowerUrl = rawUrl.toLowerCase();
+      const isSafe =
+        lowerUrl.startsWith("https://") ||
+        lowerUrl.startsWith("http://") ||
+        lowerUrl.startsWith("/") ||
+        lowerUrl.startsWith("mailto:");
+      const safeHref = isSafe ? rawUrl : "#";
+
       return (
         <a
           key={i}
-          href={linkMatch[2]}
-          target="_blank"
-          rel="noopener noreferrer"
+          href={safeHref}
+          target={isSafe && !lowerUrl.startsWith("mailto:") ? "_blank" : undefined}
+          rel={isSafe && !lowerUrl.startsWith("mailto:") ? "noopener noreferrer" : undefined}
           className="text-[#FDB827] hover:underline hover:text-[#FDB827]/80 font-medium"
         >
           {linkMatch[1]}

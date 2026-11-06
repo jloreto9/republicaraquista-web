@@ -8,6 +8,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { password } = body;
 
+    if (!NOTICUEVA_ADMIN_PASSWORD) {
+      return NextResponse.json(
+        { success: false, error: "Servicio de redacción no configurado en el servidor." },
+        { status: 503 }
+      );
+    }
+
     if (!password || typeof password !== "string") {
       return NextResponse.json(
         { success: false, error: "Contraseña requerida." },
