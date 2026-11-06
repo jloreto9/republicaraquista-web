@@ -15,6 +15,7 @@ import { supabase, getBattingStats, getPitchingStats } from "./supabase";
 import { getSeasonWpaLeaders } from "./wpa-engine";
 import { isDayGame, getVenezuelanDate } from "./utils";
 import { fetchGameLiveFeed } from "./game-feed-service";
+import { getStreaksData } from "./streaks-service";
 import calendarData from "@/data/calendar_2026_27.json";
 
 // ── LÍNEA BASE LIMPIA / INICIAL EN CERO PARA NUEVAS TEMPORADAS ────────────────
@@ -1279,7 +1280,7 @@ export async function getHeadToHeadRecords(season = ACTIVE_SEASON): Promise<Head
  * Obtiene toda la información consolidada para la suite de pestañas del Centro de Mando.
  */
 export async function getDashboardTabsData(season = ACTIVE_SEASON): Promise<DashboardTabsData> {
-  const [advancedStats, weeklyRecords, lastGame, trends, leaders, channelRecords, h2hRecords] =
+  const [advancedStats, weeklyRecords, lastGame, trends, leaders, channelRecords, h2hRecords, streaks] =
     await Promise.all([
       getLeonesAdvancedStats(season),
       getWeeklyRecords(season),
@@ -1288,6 +1289,10 @@ export async function getDashboardTabsData(season = ACTIVE_SEASON): Promise<Dash
       getCaracasTeamLeaders(season),
       getBroadcastChannelRecords(2026),
       getHeadToHeadRecords(season),
+      getStreaksData(season).catch((err) => {
+        console.error("Error al cargar rachas en dashboard:", err);
+        return null;
+      }),
     ]);
 
   return {
@@ -1298,5 +1303,6 @@ export async function getDashboardTabsData(season = ACTIVE_SEASON): Promise<Dash
     leaders,
     channelRecords,
     h2hRecords,
+    streaks: streaks || undefined,
   };
 }
