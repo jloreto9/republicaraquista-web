@@ -1,3 +1,5 @@
+import { RachasTabData } from "./streaks";
+
 export interface LeonesAdvancedStats {
   // Condiciones Generales & Racha (Columna 1)
   totalGames: number;
@@ -162,4 +164,5 @@ export interface DashboardTabsData {
   };
   channelRecords: BroadcastChannelRecord[];
   h2hRecords: HeadToHeadRecord[];
+  streaks?: RachasTabData;
 }

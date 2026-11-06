@@ -4,14 +4,15 @@ import { useState } from "react";
 import { DashboardTabsData } from "@/types/leones-stats";
 import { LastGameTab } from "./tabs/last-game-tab";
 import { TrendsTab } from "./tabs/trends-tab";
+import { RachasTab } from "./tabs/rachas-tab";
 import { TeamLeadersTab } from "./tabs/team-leaders-tab";
 import { LeonesStatsTab } from "./tabs/leones-stats-tab";
-import { Calendar, TrendingUp, Trophy, Sparkles } from "lucide-react";
+import { Calendar, TrendingUp, Trophy, Sparkles, Flame } from "lucide-react";
 
 interface DashboardTabsProps {
   data: DashboardTabsData;
   seasonLabel?: string;
-  defaultTab?: "last-game" | "trends" | "leaders" | "leones-stats";
+  defaultTab?: "last-game" | "trends" | "rachas" | "leaders" | "leones-stats";
 }
 
 export function DashboardTabs({
@@ -20,7 +21,7 @@ export function DashboardTabs({
   defaultTab = "last-game",
 }: DashboardTabsProps) {
   const [activeTab, setActiveTab] = useState<
-    "last-game" | "trends" | "leaders" | "leones-stats"
+    "last-game" | "trends" | "rachas" | "leaders" | "leones-stats"
   >(defaultTab);
 
   const tabs = [
@@ -35,6 +36,13 @@ export function DashboardTabs({
       label: "Tendencias",
       icon: TrendingUp,
       badge: "U10J",
+    },
+    {
+      id: "rachas" as const,
+      label: "Rachas",
+      icon: Flame,
+      badge: "Activas",
+      highlight: true,
     },
     {
       id: "leaders" as const,
@@ -97,6 +105,7 @@ export function DashboardTabs({
       <div className="transition-all duration-200">
         {activeTab === "last-game" && <LastGameTab lastGame={data.lastGame} />}
         {activeTab === "trends" && <TrendsTab trends={data.trends} />}
+        {activeTab === "rachas" && <RachasTab data={data.streaks} />}
         {activeTab === "leaders" && (
           <TeamLeadersTab
             batters={data.leaders.batters}
