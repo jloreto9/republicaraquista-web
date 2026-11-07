@@ -14,6 +14,8 @@ import {
   GitCompare,
   Trophy,
   TrendingUp,
+  AlertCircle,
+  Layers,
 } from "lucide-react";
 
 interface CalendarEventModalProps {
@@ -41,9 +43,14 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
     year: "numeric",
   });
 
+  const isPostponed = Boolean(event.result?.isPostponed);
+  const isDoubleHeader = Boolean(
+    event.isDoubleHeader && event.doubleHeaderGames && event.doubleHeaderGames.length > 1
+  );
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-2xl max-w-lg w-full p-5 sm:p-6 space-y-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
         {/* Glow caraquista */}
         <div className="absolute top-0 right-1/4 w-32 h-32 bg-[#FDB827]/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -67,85 +74,182 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
           </button>
         </div>
 
-        {/* Badge de Local o Visitante con el color requerido */}
-        <div className="flex items-center justify-between">
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase font-mono ${
-              event.isHome
-                ? "bg-white/10 text-white border border-white/40 shadow-[0_0_10px_rgba(255,255,255,0.15)]"
-                : "bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/40 shadow-[0_0_10px_rgba(253,184,39,0.15)]"
-            }`}
-          >
-            {event.isHome ? "🏠 Juego en Casa (Local)" : "✈️ Juego de Visita (Visitante)"}
-          </span>
+        {/* Badges y Fecha */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase font-mono ${
+                event.isHome
+                  ? "bg-white/10 text-white border border-white/40 shadow-[0_0_10px_rgba(255,255,255,0.15)]"
+                  : "bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/40 shadow-[0_0_10px_rgba(253,184,39,0.15)]"
+              }`}
+            >
+              {event.isHome ? "🏠 Juego en Casa (Local)" : "✈️ Juego de Visita (Visitante)"}
+            </span>
+            {isDoubleHeader && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase font-mono bg-[#FDB827] text-[#070B19]">
+                Doble Cartelera
+              </span>
+            )}
+            {isPostponed && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                Pospuesto
+              </span>
+            )}
+          </div>
           <span className="text-xs font-mono text-slate-400 capitalize">
             {formattedDate}
           </span>
         </div>
 
-        {/* Cara a Cara de Equipos */}
-        <div className="p-4 rounded-xl bg-[#070B19] border border-[#1E2B4D] flex items-center justify-around relative">
-          {/* Leones del Caracas */}
-          <div className="flex flex-col items-center space-y-2 text-center">
-            <div className="w-14 h-14 relative bg-[#0D152B] border border-[#FDB827]/30 rounded-2xl p-1.5 flex items-center justify-center shadow-md">
-              <Image
-                src={caracas.logoUrl}
-                alt={caracas.name}
-                width={48}
-                height={48}
-                className="object-contain"
-              />
+        {/* Banner de Aviso si fue suspendido/pospuesto */}
+        {isPostponed && (
+          <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-600/40 flex items-start gap-2.5 text-xs text-amber-200">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block text-amber-300">
+                Juego Pospuesto por {event.result?.postponedReason || "Lluvia"}
+              </span>
+              <p className="text-[11px] text-amber-200/90 mt-0.5">
+                {event.result?.note ||
+                  `El compromiso fue suspendido oficialmente y reprogramado para el ${event.result?.rescheduledToDate || "siguiente día"}.`}
+              </p>
             </div>
-            <span className="text-xs font-bold text-slate-100">Leones</span>
-            <span className="text-[10px] font-mono text-[#FDB827] font-semibold">CAR</span>
           </div>
+        )}
 
-          {/* Versus o Marcador */}
-          <div className="flex flex-col items-center space-y-1">
-            {event.result?.isCompleted ? (
-              <div className="flex flex-col items-center">
-                <span
-                  className={`text-xl font-mono font-black ${
-                    event.result.won ? "text-emerald-400" : "text-rose-400"
-                  }`}
+        {/* Si es Doble Juego: Mostrar desglose de ambos compromisos */}
+        {isDoubleHeader && event.doubleHeaderGames && event.doubleHeaderGames.length > 1 ? (
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-mono text-[#FDB827] font-bold">
+              <Layers className="w-4 h-4 text-[#FDB827]" />
+              <span>Resultados de la Doble Cartelera</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {event.doubleHeaderGames.map((dh) => (
+                <div
+                  key={dh.gamePk}
+                  className="p-3 rounded-xl bg-[#070B19] border border-[#1E2B4D] space-y-2"
                 >
-                  {event.result.caracasScore} - {event.result.opponentScore}
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-[#131E3D] text-slate-300 font-mono mt-1">
-                  {event.result.status}
-                </span>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center">
-                <span className="text-base font-mono font-bold text-slate-400">
-                  {event.isHome ? "VS" : "@"}
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono uppercase">
-                  {event.isHome ? "En Caracas" : "En la Carretera"}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Rival */}
-          <div className="flex flex-col items-center space-y-2 text-center">
-            <div className="w-14 h-14 relative bg-[#0D152B] border border-[#1E2B4D] rounded-2xl p-1.5 flex items-center justify-center shadow-md">
-              <Image
-                src={event.opponentLogo || opponent.logoUrl}
-                alt={event.opponentName}
-                width={48}
-                height={48}
-                className="object-contain"
-              />
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="font-extrabold text-[#FDB827]">
+                      Juego {dh.gameNumber}
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        dh.result.won
+                          ? "bg-emerald-950 text-emerald-400 border border-emerald-700/50"
+                          : "bg-rose-950 text-rose-400 border border-rose-700/50"
+                      }`}
+                    >
+                      {dh.result.won ? "Victoria" : "Derrota"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm font-mono font-black">
+                    <span className="text-slate-200">Leones del Caracas</span>
+                    <span
+                      className={
+                        dh.result.won ? "text-emerald-400 text-base" : "text-slate-400 text-base"
+                      }
+                    >
+                      {dh.result.caracasScore}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm font-mono font-black border-t border-[#1E2B4D]/40 pt-1.5">
+                    <span className="text-slate-400 text-xs font-medium truncate max-w-[140px]">
+                      {event.opponentName}
+                    </span>
+                    <span
+                      className={
+                        !dh.result.won ? "text-rose-400 text-base" : "text-slate-400 text-base"
+                      }
+                    >
+                      {dh.result.opponentScore}
+                    </span>
+                  </div>
+                  {dh.result.note && (
+                    <span className="text-[9.5px] font-mono text-amber-300 block bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-600/30">
+                      ℹ️ {dh.result.note}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
-            <span className="text-xs font-bold text-slate-100 max-w-[90px] truncate">
-              {event.opponentName.replace(/del |de /i, "")}
-            </span>
-            <span className="text-[10px] font-mono text-slate-400 font-semibold">
-              {event.opponentAbbr}
-            </span>
           </div>
-        </div>
+        ) : (
+          /* Cara a Cara Tradicional */
+          <div className="p-4 rounded-xl bg-[#070B19] border border-[#1E2B4D] flex items-center justify-around relative">
+            {/* Leones del Caracas */}
+            <div className="flex flex-col items-center space-y-2 text-center">
+              <div className="w-14 h-14 relative bg-[#0D152B] border border-[#FDB827]/30 rounded-2xl p-1.5 flex items-center justify-center shadow-md">
+                <Image
+                  src={caracas.logoUrl}
+                  alt={caracas.name}
+                  width={48}
+                  height={48}
+                  className="object-contain"
+                />
+              </div>
+              <span className="text-xs font-bold text-slate-100">Leones</span>
+              <span className="text-[10px] font-mono text-[#FDB827] font-semibold">CAR</span>
+            </div>
+
+            {/* Versus o Marcador */}
+            <div className="flex flex-col items-center space-y-1">
+              {event.result?.isCompleted ? (
+                <div className="flex flex-col items-center">
+                  <span
+                    className={`text-xl font-mono font-black ${
+                      event.result.won ? "text-emerald-400" : "text-rose-400"
+                    }`}
+                  >
+                    {event.result.caracasScore} - {event.result.opponentScore}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-[#131E3D] text-slate-300 font-mono mt-1">
+                    {isPostponed ? "Completado en Doble Juego" : event.result.status}
+                  </span>
+                </div>
+              ) : isPostponed ? (
+                <div className="flex flex-col items-center">
+                  <span className="text-sm font-mono font-black text-amber-400 bg-amber-950/60 px-2 py-1 rounded border border-amber-600/50">
+                    POSPUESTO
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono mt-1">
+                    {event.result.postponedReason || "Lluvia"}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <span className="text-base font-mono font-bold text-slate-400">
+                    {event.isHome ? "VS" : "@"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono uppercase">
+                    {event.isHome ? "En Caracas" : "En la Carretera"}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Rival */}
+            <div className="flex flex-col items-center space-y-2 text-center">
+              <div className="w-14 h-14 relative bg-[#0D152B] border border-[#1E2B4D] rounded-2xl p-1.5 flex items-center justify-center shadow-md">
+                <Image
+                  src={event.opponentLogo || opponent.logoUrl}
+                  alt={event.opponentName}
+                  width={48}
+                  height={48}
+                  className="object-contain"
+                />
+              </div>
+              <span className="text-xs font-bold text-slate-100 max-w-[90px] truncate">
+                {event.opponentName.replace(/del |de /i, "")}
+              </span>
+              <span className="text-[10px] font-mono text-slate-400 font-semibold">
+                {event.opponentAbbr}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Fila de Detalles: Hora, Estadio, Transmisiones */}
         <div className="space-y-3 text-xs">
@@ -155,7 +259,9 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
               <Clock className="w-4 h-4 text-[#FDB827] shrink-0 mt-0.5" />
               <div>
                 <span className="text-[10px] text-slate-400 block font-mono">Horario Oficial</span>
-                <span className="font-semibold text-slate-100 text-sm">{event.timeDisplay}</span>
+                <span className="font-semibold text-slate-100 text-sm">
+                  {isDoubleHeader ? "Doble Jornada Oficial" : event.timeDisplay}
+                </span>
               </div>
             </div>
 
@@ -198,17 +304,6 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
         {/* Botones de Acción */}
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2.5 border-t border-[#1E2B4D]">
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            {/* Oculto temporalmente mientras se conecta fuente fiable de abridores y cuotas
-            <Link
-              href={`/probabilidades?date=${event.date}`}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#FDB827]/15 hover:bg-[#FDB827]/25 border border-[#FDB827]/40 text-[#FDB827] text-xs font-bold transition-all group shadow-sm"
-              title="Ver proyección y cuotas de este encuentro"
-            >
-              <TrendingUp className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-              <span>Ver Líneas & Probabilidades</span>
-            </Link>
-            */}
-
             <Link
               href={`/matchup`}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#131E3D] hover:bg-[#1a2852] border border-[#1E2B4D] hover:border-[#FDB827]/40 text-slate-200 text-xs font-semibold transition-all group"
@@ -220,7 +315,7 @@ export function CalendarEventModal({ event, onClose }: CalendarEventModalProps) 
 
           <button
             onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-colors font-mono"
           >
             Cerrar
           </button>

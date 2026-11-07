@@ -611,6 +611,7 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
         .in("game_type", ["R", "regular"])
         .or("home_team_id.eq.695,away_team_id.eq.695")
         .order("game_date", { ascending: false })
+        .order("game_datetime", { ascending: false })
         .limit(1);
 
       if (rawGames && rawGames.length > 0) {

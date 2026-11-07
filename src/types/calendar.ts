@@ -7,6 +7,23 @@ export interface CalendarGameResult {
   opponentScore: number;
   won: boolean;
   innings?: number;
+  // Campos de manejo de excepciones y dobles juegos
+  isPostponed?: boolean;
+  isSuspended?: boolean;
+  postponedReason?: string;
+  rescheduledToDate?: string;
+  rescheduledFromDate?: string;
+  isDoubleHeader?: boolean;
+  gameNumber?: number; // 1 o 2
+  note?: string;
+}
+
+export interface DoubleHeaderGameEntry {
+  gamePk: number;
+  gameNumber: number;
+  timeDisplay?: string;
+  isHome: boolean;
+  result: CalendarGameResult;
 }
 
 export interface CalendarGameEvent {
@@ -29,6 +46,9 @@ export interface CalendarGameEvent {
   transmission: string; // "Televen", "IVC", "Por confirmar", etc.
   rawDescription?: string;
   result?: CalendarGameResult;
+  // Soporte para múltiples juegos en una misma fecha (dobles carteleras)
+  isDoubleHeader?: boolean;
+  doubleHeaderGames?: DoubleHeaderGameEntry[];
 }
 
 export interface MonthCalendarData {

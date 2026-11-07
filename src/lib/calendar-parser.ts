@@ -4,6 +4,8 @@ import {
   CalendarGameEvent,
   CalendarApiResponse,
   MonthCalendarData,
+  DoubleHeaderGameEntry,
+  CalendarGameResult,
 } from "@/types/calendar";
 import { supabase } from "./supabase";
 import fallbackCalendar from "@/data/calendar_2026_27.json";
@@ -17,6 +19,8 @@ for (const ev of fallbackCalendar.events) {
 }
 
 interface SupabaseGameMatch {
+  id?: number;
+  game_pk?: number;
   game_date?: string;
   game_datetime?: string;
   home_team_id: number;
@@ -26,7 +30,28 @@ interface SupabaseGameMatch {
   status?: string;
 }
 
-
+interface ParsedMlbGame {
+  gamePk: number;
+  gameNumber: number;
+  isDoubleHeader: boolean;
+  scheduledDate: string;
+  officialDate: string;
+  rescheduledFromDate?: string;
+  rescheduleGameDate?: string;
+  status: string;
+  reason?: string;
+  isCompleted: boolean;
+  isPostponed: boolean;
+  isSuspended: boolean;
+  isHome: boolean;
+  opponentId: number;
+  homeScore: number;
+  awayScore: number;
+  caracasScore: number;
+  opponentScore: number;
+  won: boolean;
+  timeDisplay?: string;
+}
 
 const OPPONENT_NAME_TO_ID: Record<string, number> = {
   "aguilas del zulia": 692,
@@ -262,10 +287,12 @@ export function getPrimaryBroadcastBadge(trans?: string): string {
 /**
  * Cruza los eventos del calendario con los resultados oficiales de MLB Stats API y Supabase.
  * Implementa una arquitectura dual de alta resiliencia:
- * 1. Primar officialDate de MLB Stats API en tiempo real para evitar que juegos nocturnos
- *    (ej. sábados 8:00 PM VET = 00:00 UTC) salten de fecha tras terminar luego de medianoche.
- * 2. Normalizar marcas UTC de Supabase restando las 4 horas de la hora venezolana (UTC-4)
- *    y verificando localía estricta (isHome).
+ * 1. Soporte completo de Dobles Carteleras (Doubleheaders):
+ *    Almacena múltiples juegos por fecha sin sobrescribir Game 1 con Game 2.
+ * 2. Manejo exhaustivo de Juegos Suspendidos y Pospuestos:
+ *    Detecta suspensiones en la fecha original, extrae el motivo ("Lluvia") y vincula
+ *    el resultado final cuando el juego reprogramado (makeup) ya fue completado.
+ * 3. Fallback con Supabase normalizando horario UTC-4 (VET) y admitiendo dobles juegos.
  */
 export async function attachSupabaseResults(
   events: CalendarGameEvent[]
@@ -273,15 +300,9 @@ export async function attachSupabaseResults(
   if (events.length === 0) return events;
 
   // 1. Obtener resultados oficiales en vivo de MLB Stats API
-  const mlbResultsMap = new Map<
-    string,
-    {
-      homeScore: number;
-      awayScore: number;
-      status: string;
-      isCompleted: boolean;
-    }
-  >();
+  const mlbGamesByScheduledDate = new Map<string, ParsedMlbGame[]>();
+  const mlbGamesByOfficialDate = new Map<string, ParsedMlbGame[]>();
+  const mlbRescheduledFromMap = new Map<string, ParsedMlbGame>();
 
   try {
     const mlbRes = await fetch(
@@ -297,6 +318,7 @@ export async function attachSupabaseResults(
       const mlbJson = await mlbRes.json();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const dateObj of mlbJson.dates || []) {
+        const scheduledDate = dateObj.date;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for (const g of dateObj.games || []) {
           const homeId = Number(g.teams?.home?.team?.id);
@@ -304,25 +326,67 @@ export async function attachSupabaseResults(
           if (homeId === 695 || awayId === 695) {
             const isHome = homeId === 695;
             const oppId = isHome ? awayId : homeId;
-            const targetDate = g.officialDate || g.originalDate || dateObj.date;
+            const officialDate = g.officialDate || scheduledDate;
             const status = g.status?.detailedState || g.status?.abstractGameState || "Final";
+            const statusLower = status.toLowerCase();
             const isCompleted = [
               "final",
               "completed",
               "completed early",
               "game over",
-            ].includes(status.toLowerCase());
+            ].includes(statusLower);
+            const isPostponed = [
+              "postponed",
+              "postponed: rain",
+            ].includes(statusLower);
+            const isSuspended = [
+              "suspended",
+              "suspended: rain",
+            ].includes(statusLower);
 
             const homeScore = Number(g.teams?.home?.score ?? 0);
             const awayScore = Number(g.teams?.away?.score ?? 0);
+            const caracasScore = isHome ? homeScore : awayScore;
+            const opponentScore = isHome ? awayScore : homeScore;
 
-            // Clave única: fecha oficial + rival + localía
-            mlbResultsMap.set(`${targetDate}-${oppId}-${isHome ? "H" : "A"}`, {
+            const parsedGame: ParsedMlbGame = {
+              gamePk: Number(g.gamePk),
+              gameNumber: Number(g.gameNumber || 1),
+              isDoubleHeader: g.doubleHeader === "Y",
+              scheduledDate,
+              officialDate,
+              rescheduledFromDate: g.rescheduledFromDate,
+              rescheduleGameDate: g.rescheduleGameDate,
+              status,
+              reason: g.status?.reason,
+              isCompleted,
+              isPostponed,
+              isSuspended,
+              isHome,
+              opponentId: oppId,
               homeScore,
               awayScore,
-              status,
-              isCompleted,
-            });
+              caracasScore,
+              opponentScore,
+              won: caracasScore > opponentScore,
+            };
+
+            // Indexar por fecha programada
+            if (!mlbGamesByScheduledDate.has(scheduledDate)) {
+              mlbGamesByScheduledDate.set(scheduledDate, []);
+            }
+            mlbGamesByScheduledDate.get(scheduledDate)!.push(parsedGame);
+
+            // Indexar por fecha oficial
+            if (!mlbGamesByOfficialDate.has(officialDate)) {
+              mlbGamesByOfficialDate.set(officialDate, []);
+            }
+            mlbGamesByOfficialDate.get(officialDate)!.push(parsedGame);
+
+            // Indexar por fecha original de reprogramación (ej. juego makeup del 05/11)
+            if (g.rescheduledFromDate) {
+              mlbRescheduledFromMap.set(g.rescheduledFromDate, parsedGame);
+            }
           }
         }
       }
@@ -340,7 +404,7 @@ export async function attachSupabaseResults(
 
       const { data: rawGames, error } = await supabase
         .from("games")
-        .select("game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status")
+        .select("id, game_pk, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status")
         .gte("game_date", minDate)
         .lte("game_date", maxDate)
         .or("home_team_id.eq.695,away_team_id.eq.695");
@@ -353,71 +417,213 @@ export async function attachSupabaseResults(
     }
   }
 
-  // 3. Cruzar eventos con prioridad: MLB Stats API -> Supabase normalizado por VET
+  // 3. Cruzar eventos con prioridad: MLB Stats API -> Supabase
   return events.map((event) => {
-    const mlbKey = `${event.date}-${event.opponentId}-${event.isHome ? "H" : "A"}`;
-    const mlbMatch = mlbResultsMap.get(mlbKey);
+    // A) Chequear juegos programados para esta fecha en MLB Stats API
+    const mlbScheduledGames = mlbGamesByScheduledDate.get(event.date) || [];
+    const mlbMakeupFromThisDate = mlbRescheduledFromMap.get(event.date);
 
-    if (mlbMatch && mlbMatch.isCompleted) {
-      const caracasScore = event.isHome ? mlbMatch.homeScore : mlbMatch.awayScore;
-      const opponentScore = event.isHome ? mlbMatch.awayScore : mlbMatch.homeScore;
+    // CASO 1: Juego Pospuesto / Suspendido
+    const postponedMlb = mlbScheduledGames.find((g) => g.isPostponed || g.isSuspended);
+    if (postponedMlb || mlbMakeupFromThisDate) {
+      const makeupCompleted = mlbMakeupFromThisDate && mlbMakeupFromThisDate.isCompleted;
+      const makeupScoreStr = makeupCompleted
+        ? `${mlbMakeupFromThisDate.won ? "G" : "P"} ${mlbMakeupFromThisDate.caracasScore}-${mlbMakeupFromThisDate.opponentScore}`
+        : "";
+
       return {
         ...event,
         result: {
-          isCompleted: true,
-          status: mlbMatch.status,
-          homeScore: mlbMatch.homeScore,
-          awayScore: mlbMatch.awayScore,
-          caracasScore,
-          opponentScore,
-          won: caracasScore > opponentScore,
+          isCompleted: Boolean(makeupCompleted),
+          status: "Pospuesto",
+          isPostponed: true,
+          isSuspended: Boolean(postponedMlb?.isSuspended),
+          postponedReason: postponedMlb?.reason || "Lluvia",
+          rescheduledToDate: mlbMakeupFromThisDate?.scheduledDate || postponedMlb?.rescheduleGameDate,
+          rescheduledFromDate: event.date,
+          homeScore: mlbMakeupFromThisDate ? mlbMakeupFromThisDate.homeScore : 0,
+          awayScore: mlbMakeupFromThisDate ? mlbMakeupFromThisDate.awayScore : 0,
+          caracasScore: mlbMakeupFromThisDate ? mlbMakeupFromThisDate.caracasScore : 0,
+          opponentScore: mlbMakeupFromThisDate ? mlbMakeupFromThisDate.opponentScore : 0,
+          won: mlbMakeupFromThisDate ? mlbMakeupFromThisDate.won : false,
+          note: makeupCompleted
+            ? `Pospuesto por lluvia. Disputado en doble juego (${makeupScoreStr})`
+            : `Pospuesto por lluvia. Reprogramado para el ${postponedMlb?.rescheduleGameDate || "siguiente fecha"}`,
         },
       };
     }
 
-    // Fallback con Supabase, normalizando timezone UTC-4 y validando localía
-    const matchedGame = supabaseGames.find((g) => {
+    // CASO 2: Juegos Completados en MLB Stats API (Doble Juego o Juego Individual)
+    const completedMlbGames = mlbScheduledGames.filter((g) => g.isCompleted);
+    if (completedMlbGames.length > 0) {
+      if (completedMlbGames.length >= 2 || (completedMlbGames.length === 1 && completedMlbGames[0].isDoubleHeader)) {
+        const sortedGames = [...completedMlbGames].sort((a, b) => a.gameNumber - b.gameNumber);
+        const doubleHeaderGames: DoubleHeaderGameEntry[] = sortedGames.map((g) => ({
+          gamePk: g.gamePk,
+          gameNumber: g.gameNumber,
+          isHome: g.isHome,
+          timeDisplay: g.timeDisplay,
+          result: {
+            isCompleted: true,
+            status: g.status,
+            homeScore: g.homeScore,
+            awayScore: g.awayScore,
+            caracasScore: g.caracasScore,
+            opponentScore: g.opponentScore,
+            won: g.won,
+            isDoubleHeader: true,
+            gameNumber: g.gameNumber,
+            rescheduledFromDate: g.rescheduledFromDate,
+            note: g.rescheduledFromDate ? `Reprogramado del ${g.rescheduledFromDate}` : undefined,
+          },
+        }));
+
+        const primaryGame = sortedGames[0];
+        return {
+          ...event,
+          isDoubleHeader: true,
+          doubleHeaderGames,
+          result: {
+            isCompleted: true,
+            status: "Final (Doble Juego)",
+            homeScore: primaryGame.homeScore,
+            awayScore: primaryGame.awayScore,
+            caracasScore: primaryGame.caracasScore,
+            opponentScore: primaryGame.opponentScore,
+            won: primaryGame.won,
+            isDoubleHeader: true,
+          },
+        };
+      }
+
+      // Juego individual completado
+      const singleMlb = completedMlbGames[0];
+      return {
+        ...event,
+        result: {
+          isCompleted: true,
+          status: singleMlb.status,
+          homeScore: singleMlb.homeScore,
+          awayScore: singleMlb.awayScore,
+          caracasScore: singleMlb.caracasScore,
+          opponentScore: singleMlb.opponentScore,
+          won: singleMlb.won,
+        },
+      };
+    }
+
+    // CASO 3: Fallback con Supabase
+    const matchingSbGames = supabaseGames.filter((g) => {
       const gVetDate = getVenezuelanDate(g.game_date, g.game_datetime);
       const dateMatch =
         gVetDate === event.date ||
         (g.game_date && g.game_date.slice(0, 10) === event.date);
       if (!dateMatch) return false;
-
-      const isHome = Number(g.home_team_id) === 695;
-      if (isHome !== event.isHome) return false;
-
-      const opponentMatch =
-        Number(g.home_team_id) === event.opponentId ||
-        Number(g.away_team_id) === event.opponentId;
-      return opponentMatch;
+      const isCaracas = Number(g.home_team_id) === 695 || Number(g.away_team_id) === 695;
+      return isCaracas;
     });
 
-    if (!matchedGame) return event;
+    if (matchingSbGames.length === 0) return event;
 
-    const isHome = Number(matchedGame.home_team_id) === 695;
-    const homeScore = Number(matchedGame.home_score ?? 0);
-    const awayScore = Number(matchedGame.away_score ?? 0);
-    const caracasScore = isHome ? homeScore : awayScore;
-    const opponentScore = isHome ? awayScore : homeScore;
-    const isCompleted = [
-      "final",
-      "completed",
-      "completed early",
-      "game over",
-    ].includes((matchedGame.status || "").toLowerCase());
+    const completedSbGames = matchingSbGames.filter((g) =>
+      ["final", "completed", "completed early", "game over"].includes((g.status || "").toLowerCase())
+    );
 
-    return {
-      ...event,
-      result: {
-        isCompleted,
-        status: matchedGame.status || "Final",
-        homeScore,
-        awayScore,
-        caracasScore,
-        opponentScore,
-        won: caracasScore > opponentScore,
-      },
-    };
+    if (completedSbGames.length >= 2) {
+      // Doble juego en Supabase
+      const doubleHeaderGames: DoubleHeaderGameEntry[] = completedSbGames.map((g, idx) => {
+        const isHomeSb = Number(g.home_team_id) === 695;
+        const hScore = Number(g.home_score ?? 0);
+        const aScore = Number(g.away_score ?? 0);
+        const cScore = isHomeSb ? hScore : aScore;
+        const oppScore = isHomeSb ? aScore : hScore;
+        return {
+          gamePk: g.game_pk || g.id || idx + 1,
+          gameNumber: idx + 1,
+          isHome: isHomeSb,
+          result: {
+            isCompleted: true,
+            status: g.status || "Final",
+            homeScore: hScore,
+            awayScore: aScore,
+            caracasScore: cScore,
+            opponentScore: oppScore,
+            won: cScore > oppScore,
+            isDoubleHeader: true,
+            gameNumber: idx + 1,
+          },
+        };
+      });
+
+      const firstG = completedSbGames[0];
+      const isHomeFirst = Number(firstG.home_team_id) === 695;
+      const hScore = Number(firstG.home_score ?? 0);
+      const aScore = Number(firstG.away_score ?? 0);
+      const cScore = isHomeFirst ? hScore : aScore;
+      const oppScore = isHomeFirst ? aScore : hScore;
+
+      return {
+        ...event,
+        isDoubleHeader: true,
+        doubleHeaderGames,
+        result: {
+          isCompleted: true,
+          status: "Final (Doble Juego)",
+          homeScore: hScore,
+          awayScore: aScore,
+          caracasScore: cScore,
+          opponentScore: oppScore,
+          won: cScore > oppScore,
+          isDoubleHeader: true,
+        },
+      };
+    }
+
+    if (completedSbGames.length === 1) {
+      const g = completedSbGames[0];
+      const isHomeSb = Number(g.home_team_id) === 695;
+      const hScore = Number(g.home_score ?? 0);
+      const aScore = Number(g.away_score ?? 0);
+      const cScore = isHomeSb ? hScore : aScore;
+      const oppScore = isHomeSb ? aScore : hScore;
+
+      return {
+        ...event,
+        result: {
+          isCompleted: true,
+          status: g.status || "Final",
+          homeScore: hScore,
+          awayScore: aScore,
+          caracasScore: cScore,
+          opponentScore: oppScore,
+          won: cScore > oppScore,
+        },
+      };
+    }
+
+    // Si está pospuesto en Supabase
+    const postponedSb = matchingSbGames.find((g) =>
+      ["postponed", "cancelled", "canceled", "suspended"].includes((g.status || "").toLowerCase())
+    );
+    if (postponedSb) {
+      return {
+        ...event,
+        result: {
+          isCompleted: false,
+          status: "Pospuesto",
+          isPostponed: true,
+          postponedReason: "Lluvia",
+          homeScore: 0,
+          awayScore: 0,
+          caracasScore: 0,
+          opponentScore: 0,
+          won: false,
+          note: "Juego pospuesto",
+        },
+      };
+    }
+
+    return event;
   });
 }
 

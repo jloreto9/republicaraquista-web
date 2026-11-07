@@ -420,6 +420,59 @@ export async function getStandings(
     });
   }
 
+  // Reconciliación con MLB Stats API Standings como salvaguarda ante demoras o caídas de cron en Supabase
+  try {
+    const mlbStandingsRes = await fetch(
+      `https://statsapi.mlb.com/api/v1/standings?leagueId=135&season=${season}`,
+      {
+        signal: AbortSignal.timeout(3500),
+        next: { revalidate: 60 },
+      }
+    );
+    if (mlbStandingsRes.ok) {
+      const mlbData = await mlbStandingsRes.json();
+      const officialRecords = new Map<
+        number,
+        { wins: number; losses: number; streak?: string; gamesBack?: string }
+      >();
+      for (const rec of mlbData.records || []) {
+        for (const t of rec.teamRecords || []) {
+          const teamId = Number(t.team?.id);
+          officialRecords.set(teamId, {
+            wins: Number(t.wins ?? 0),
+            losses: Number(t.losses ?? 0),
+            streak: t.streak?.streakCode,
+            gamesBack: t.gamesBack,
+          });
+        }
+      }
+
+      // Si MLB reporta más juegos totales que los registrados en Supabase, sincronizar wins/losses
+      const totalSbGames = standings.reduce((acc, t) => acc + t.gamesPlayed, 0);
+      let totalMlbGames = 0;
+      officialRecords.forEach((r) => {
+        totalMlbGames += r.wins + r.losses;
+      });
+
+      if (totalMlbGames > totalSbGames) {
+        standings.forEach((team) => {
+          const off = officialRecords.get(team.teamId);
+          if (off && off.wins + off.losses >= team.gamesPlayed) {
+            team.wins = off.wins;
+            team.losses = off.losses;
+            team.gamesPlayed = off.wins + off.losses;
+            team.pct = team.gamesPlayed > 0 ? team.wins / team.gamesPlayed : 0.0;
+            if (off.streak) team.streak = off.streak;
+            if (off.gamesBack !== undefined) team.gamesBack = off.gamesBack;
+          }
+        });
+        standings.sort((a, b) => b.pct - a.pct || b.runDifferential - a.runDifferential);
+      }
+    }
+  } catch (mlbErr) {
+    // Si MLB Stats API falla o hay timeout, se preserva el cálculo fiel de Supabase
+  }
+
   return standings;
 }
 
@@ -468,6 +521,7 @@ export async function getRecentGames(
     .eq("season", season)
     .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
     .order("game_date", { ascending: false })
+    .order("game_datetime", { ascending: false })
     .limit(limit);
 
   if (error) {

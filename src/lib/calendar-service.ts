@@ -66,12 +66,12 @@ export function getNextScheduledGame(referenceDateStr?: string): CalendarGameEve
 
   const todayStr = referenceDateStr || new Date().toISOString().split("T")[0];
 
-  // 1. Buscar el primer juego que sea en o después de la fecha de referencia y no esté completado
-  const upcoming = events.find((e) => e.date >= todayStr && !e.result?.isCompleted);
+  // 1. Buscar el primer juego que sea en o después de la fecha de referencia y no esté completado ni pospuesto
+  const upcoming = events.find((e) => e.date >= todayStr && !e.result?.isCompleted && !e.result?.isPostponed);
   if (upcoming) return upcoming;
 
   // 2. Si no hay juegos futuros respecto a todayStr, buscar cualquier juego no completado
-  const pending = events.find((e) => !e.result?.isCompleted);
+  const pending = events.find((e) => !e.result?.isCompleted && !e.result?.isPostponed);
   if (pending) return pending;
 
   // 3. Fallback: Retornar el primer juego de la temporada regular
@@ -84,6 +84,14 @@ export function getNextScheduledGame(referenceDateStr?: string): CalendarGameEve
 export function getGameForDate(dateStr: string): CalendarGameEvent | null {
   const events = getAllCalendarGames();
   return events.find((e) => e.date === dateStr) || null;
+}
+
+/**
+ * Retorna todos los juegos de Leones del Caracas para una fecha específica (soporta dobles carteleras)
+ */
+export function getGamesForDate(dateStr: string): CalendarGameEvent[] {
+  const events = getAllCalendarGames();
+  return events.filter((e) => e.date === dateStr);
 }
 
 /**
@@ -109,4 +117,3 @@ export function getDaysUntilGame(gameDateStr: string, referenceDateStr?: string)
   const diffTime = gameDate.getTime() - refDate.getTime();
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
-
