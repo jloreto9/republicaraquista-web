@@ -11,6 +11,17 @@ interface StandingsTableProps {
   showPythagorean?: boolean;
 }
 
+function getStreakBadgeClass(streak: string): string {
+  const s = (streak || "").trim().toUpperCase();
+  if (s.startsWith("G") || s.startsWith("W") || s.endsWith("W") || s.endsWith("G")) {
+    return "bg-emerald-950/80 text-emerald-400 border border-emerald-800/40";
+  }
+  if (s.startsWith("P") || s.startsWith("L") || s.endsWith("L") || s.endsWith("P")) {
+    return "bg-rose-950/80 text-rose-400 border border-rose-800/40";
+  }
+  return "bg-slate-800/80 text-slate-400 border border-slate-700/40";
+}
+
 export function StandingsTable({
   standings,
   showPythagorean = true,
@@ -136,9 +147,7 @@ export function StandingsTable({
                           <span
                             className={cn(
                               "px-1.5 py-0.2 rounded text-[10px] font-bold",
-                              team.streak.startsWith("G")
-                                ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800/40"
-                                : "bg-rose-950/80 text-rose-400 border border-rose-800/40"
+                              getStreakBadgeClass(team.streak)
                             )}
                           >
                             {team.streak}
@@ -302,9 +311,7 @@ export function StandingsTable({
                     <span
                       className={cn(
                         "px-1.5 py-0.5 rounded text-[10px] font-bold",
-                        team.streak.startsWith("G")
-                          ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800/40"
-                          : "bg-rose-950/80 text-rose-400 border border-rose-800/40"
+                        getStreakBadgeClass(team.streak)
                       )}
                     >
                       {team.streak}
