@@ -319,12 +319,24 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
     try {
       const { data: rondonRows } = await supabase
         .from("batting_stats")
-        .select("game_id")
+        .select("game_id, ab, bb, hbp, sf, sh, r, sb")
         .in("game_id", allGameIdentifiers)
         .eq("player_id", JOSE_RONDON_ID);
 
       if (rondonRows && rondonRows.length > 0) {
-        rondonGameIds = new Set(rondonRows.map((r) => Number(r.game_id)));
+        // Un bateador vio acción real si consumió turnos/apariciones al plato (PA) o anotó carrera / robó base
+        const playedRows = rondonRows.filter((r) => {
+          const activity =
+            Number(r.ab || 0) +
+            Number(r.bb || 0) +
+            Number(r.hbp || 0) +
+            Number(r.sf || 0) +
+            Number(r.sh || 0) +
+            Number(r.r || 0) +
+            Number(r.sb || 0);
+          return activity > 0;
+        });
+        rondonGameIds = new Set(playedRows.map((r) => Number(r.game_id)));
       }
     } catch (err) {
       console.warn("Fallo consulta de juegos disputados por José Rondón:", err);
