@@ -46,13 +46,14 @@ Monitorea el balance global del equipo, factores de sede, horario y la métrica 
 | **Racha** | `streak` | Seguidilla activa de victorias (`W`) o derrotas (`L`) consecutivas ordenada cronológicamente por la fecha venezolana del encuentro. | `X W` o `X L` (ej. `5 W`) |
 | **En Extrainning** | `extraInning` | Récord en juegos decididos más allá de las entradas reglamentarias pactadas (`scheduledInnings`). Compara entradas jugadas contra pactadas (9 en juego sencillo, 7 en dobles carteleras de la LVBP). | `G-P` (ej. `1-0`) |
 | **Ult-10J** | `last10` | Balance de victorias y derrotas en la ventana de los últimos hasta 10 partidos completados cronológicamente (`slice(-10)`). | `G-P` (ej. `7-3`) |
-| **Sin Rondón** | `withoutRondon` | Balance de victorias y derrotas de Leones del Caracas en aquellos encuentros oficiales donde **José Rondón** (MLB ID `602922`, `JOSE_RONDON_ID`) **no vio acción oficial** ($PA = AB + BB + HBP + SF + SH + R + SB = 0$, o ausencia en `batting_stats`). | `G-P` (ej. `6-2` en 2026, `12-8` en 2025) |
+| **Con Rondón** | `withRondon` | Balance de victorias y derrotas de Leones del Caracas en aquellos encuentros oficiales donde **José Rondón** (MLB ID `602922`, `JOSE_RONDON_ID`) **sí vio acción activa en el terreno** ($PA = AB + BB + HBP + SF + SH + R + SB > 0$). | `G-P` (ej. `6-8` en 2026, `12-24` en 2025) |
+| **Sin Rondón** | `withoutRondon` | Balance de victorias y derrotas de Leones del Caracas en aquellos encuentros oficiales donde **José Rondón** **no vio acción oficial** ($PA = 0$ o ausencia de registro en `batting_stats`). | `G-P` (ej. `6-2` en 2026, `12-8` en 2025) |
 
 > [!NOTE]
-> **Origen y Contexto Sabermétrico de "Sin Rondón"**:  
+> **Origen y Contexto Sabermétrico del Dúo "Con Rondón / Sin Rondón"**:  
 > - **Temporada 2024-2025 (2025)**: José Rondón estuvo ausente en 20 encuentros. En ese tramo sin él, Leones tuvo récord ganador de **12-8 (.600)**, mientras que con él en acción registró **12-24 (.333)**.
-> - **Temporada 2026-2027 (2026 en curso)**: Tras sufrir una lesión a inicios de noviembre y descansar en 8 juegos en total, Leones marcha con récord de **6-2 (.750)** sin él (incluyendo la racha activa de victorias de noviembre), frente a **6-8 (.429)** con él en alineación.  
-> Esta métrica se consolidó como una de las conversaciones analíticas más populares y reveladoras en la afición caraquista.
+> - **Temporada 2026-2027 (2026 en curso)**: Tras sufrir una lesión a inicios de noviembre y descansar en 8 juegos en total, Leones marcha con récord de **6-2 (.750)** sin él (incluyendo la racha activa de 5 victorias de noviembre), frente a **6-8 (.429)** con él en alineación.  
+> La comparativa cara a cara entre ambos registros se consolidó como una de las conversaciones analíticas más populares, reveladoras y divertidas en la afición caraquista.
 
 ---
 

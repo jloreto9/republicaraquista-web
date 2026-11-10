@@ -81,6 +81,13 @@ export function LeonesStatsTab({
               <span className="font-semibold text-slate-200">{stats.last10}</span>
             </p>
             <p
+              className="flex justify-between border-b border-[#1E2B4D]/40 pb-1"
+              title="Récord de Leones del Caracas en juegos con la participación activa de José Rondón"
+            >
+              <span className="text-slate-400">Con Rondón:</span>
+              <span className="font-semibold text-slate-200">{stats.withRondon || "0-0"}</span>
+            </p>
+            <p
               className="flex justify-between pt-0.5"
               title="Récord de Leones del Caracas en juegos sin la participación de José Rondón"
             >

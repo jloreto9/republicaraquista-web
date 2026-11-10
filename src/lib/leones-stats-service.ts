@@ -30,6 +30,7 @@ const CLEAN_ZERO_STATS: LeonesAdvancedStats = {
   streak: "-",
   extraInning: "0-0",
   last10: "0-0",
+  withRondon: "0-0",
   withoutRondon: "0-0",
   oneRun: "0-0",
   remontados: 0,
@@ -80,6 +81,7 @@ const BASELINE_2025_STATS: LeonesAdvancedStats = {
   streak: "2 L",
   extraInning: "1-2",
   last10: "3-7",
+  withRondon: "12-24",
   withoutRondon: "12-8",
   oneRun: "6-11",
   remontados: 2,
@@ -342,6 +344,8 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       console.warn("Fallo consulta de juegos disputados por José Rondón:", err);
     }
 
+    let withRondonWins = 0;
+    let withRondonLosses = 0;
     let withoutRondonWins = 0;
     let withoutRondonLosses = 0;
 
@@ -364,7 +368,10 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       const gId = Number(g.id);
       const gPk = Number(g.game_pk || 0);
       const rondonPlayed = rondonGameIds.has(gId) || (gPk > 0 && rondonGameIds.has(gPk));
-      if (!rondonPlayed) {
+      if (rondonPlayed) {
+        if (won) withRondonWins++;
+        else withRondonLosses++;
+      } else {
         if (won) withoutRondonWins++;
         else withoutRondonLosses++;
       }
@@ -532,6 +539,7 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       streak,
       extraInning: `${extraWins}-${extraLosses}`,
       last10,
+      withRondon: `${withRondonWins}-${withRondonLosses}`,
       withoutRondon: `${withoutRondonWins}-${withoutRondonLosses}`,
       oneRun: `${oneRunWins}-${oneRunLosses}`,
       remontados,
