@@ -10,7 +10,7 @@ import {
   DashboardTabsData,
   GameMVP,
 } from "@/types/leones-stats";
-import { ACTIVE_SEASON, getTeam, getPlayerHeadshotUrl } from "./constants";
+import { ACTIVE_SEASON, getTeam, getPlayerHeadshotUrl, JOSE_RONDON_ID } from "./constants";
 import { supabase, getBattingStats, getPitchingStats } from "./supabase";
 import { getSeasonWpaLeaders } from "./wpa-engine";
 import { isDayGame, getVenezuelanDate } from "./utils";
@@ -30,6 +30,7 @@ const CLEAN_ZERO_STATS: LeonesAdvancedStats = {
   streak: "-",
   extraInning: "0-0",
   last10: "0-0",
+  withoutRondon: "0-0",
   oneRun: "0-0",
   remontados: 0,
   up: "0-0",
@@ -79,6 +80,7 @@ const BASELINE_2025_STATS: LeonesAdvancedStats = {
   streak: "2 L",
   extraInning: "1-2",
   last10: "3-7",
+  withoutRondon: "12-8",
   oneRun: "6-11",
   remontados: 2,
   up: "21-5",
@@ -307,6 +309,30 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
     let extraWins = 0;
     let extraLosses = 0;
 
+    // Identificar partidos donde José Rondón vio acción oficial
+    const allGameIdentifiers = Array.from(
+      new Set(
+        sortedGames.flatMap((g) => [Number(g.id), Number(g.game_pk)].filter(Boolean))
+      )
+    );
+    let rondonGameIds = new Set<number>();
+    try {
+      const { data: rondonRows } = await supabase
+        .from("batting_stats")
+        .select("game_id")
+        .in("game_id", allGameIdentifiers)
+        .eq("player_id", JOSE_RONDON_ID);
+
+      if (rondonRows && rondonRows.length > 0) {
+        rondonGameIds = new Set(rondonRows.map((r) => Number(r.game_id)));
+      }
+    } catch (err) {
+      console.warn("Fallo consulta de juegos disputados por José Rondón:", err);
+    }
+
+    let withoutRondonWins = 0;
+    let withoutRondonLosses = 0;
+
     const daysCount = { 0: { w: 0, l: 0 }, 1: { w: 0, l: 0 }, 2: { w: 0, l: 0 }, 3: { w: 0, l: 0 }, 4: { w: 0, l: 0 }, 5: { w: 0, l: 0 }, 6: { w: 0, l: 0 } };
     let octW = 0, octL = 0, novW = 0, novL = 0, decW = 0, decL = 0;
 
@@ -322,6 +348,14 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       if (won) wins++; else losses++;
       if (isHome) { if (won) homeWins++; else homeLosses++; }
       else { if (won) awayWins++; else awayLosses++; }
+
+      const gId = Number(g.id);
+      const gPk = Number(g.game_pk || 0);
+      const rondonPlayed = rondonGameIds.has(gId) || (gPk > 0 && rondonGameIds.has(gPk));
+      if (!rondonPlayed) {
+        if (won) withoutRondonWins++;
+        else withoutRondonLosses++;
+      }
 
       const isDay = isDayGame(g.game_datetime, g.is_day_game);
       if (isDay) { if (won) dayWins++; else dayLosses++; }
@@ -486,6 +520,7 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       streak,
       extraInning: `${extraWins}-${extraLosses}`,
       last10,
+      withoutRondon: `${withoutRondonWins}-${withoutRondonLosses}`,
       oneRun: `${oneRunWins}-${oneRunLosses}`,
       remontados,
       up: `${arribaWins}-${arribaLosses}`,

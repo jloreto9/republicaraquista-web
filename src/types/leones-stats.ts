@@ -12,6 +12,7 @@ export interface LeonesAdvancedStats {
   streak: string;         // Ej: "1 L" o "3 W"
   extraInning: string;    // Ej: "2-1"
   last10: string;         // Ej: "5-5"
+  withoutRondon: string;  // Récord de Leones sin José Rondón en acción (ej: "0-0" o "12-8")
 
   // Situaciones de Presión & Decisiones (Columna 2)
   oneRun: string;         // Ej: "4-7"

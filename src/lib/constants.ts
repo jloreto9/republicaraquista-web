@@ -105,6 +105,9 @@ export const LVBP_TEAMS: Record<number, Team> = {
 
 export const LVBP_TEAM_IDS = [695, 696, 698, 699, 693, 692, 694, 697];
 
+// ID oficial de José Rondón en MLB Stats API / Supabase
+export const JOSE_RONDON_ID = 602922;
+
 // Temporada base de respaldo y re-exportación del servicio dinámico
 export const ACTIVE_SEASON = 2026; // 2026-2027 (temporada activa oficial)
 export { getActiveSeason, getAvailableSeasons, FALLBACK_SEASON } from "./season-service";

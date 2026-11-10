@@ -76,9 +76,16 @@ export function LeonesStatsTab({
               <span className="text-slate-400">En extrainning:</span>
               <span className="font-semibold text-slate-200">{stats.extraInning}</span>
             </p>
-            <p className="flex justify-between pt-0.5">
+            <p className="flex justify-between border-b border-[#1E2B4D]/40 pb-1">
               <span className="text-slate-400">Ult-10J:</span>
               <span className="font-semibold text-slate-200">{stats.last10}</span>
+            </p>
+            <p
+              className="flex justify-between pt-0.5"
+              title="Récord de Leones del Caracas en juegos sin la participación de José Rondón"
+            >
+              <span className="text-slate-400">Sin Rondón:</span>
+              <span className="font-semibold text-amber-400">{stats.withoutRondon || "0-0"}</span>
             </p>
           </div>
 
