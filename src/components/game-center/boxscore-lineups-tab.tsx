@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   GameCenterTeam,
   GameCenterBoxscoreBatter,
   GameCenterBoxscorePitcher,
 } from "@/types/game-center";
-import { Users, ChevronDown, ChevronUp } from "lucide-react";
+import { Users, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BoxscoreLineupsTabProps {
+  gamePk?: number;
   homeTeam: GameCenterTeam;
   awayTeam: GameCenterTeam;
   awayBatters: GameCenterBoxscoreBatter[];
@@ -20,6 +22,7 @@ interface BoxscoreLineupsTabProps {
 }
 
 export function BoxscoreLineupsTab({
+  gamePk,
   homeTeam,
   awayTeam,
   awayBatters,
@@ -65,6 +68,11 @@ export function BoxscoreLineupsTab({
 
   const startersCount = currentBatters.filter((b) => !b.isSubstitute).length;
   const subsCount = currentBatters.filter((b) => b.isSubstitute).length;
+  const optimizerHref = gamePk
+    ? `/bullpen?tab=lineups&subtab=optimizer&gamePk=${gamePk}${
+        currentTeam.id !== 695 ? `&teamId=${currentTeam.id}` : ""
+      }`
+    : null;
 
   return (
     <div className="space-y-6">
@@ -121,16 +129,27 @@ export function BoxscoreLineupsTab({
 
       {/* ── TABLA DE BATEO 1-9 (LINEUP) ── */}
       <div className="p-3.5 sm:p-5 rounded-2xl bg-[#0D152B] border border-[#1E2B4D] shadow-xl overflow-hidden">
-        <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#1E2B4D]">
-          <div className="flex items-center space-x-2">
-            <Users className="w-4 h-4 text-[#FDB827]" />
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-[#1E2B4D]">
+          <div className="flex items-center space-x-2 min-w-0">
+            <Users className="w-4 h-4 text-[#FDB827] shrink-0" />
             <h3 className="text-xs sm:text-sm font-bold text-slate-100 uppercase tracking-wider truncate">
               Alineación Ofensiva · {currentTeam.name}
             </h3>
           </div>
-          <span className="text-[10px] font-mono text-slate-400 shrink-0 ml-2">
-            {currentBatters.length} Bateadores {subsCount > 0 ? `(${startersCount}+${subsCount})` : ""}
-          </span>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span className="text-[10px] font-mono text-slate-400">
+              {currentBatters.length} Bateadores {subsCount > 0 ? `(${startersCount}+${subsCount})` : ""}
+            </span>
+            {optimizerHref && startersCount >= 9 && (
+              <Link
+                href={optimizerHref}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FDB827] hover:bg-[#FDB827]/90 text-[#070B19] font-bold text-xs transition-all active:scale-95 shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Optimizar este Lineup</span>
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* ── VISTA MÓVIL ESENCIAL DE BATEO (< md) ── */}

@@ -1,3 +1,5 @@
+export type TangoStatsSource = "supabase" | "mlb" | "canonical_map" | "synthetic";
+
 export interface TangoPlayer {
   playerId: number;
   playerName: string;
@@ -10,6 +12,7 @@ export interface TangoPlayer {
   wrcPlus: number;
   iso: number;
   headshot?: string;
+  statsSource?: TangoStatsSource;
 }
 
 export interface TangoSlotContribution {

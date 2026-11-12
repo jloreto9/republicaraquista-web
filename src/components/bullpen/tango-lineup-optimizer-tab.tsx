@@ -10,10 +10,18 @@ import {
   ChevronUp,
   Shuffle,
   Zap,
-  Calendar,
   Layers,
+  Radio,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
-import { GameLineup, TopLineup, StarterSlot } from "@/types/bullpen";
+import {
+  GameLineup,
+  TopLineup,
+  StarterSlot,
+  TodayLineupStatus,
+} from "@/types/bullpen";
 import {
   TangoPlayer,
   TangoOptimizationResult,
@@ -28,18 +36,76 @@ import { cn } from "@/lib/utils";
 interface TangoLineupOptimizerTabProps {
   gameLineups?: GameLineup[];
   topFrequentLineups?: TopLineup[];
+  todayLineup?: GameLineup | null;
+  todayLineupStatus?: TodayLineupStatus;
+  requestedLineup?: GameLineup | null;
+  playerStatsMap?: Record<number, TangoPlayer>;
+  initialGamePk?: number;
   teamName?: string;
   season?: number;
+}
+
+function formatGameStatusEs(status?: "Live" | "Final" | "Preview"): string {
+  switch (status) {
+    case "Live":
+      return "En Vivo";
+    case "Preview":
+      return "Pre-Juego";
+    case "Final":
+      return "Final";
+    default:
+      return "Programado";
+  }
 }
 
 export function TangoLineupOptimizerTab({
   gameLineups = [],
   topFrequentLineups = [],
+  todayLineup = null,
+  todayLineupStatus,
+  requestedLineup = null,
+  playerStatsMap,
+  initialGamePk,
   teamName = "Leones del Caracas",
   season = 2026,
 }: TangoLineupOptimizerTabProps) {
-  // Determinar clave inicial por defecto: Priorizar la más frecuente de la temporada, o el último juego disputado
+  const hasTodayLineup = Boolean(
+    todayLineup && todayLineup.starters && todayLineup.starters.length >= 9
+  );
+  const hasRequestedLineup = Boolean(
+    requestedLineup &&
+      requestedLineup.starters &&
+      requestedLineup.starters.length >= 9
+  );
+  const showDistinctRequestedOption = Boolean(
+    hasRequestedLineup &&
+      requestedLineup &&
+      (!hasTodayLineup ||
+        requestedLineup.gamePk !== todayLineup?.gamePk ||
+        (requestedLineup.teamId !== undefined &&
+          todayLineup?.teamId !== undefined &&
+          requestedLineup.teamId !== todayLineup.teamId))
+  );
+
+  // Determinar clave inicial por defecto: gamePk solicitado -> lineup publicado de hoy -> más frecuente -> último juego
   const defaultKey = useMemo(() => {
+    if (initialGamePk) {
+      if (hasRequestedLineup && requestedLineup?.gamePk === initialGamePk) {
+        return "requested";
+      }
+      if (hasTodayLineup && todayLineup?.gamePk === initialGamePk) {
+        return "today";
+      }
+      const matchIdx = gameLineups.findIndex(
+        (g) => g.gamePk === initialGamePk && g.starters && g.starters.length >= 9
+      );
+      if (matchIdx >= 0) {
+        return `game_${matchIdx}`;
+      }
+    }
+    if (hasTodayLineup) {
+      return "today";
+    }
     if (topFrequentLineups && topFrequentLineups.length > 0) {
       return "top_0";
     }
@@ -47,12 +113,20 @@ export function TangoLineupOptimizerTab({
       return "game_0";
     }
     return "top_0";
-  }, [topFrequentLineups, gameLineups]);
+  }, [
+    initialGamePk,
+    hasRequestedLineup,
+    requestedLineup,
+    hasTodayLineup,
+    todayLineup,
+    topFrequentLineups,
+    gameLineups,
+  ]);
 
   const [selectedLineupKey, setSelectedLineupKey] = useState<string>(defaultKey);
   const [showTheoryGuide, setShowTheoryGuide] = useState<boolean>(false);
 
-  // Sincronizar clave si cambian los datos de temporada
+  // Sincronizar clave si cambian los datos o el gamePk solicitado
   useEffect(() => {
     setSelectedLineupKey(defaultKey);
   }, [defaultKey]);
@@ -63,7 +137,37 @@ export function TangoLineupOptimizerTab({
     let title = "Alineación Real";
     let subtitle = `Temporada ${season}`;
 
-    if (selectedLineupKey.startsWith("top_")) {
+    const formatLineupSubtitle = (g: GameLineup) => {
+      const statusText = formatGameStatusEs(g.status);
+      const locText = g.isHome ? "Home Club" : "Visitante";
+      if (g.status === "Preview") {
+        return `${statusText} • ${locText}`;
+      }
+      const resultText = g.won ? "Victoria" : "Derrota";
+      return g.scoreStr
+        ? `${statusText} • ${resultText} ${g.scoreStr} • ${locText}`
+        : `${statusText} • ${locText}`;
+    };
+
+    if (selectedLineupKey === "requested" && hasRequestedLineup && requestedLineup) {
+      starters = requestedLineup.starters.slice(0, 9);
+      const dhSuffix =
+        requestedLineup.gameNumber && requestedLineup.gameNumber > 1
+          ? ` · Juego ${requestedLineup.gameNumber}`
+          : "";
+      title = `${
+        requestedLineup.teamName ? `${requestedLineup.teamName} vs ` : "Juego vs "
+      }${requestedLineup.opp} (${requestedLineup.gameDate})${dhSuffix}`;
+      subtitle = formatLineupSubtitle(requestedLineup);
+    } else if (selectedLineupKey === "today" && hasTodayLineup && todayLineup) {
+      starters = todayLineup.starters.slice(0, 9);
+      const dhSuffix =
+        todayLineup.gameNumber && todayLineup.gameNumber > 1
+          ? ` · Juego ${todayLineup.gameNumber}`
+          : "";
+      title = `Lineup de Hoy vs ${todayLineup.opp} (${todayLineup.gameDate})${dhSuffix}`;
+      subtitle = formatLineupSubtitle(todayLineup);
+    } else if (selectedLineupKey.startsWith("top_")) {
       const idx = parseInt(selectedLineupKey.replace("top_", ""), 10);
       const top = topFrequentLineups[idx] || topFrequentLineups[0];
       if (top && top.starters && top.starters.length > 0) {
@@ -83,7 +187,18 @@ export function TangoLineupOptimizerTab({
 
     // Fallback de contingencia si no hubiese starters en la clave exacta
     if (starters.length === 0) {
-      if (topFrequentLineups.length > 0 && topFrequentLineups[0].starters.length > 0) {
+      if (hasTodayLineup && todayLineup) {
+        starters = todayLineup.starters.slice(0, 9);
+        title = `Lineup de Hoy vs ${todayLineup.opp} (${todayLineup.gameDate})`;
+        subtitle = formatLineupSubtitle(todayLineup);
+      } else if (hasRequestedLineup && requestedLineup) {
+        starters = requestedLineup.starters.slice(0, 9);
+        title = `Juego vs ${requestedLineup.opp} (${requestedLineup.gameDate})`;
+        subtitle = formatLineupSubtitle(requestedLineup);
+      } else if (
+        topFrequentLineups.length > 0 &&
+        topFrequentLineups[0].starters.length > 0
+      ) {
         starters = topFrequentLineups[0].starters.slice(0, 9);
         title = `Alineación Más Frecuente #1`;
         subtitle = `${topFrequentLineups[0].games} JJ • ${topFrequentLineups[0].record}`;
@@ -95,11 +210,27 @@ export function TangoLineupOptimizerTab({
     }
 
     const resolved: TangoPlayer[] = starters.map((s, idx) => {
-      return resolvePlayerStats(s.playerName, s.position, s.playerId, idx + 1);
+      return resolvePlayerStats(
+        s.playerName,
+        s.position,
+        s.playerId,
+        idx + 1,
+        playerStatsMap
+      );
     });
 
     return { initialPlayers: resolved, contextTitle: title, contextSubtitle: subtitle };
-  }, [selectedLineupKey, topFrequentLineups, gameLineups, season]);
+  }, [
+    selectedLineupKey,
+    hasRequestedLineup,
+    requestedLineup,
+    hasTodayLineup,
+    todayLineup,
+    topFrequentLineups,
+    gameLineups,
+    playerStatsMap,
+    season,
+  ]);
 
   // Jugadores activos editables (permiten simular cambios de orden manuales)
   const [activePlayers, setActivePlayers] = useState<TangoPlayer[]>(initialPlayers);
@@ -161,7 +292,10 @@ export function TangoLineupOptimizerTab({
       <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-2xl p-8 text-center text-slate-400 space-y-2">
         <Sparkles className="w-8 h-8 text-[#FDB827] mx-auto opacity-60" />
         <h3 className="text-base font-bold text-slate-200">Alineación no disponible</h3>
-        <p className="text-xs">No se encontraron los 9 peloteros titulares para el juego seleccionado.</p>
+        <p className="text-xs">
+          {todayLineupStatus?.message ||
+            "No se encontraron los 9 peloteros titulares para el juego seleccionado."}
+        </p>
       </div>
     );
   }
@@ -214,8 +348,33 @@ export function TangoLineupOptimizerTab({
               onChange={(e) => setSelectedLineupKey(e.target.value)}
               className="bg-[#070B19] border border-[#1E2B4D] text-slate-200 text-xs rounded-xl px-3 py-2 font-medium focus:ring-1 focus:ring-[#FDB827] focus:outline-none max-w-md"
             >
+              {hasTodayLineup && todayLineup && (
+                <optgroup label="Lineup Publicado de Hoy (Game Center)">
+                  <option value="today">
+                    Hoy ({todayLineup.gameDate}) vs {todayLineup.opp}
+                    {todayLineup.gameNumber && todayLineup.gameNumber > 1
+                      ? ` · J${todayLineup.gameNumber}`
+                      : ""}
+                    {` · ${formatGameStatusEs(todayLineup.status).toUpperCase()}`}
+                  </option>
+                </optgroup>
+              )}
+              {showDistinctRequestedOption && requestedLineup && (
+                <optgroup label="Lineup Seleccionado desde Game Center">
+                  <option value="requested">
+                    {requestedLineup.teamName ? `${requestedLineup.teamName} · ` : ""}
+                    {requestedLineup.gameDate} vs {requestedLineup.opp}
+                    {requestedLineup.gameNumber && requestedLineup.gameNumber > 1
+                      ? ` · J${requestedLineup.gameNumber}`
+                      : ""}
+                    {requestedLineup.status
+                      ? ` · ${formatGameStatusEs(requestedLineup.status).toUpperCase()}`
+                      : ""}
+                  </option>
+                </optgroup>
+              )}
               {topFrequentLineups.length > 0 && (
-                <optgroup label="⭐ Alineaciones Titulares Más Frecuentes">
+                <optgroup label="Alineaciones Titulares Más Frecuentes">
                   {topFrequentLineups.map((top, idx) => (
                     <option key={`top_${idx}`} value={`top_${idx}`}>
                       #{top.rank || idx + 1} Más Usada ({top.games} JJ • {top.record})
@@ -224,7 +383,7 @@ export function TangoLineupOptimizerTab({
                 </optgroup>
               )}
               {gameLineups.length > 0 && (
-                <optgroup label="📅 Juegos Disputados en la Temporada">
+                <optgroup label="Juegos Disputados en la Temporada">
                   {gameLineups.map((g, idx) => (
                     <option key={g.gamePk || `game_${idx}`} value={`game_${idx}`}>
                       {g.gameDate} vs {g.opp} ({g.won ? "G" : "P"} {g.scoreStr})
@@ -254,6 +413,77 @@ export function TangoLineupOptimizerTab({
               <span>Restablecer Orden Real</span>
             </button>
           </div>
+        </div>
+
+        {/* Estado del Lineup del Día (Game Center) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#1E2B4D] text-xs">
+          {hasTodayLineup && todayLineup ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold border",
+                    todayLineup.status === "Live"
+                      ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                      : todayLineup.status === "Preview"
+                      ? "bg-[#FDB827]/15 text-[#FDB827] border-[#FDB827]/30"
+                      : "bg-sky-500/15 text-sky-300 border-sky-500/30"
+                  )}
+                >
+                  {todayLineup.status === "Live" ? (
+                    <Radio className="w-3.5 h-3.5 animate-pulse" />
+                  ) : todayLineup.status === "Preview" ? (
+                    <Clock className="w-3.5 h-3.5" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>
+                    Lineup de Hoy: {formatGameStatusEs(todayLineup.status)}
+                  </span>
+                </span>
+                <span className="text-slate-200 font-semibold">
+                  vs {todayLineup.opp} ({todayLineup.gameDate})
+                </span>
+                {todayLineup.gameNumber && todayLineup.gameNumber > 1 && (
+                  <span className="px-2 py-0.5 rounded bg-[#1E2B4D] text-[#FDB827] font-mono font-bold text-[11px]">
+                    Doble Juego · J{todayLineup.gameNumber}
+                  </span>
+                )}
+              </div>
+              {selectedLineupKey !== "today" && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedLineupKey("today")}
+                  className="text-xs font-bold text-[#FDB827] hover:underline"
+                >
+                  Cargar Lineup de Hoy
+                </button>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/30 font-semibold">
+                <AlertCircle className="w-3.5 h-3.5 text-[#FDB827] shrink-0" />
+                <span>
+                  {todayLineupStatus?.message ||
+                    (todayLineupStatus?.hasGameToday
+                      ? `Lineup de hoy aún no publicado${
+                          todayLineupStatus.opponent
+                            ? ` (${todayLineupStatus.opponent})`
+                            : ""
+                        } — mostrando alineación más frecuente`
+                      : "Lineup del día aún no publicado — mostrando alineación más frecuente")}
+                </span>
+              </span>
+              {todayLineupStatus?.hasGameToday &&
+                todayLineupStatus.gameNumber &&
+                todayLineupStatus.gameNumber > 1 && (
+                  <span className="px-2 py-0.5 rounded bg-[#1E2B4D] text-[#FDB827] font-mono font-bold text-[11px]">
+                    Doble Juego · J{todayLineupStatus.gameNumber}
+                  </span>
+                )}
+            </div>
+          )}
         </div>
       </div>
 

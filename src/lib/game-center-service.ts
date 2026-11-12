@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { getTeam, getPlayerHeadshotUrl } from "./constants";
 import { buildGameScorecard } from "./scorecard-engine";
 import { processGameWpa } from "./wpa-engine";
+import { getVenezuelanToday } from "./utils";
 import {
   GameCenterData,
   GameCenterTeam,
@@ -109,6 +110,280 @@ function translateDescriptionToSpanish(desc: string): string {
 }
 
 /**
+ * Filtra y ordena la lista de juegos disponibles usando fecha VET (UTC-4) y desempate de doble juego.
+ */
+export function filterAndSortCaracasGames(
+  games: GameCenterAvailableGame[],
+  todayVet?: string
+): GameCenterAvailableGame[] {
+  const todayIso = todayVet || getVenezuelanToday().dateString;
+  const activeOrPlayed = games.filter(
+    (g) =>
+      g.isLive ||
+      ["Final", "Completed", "Game Over", "Completed Early"].includes(g.status) ||
+      g.date <= todayIso
+  );
+
+  // Priorizar juegos EN VIVO al inicio, luego fecha descendente, luego gameNumber descendente y hora descendente
+  activeOrPlayed.sort((a, b) => {
+    if (a.isLive && !b.isLive) return -1;
+    if (!a.isLive && b.isLive) return 1;
+    const dateCmp = b.date.localeCompare(a.date);
+    if (dateCmp !== 0) return dateCmp;
+    const numCmp = (b.gameNumber ?? 1) - (a.gameNumber ?? 1);
+    if (numCmp !== 0) return numCmp;
+    return (b.gameDatetime || "").localeCompare(a.gameDatetime || "");
+  });
+
+  return activeOrPlayed;
+}
+
+/**
+ * Extrae el arreglo de peloteros titulares desde un objeto de juego de `schedule?hydrate=lineups`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function extractLineupFromSchedule(scheduleGame: any, isHome: boolean): any[] {
+  const lineups = scheduleGame?.lineups;
+  if (!lineups) return [];
+  const players = isHome ? lineups.homePlayers : lineups.awayPlayers;
+  return Array.isArray(players) ? players : [];
+}
+
+/**
+ * Consulta `schedule?hydrate=lineups` para un `gamePk` cuando el `feed/live` pre-juego aún no incluye boxscore.
+ */
+export async function fetchScheduleLineupsForGame(
+  gamePk: number,
+  gameDate?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<{ homePlayers: any[]; awayPlayers: any[] }> {
+  try {
+    const res = await fetch(
+      `https://statsapi.mlb.com/api/v1/schedule?sportId=17&leagueId=135&gamePk=${gamePk}&hydrate=lineups`,
+      {
+        signal: AbortSignal.timeout(8000),
+        next: { revalidate: 30 },
+      }
+    );
+    if (res.ok) {
+      const json = await res.json();
+      const schedGame = json?.dates?.[0]?.games?.[0];
+      if (schedGame?.lineups) {
+        return {
+          homePlayers: extractLineupFromSchedule(schedGame, true),
+          awayPlayers: extractLineupFromSchedule(schedGame, false),
+        };
+      }
+    }
+
+    if (gameDate) {
+      const resByDate = await fetch(
+        `https://statsapi.mlb.com/api/v1/schedule?sportId=17&leagueId=135&date=${gameDate}&hydrate=lineups`,
+        {
+          signal: AbortSignal.timeout(8000),
+          next: { revalidate: 30 },
+        }
+      );
+      if (resByDate.ok) {
+        const jsonByDate = await resByDate.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const gamesOnDate: any[] = jsonByDate?.dates?.[0]?.games || [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const matched = gamesOnDate.find((g: any) => Number(g?.gamePk) === Number(gamePk));
+        if (matched?.lineups) {
+          return {
+            homePlayers: extractLineupFromSchedule(matched, true),
+            awayPlayers: extractLineupFromSchedule(matched, false),
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`Fallo obteniendo schedule?hydrate=lineups para gamePk ${gamePk}:`, err);
+  }
+  return { homePlayers: [], awayPlayers: [] };
+}
+
+/**
+ * Formatea bateadores del boxscore con cascada resiliente:
+ * 1. `boxTeam.batters`
+ * 2. `boxTeam.battingOrder`
+ * 3. `fallbackLineupPlayers` (`schedule?hydrate=lineups`)
+ */
+export function formatBoxscoreBatters(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  boxTeam: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  gamePlayersMap?: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fallbackLineupPlayers?: any[]
+): GameCenterBoxscoreBatter[] {
+  const rawBatters: number[] = Array.isArray(boxTeam?.batters) ? boxTeam.batters : [];
+  const rawBattingOrder: number[] = Array.isArray(boxTeam?.battingOrder) ? boxTeam.battingOrder : [];
+  const playersMap = boxTeam?.players || {};
+
+  // 1. Filtrar lanzadores que solo lanzan, preservando todo jugador de posición
+  // y cualquier jugador con rol ofensivo (incluyendo corredores emergentes PR y bateadores emergentes PH sin VB).
+  const filteredFromBatters = rawBatters.filter((pId) => {
+    const p = playersMap[`ID${pId}`];
+    if (!p) return false;
+    const pos = p.position?.abbreviation;
+    const isPitcher =
+      pos === "P" ||
+      p.position?.type === "Pitcher" ||
+      p.position?.code === "1";
+
+    if (!isPitcher) return true;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
+    const hasOffensiveAction =
+      allPos.includes("PR") ||
+      allPos.includes("PH") ||
+      allPos.includes("DH") ||
+      Boolean(p.battingOrder) ||
+      Number(p.stats?.batting?.plateAppearances ?? 0) > 0 ||
+      Number(p.stats?.batting?.runs ?? 0) > 0 ||
+      Number(p.stats?.batting?.stolenBases ?? 0) > 0;
+
+    return hasOffensiveAction;
+  });
+
+  // Respaldo 1: usar `boxTeam.battingOrder` si `batters` no produjo titulares suficientes
+  let batterIdsToRender: number[] = filteredFromBatters;
+  let usedBattingOrderFallback = false;
+  if (
+    filteredFromBatters.length === 0 ||
+    (filteredFromBatters.length < 9 && rawBattingOrder.length >= 9)
+  ) {
+    if (rawBattingOrder.length > 0) {
+      batterIdsToRender = Array.from(new Set(rawBattingOrder.map((id) => Number(id)).filter(Boolean)));
+      usedBattingOrderFallback = true;
+    }
+  }
+
+  // Respaldo 2: usar `schedule?hydrate=lineups` si ni `batters` ni `battingOrder` tienen titulares
+  if (batterIdsToRender.length === 0 && Array.isArray(fallbackLineupPlayers) && fallbackLineupPlayers.length > 0) {
+    const filteredSchedule =
+      fallbackLineupPlayers.length > 9
+        ? fallbackLineupPlayers.filter((fp) => {
+            const pos = fp?.primaryPosition?.abbreviation;
+            const code = fp?.primaryPosition?.code;
+            return pos !== "P" && code !== "1";
+          })
+        : fallbackLineupPlayers;
+
+    return filteredSchedule.slice(0, 9).map((fp, idx) => {
+      const pId = Number(fp?.id || 0);
+      const p = playersMap[`ID${pId}`] || {};
+      const gp = gamePlayersMap?.[`ID${pId}`] || {};
+      const stats = p.stats?.batting || {};
+      const season = p.seasonStats?.batting || {};
+      const rawBats = gp?.batSide?.code || fp?.batSide?.code || p?.person?.batSide?.code;
+      const bats: "R" | "L" | "S" | undefined =
+        rawBats === "R" || rawBats === "L" || rawBats === "S" ? rawBats : undefined;
+
+      return {
+        id: pId,
+        name: fp?.fullName || p.person?.fullName || gp?.fullName || "Pelotero",
+        jersey: p.jerseyNumber || fp?.primaryNumber || gp?.primaryNumber || "-",
+        position: fp?.primaryPosition?.abbreviation || p.position?.abbreviation || gp?.primaryPosition?.abbreviation || "DH",
+        order: idx + 1,
+        slot: idx + 1,
+        isSubstitute: false,
+        note: stats.note || "",
+        ab: Number(stats.atBats ?? 0),
+        r: Number(stats.runs ?? 0),
+        h: Number(stats.hits ?? 0),
+        doubles: Number(stats.doubles ?? 0),
+        triples: Number(stats.triples ?? 0),
+        hr: Number(stats.homeRuns ?? 0),
+        rbi: Number(stats.rbi ?? 0),
+        bb: Number(stats.baseOnBalls ?? 0),
+        so: Number(stats.strikeOuts ?? 0),
+        avg: season.avg || ".000",
+        ops: season.ops || ".000",
+        bats,
+        obp: season.obp ? String(season.obp) : undefined,
+        slg: season.slg ? String(season.slg) : undefined,
+      };
+    });
+  }
+
+  // 2. Ordenar por battingOrder numérico (ej: 100, 200, ..., 500, 501, ..., 900, 901)
+  // para que los suplentes queden exactamente ubicados debajo del titular al que reemplazaron.
+  if (!usedBattingOrderFallback) {
+    batterIdsToRender.sort((a, b) => {
+      const pA = playersMap[`ID${a}`] || {};
+      const pB = playersMap[`ID${b}`] || {};
+      const boA = pA.battingOrder ? parseInt(pA.battingOrder, 10) : 9999;
+      const boB = pB.battingOrder ? parseInt(pB.battingOrder, 10) : 9999;
+      return boA - boB;
+    });
+  }
+
+  let currentSlot = 1;
+  return batterIdsToRender.map((pId, idx) => {
+    const p = playersMap[`ID${pId}`] || {};
+    const gp = gamePlayersMap?.[`ID${pId}`] || {};
+    const stats = p.stats?.batting || {};
+    const season = p.seasonStats?.batting || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
+
+    const bo = p.battingOrder ? parseInt(p.battingOrder, 10) : null;
+    const slot = bo ? Math.floor(bo / 100) : usedBattingOrderFallback ? idx + 1 : currentSlot;
+    const isSubstitute = bo ? bo % 100 > 0 : false;
+    if (!isSubstitute && bo) {
+      currentSlot = slot;
+    }
+
+    const note = stats.note || "";
+
+    // Posición a mostrar
+    let posDisplay = p.position?.abbreviation || gp?.primaryPosition?.abbreviation || "OF";
+    if (posDisplay === "P" && allPos.includes("PR")) {
+      posDisplay = "PR";
+    } else if (
+      allPos.includes("PR") &&
+      Number(stats.atBats ?? 0) === 0 &&
+      !["1B", "2B", "3B", "SS", "LF", "CF", "RF", "C", "DH"].includes(posDisplay)
+    ) {
+      posDisplay = "PR";
+    }
+
+    const rawBats = gp?.batSide?.code || p?.person?.batSide?.code;
+    const bats: "R" | "L" | "S" | undefined =
+      rawBats === "R" || rawBats === "L" || rawBats === "S" ? rawBats : undefined;
+
+    return {
+      id: pId,
+      name: p.person?.fullName || gp?.fullName || "Pelotero",
+      jersey: p.jerseyNumber || gp?.primaryNumber || "-",
+      position: posDisplay,
+      order: slot,
+      slot,
+      isSubstitute,
+      note,
+      ab: Number(stats.atBats ?? 0),
+      r: Number(stats.runs ?? 0),
+      h: Number(stats.hits ?? 0),
+      doubles: Number(stats.doubles ?? 0),
+      triples: Number(stats.triples ?? 0),
+      hr: Number(stats.homeRuns ?? 0),
+      rbi: Number(stats.rbi ?? 0),
+      bb: Number(stats.baseOnBalls ?? 0),
+      so: Number(stats.strikeOuts ?? 0),
+      avg: season.avg || ".000",
+      ops: season.ops || ".000",
+      bats,
+      obp: season.obp ? String(season.obp) : undefined,
+      slg: season.slg ? String(season.slg) : undefined,
+    };
+  });
+}
+
+/**
  * Consulta la lista de juegos oficiales de la temporada activa (2026-2027) directamente
  * desde el calendario oficial de MLB Stats API (`sportId=17`, `leagueId=135`).
  */
@@ -163,26 +438,15 @@ export async function getCaracasAvailableGames(season = 2026): Promise<GameCente
               status: statusDetail,
               isHome,
               isLive,
+              gameNumber: Number(g.gameNumber ?? 1),
+              isDoubleHeader: g.doubleHeader === "Y" || g.doubleHeader === "S",
+              gameDatetime: g.gameDate || "",
             });
           }
         }
       }
 
-      // Filtrar partidos que ya se jugaron o que están en vivo / programados para hoy
-      const todayIso = new Date().toISOString().slice(0, 10);
-      const activeOrPlayed = games.filter(
-        (g) =>
-          g.isLive ||
-          ["Final", "Completed", "Game Over", "Completed Early"].includes(g.status) ||
-          g.date <= todayIso
-      );
-
-      // Priorizar juegos EN VIVO al inicio, luego ordenar por fecha descendente
-      activeOrPlayed.sort((a, b) => {
-        if (a.isLive && !b.isLive) return -1;
-        if (!a.isLive && b.isLive) return 1;
-        return b.date.localeCompare(a.date);
-      });
+      const activeOrPlayed = filterAndSortCaracasGames(games);
 
       if (activeOrPlayed.length > 0) {
         return activeOrPlayed;
@@ -309,7 +573,7 @@ export async function getGameCenterData(
     ["Live", "In Progress"].includes(abstractState) ||
     detailedState === "In Progress" ||
     gameData.status?.codedGameState === "I";
-  const isPreview = abstractState === "Preview" || ["Scheduled", "Pre-Game"].includes(detailedState);
+  const isPreview = abstractState === "Preview" || ["Scheduled", "Pre-Game", "Warmup"].includes(detailedState);
   const status: "Live" | "Final" | "Preview" = isLive ? "Live" : isPreview ? "Preview" : "Final";
   const statusLabel = isLive ? "EN VIVO" : isPreview ? "PRE-JUEGO" : "FINAL";
 
@@ -536,93 +800,27 @@ export async function getGameCenterData(
   parsedPlays.reverse();
 
   // Boxscore Oficial (Alineaciones 1-9 y Lanzadores)
-  const formatBatters = (boxTeam: any): GameCenterBoxscoreBatter[] => {
-    const rawBatters: number[] = boxTeam?.batters || [];
-    const playersMap = boxTeam?.players || {};
+  const gamePlayersMap = gameData.players || {};
+  let awayBatters = formatBoxscoreBatters(boxscore.teams?.away, gamePlayersMap);
+  let homeBatters = formatBoxscoreBatters(boxscore.teams?.home, gamePlayersMap);
 
-    // 1. Filtrar lanzadores que solo lanzan, preservando todo jugador de posición
-    // y cualquier jugador con rol ofensivo (incluyendo corredores emergentes PR y bateadores emergentes PH sin VB).
-    const filteredBatterIds = rawBatters.filter((pId) => {
-      const p = playersMap[`ID${pId}`];
-      if (!p) return false;
-      const pos = p.position?.abbreviation;
-      const isPitcher =
-        pos === "P" ||
-        p.position?.type === "Pitcher" ||
-        p.position?.code === "1";
-
-      if (!isPitcher) return true;
-
-      const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
-      const hasOffensiveAction =
-        allPos.includes("PR") ||
-        allPos.includes("PH") ||
-        allPos.includes("DH") ||
-        Boolean(p.battingOrder) ||
-        Number(p.stats?.batting?.plateAppearances ?? 0) > 0 ||
-        Number(p.stats?.batting?.runs ?? 0) > 0 ||
-        Number(p.stats?.batting?.stolenBases ?? 0) > 0;
-
-      return hasOffensiveAction;
-    });
-
-    // 2. Ordenar por battingOrder numérico (ej: 100, 200, ..., 500, 501, ..., 900, 901)
-    // para que los suplentes queden exactamente ubicados debajo del titular al que reemplazaron.
-    filteredBatterIds.sort((a, b) => {
-      const pA = playersMap[`ID${a}`] || {};
-      const pB = playersMap[`ID${b}`] || {};
-      const boA = pA.battingOrder ? parseInt(pA.battingOrder, 10) : 9999;
-      const boB = pB.battingOrder ? parseInt(pB.battingOrder, 10) : 9999;
-      return boA - boB;
-    });
-
-    let currentSlot = 1;
-    return filteredBatterIds.map((pId) => {
-      const p = playersMap[`ID${pId}`] || {};
-      const stats = p.stats?.batting || {};
-      const season = p.seasonStats?.batting || {};
-      const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
-
-      const bo = p.battingOrder ? parseInt(p.battingOrder, 10) : null;
-      let slot = bo ? Math.floor(bo / 100) : currentSlot;
-      const isSubstitute = bo ? (bo % 100 > 0) : false;
-      if (!isSubstitute && bo) {
-        currentSlot = slot;
-      }
-
-      const note = stats.note || ""; // ej: "a-", "1-", etc.
-
-      // Posición a mostrar
-      let posDisplay = p.position?.abbreviation || "OF";
-      if (posDisplay === "P" && allPos.includes("PR")) {
-        posDisplay = "PR";
-      } else if (allPos.includes("PR") && Number(stats.atBats ?? 0) === 0 && !["1B", "2B", "3B", "SS", "LF", "CF", "RF", "C", "DH"].includes(posDisplay)) {
-        posDisplay = "PR";
-      }
-
-      return {
-        id: pId,
-        name: p.person?.fullName || "Pelotero",
-        jersey: p.jerseyNumber || "-",
-        position: posDisplay,
-        order: slot,
-        slot,
-        isSubstitute,
-        note,
-        ab: Number(stats.atBats ?? 0),
-        r: Number(stats.runs ?? 0),
-        h: Number(stats.hits ?? 0),
-        doubles: Number(stats.doubles ?? 0),
-        triples: Number(stats.triples ?? 0),
-        hr: Number(stats.homeRuns ?? 0),
-        rbi: Number(stats.rbi ?? 0),
-        bb: Number(stats.baseOnBalls ?? 0),
-        so: Number(stats.strikeOuts ?? 0),
-        avg: season.avg || ".000",
-        ops: season.ops || ".000",
-      };
-    });
-  };
+  if (awayBatters.length === 0 || homeBatters.length === 0) {
+    const scheduleLineups = await fetchScheduleLineupsForGame(gamePk, gameDate);
+    if (awayBatters.length === 0 && scheduleLineups.awayPlayers.length > 0) {
+      awayBatters = formatBoxscoreBatters(
+        boxscore.teams?.away,
+        gamePlayersMap,
+        scheduleLineups.awayPlayers
+      );
+    }
+    if (homeBatters.length === 0 && scheduleLineups.homePlayers.length > 0) {
+      homeBatters = formatBoxscoreBatters(
+        boxscore.teams?.home,
+        gamePlayersMap,
+        scheduleLineups.homePlayers
+      );
+    }
+  }
 
   const formatPitchers = (boxTeam: any): GameCenterBoxscorePitcher[] => {
     const rawPitchers: number[] = boxTeam?.pitchers || [];
@@ -650,8 +848,8 @@ export async function getGameCenterData(
   };
 
   const boxscoreData = {
-    awayBatters: formatBatters(boxscore.teams?.away),
-    homeBatters: formatBatters(boxscore.teams?.home),
+    awayBatters,
+    homeBatters,
     awayPitchers: formatPitchers(boxscore.teams?.away),
     homePitchers: formatPitchers(boxscore.teams?.home),
   };

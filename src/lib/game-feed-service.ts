@@ -19,8 +19,20 @@ import {
 } from "@/types/situational";
 import { BattedBall, PitchEvent, StrikeZoneMetrics, SprayPlayerOption } from "@/types/spray";
 import { getBullpenAndLineups } from "./bullpen";
-import { BullpenAndLineupsData } from "@/types/bullpen";
+import { BullpenAndLineupsData, GameLineup, StarterSlot, TodayLineupStatus } from "@/types/bullpen";
+import { TangoPlayer } from "@/types/tango-lineup";
+import { BattingStats } from "@/types/sports";
 import { getKnownPitcherHand } from "./pitcher-hand-service";
+import { getBattingStats } from "./supabase";
+import { getVenezuelanToday } from "./utils";
+import {
+  getCaracasAvailableGames,
+  fetchScheduleLineupsForGame,
+} from "./game-center-service";
+import {
+  buildTangoPlayerFromBattingStats,
+  buildTangoPlayerFromMlbSeasonStats,
+} from "./tango-lineup-engine";
 
 const LEONES_TEAM_ID = 695;
 
@@ -166,11 +178,548 @@ export async function getSeasonLiveFeeds(season = 2026): Promise<any[]> {
 // 1. DYNAMIC BULLPEN & LINEUPS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function getDynamicBullpenAndLineups(season = 2026): Promise<BullpenAndLineupsData> {
-  const feeds = await getSeasonLiveFeeds(season);
-  if (!feeds.length) {
-    return getBullpenAndLineups(season, LEONES_TEAM_ID);
+function buildStarterSlot(
+  order: number,
+  playerId: number,
+  playerName: string,
+  position: string
+): StarterSlot {
+  let badgeColor = "#3b82f6";
+  if (order === 4) badgeColor = "#f59e0b";
+  else if (order >= 5) badgeColor = "#8b5cf6";
+
+  return {
+    order,
+    playerId,
+    playerName,
+    position: position || "DH",
+    badgeColor,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapFeedGameStatus(feed: any): {
+  status: "Live" | "Final" | "Preview";
+  detailedState: string;
+} {
+  const detailedState = String(feed?.gameData?.status?.detailedState || "Scheduled");
+  const abstractState = String(feed?.gameData?.status?.abstractGameState || "Preview");
+  const codedState = String(feed?.gameData?.status?.codedGameState || "");
+
+  const isLive =
+    ["Live", "In Progress"].includes(abstractState) ||
+    detailedState === "In Progress" ||
+    codedState === "I";
+  const isPreview =
+    abstractState === "Preview" ||
+    ["Scheduled", "Pre-Game", "Warmup"].includes(detailedState);
+
+  const status: "Live" | "Final" | "Preview" = isLive
+    ? "Live"
+    : isPreview
+    ? "Preview"
+    : "Final";
+  return { status, detailedState };
+}
+
+/**
+ * Extrae una alineación titular 1-9 desde un `feed/live` (y respaldo de `schedule?hydrate=lineups`).
+ */
+export function extractTeamGameLineupFromFeed(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  feed: any,
+  targetTeamId: number,
+  todayVet: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fallbackSchedulePlayers?: any[]
+): GameLineup | null {
+  if (!feed?.gameData) return null;
+
+  const homeId = Number(feed?.gameData?.teams?.home?.id || 0);
+  const awayId = Number(feed?.gameData?.teams?.away?.id || 0);
+  if (targetTeamId !== homeId && targetTeamId !== awayId) {
+    return null;
   }
+
+  const isHome = homeId === targetTeamId;
+  const oppId = isHome ? awayId : homeId;
+  const teamInfo = getTeam(targetTeamId);
+  const oppInfo = getTeam(oppId);
+  const oppTeamObj = isHome ? feed?.gameData?.teams?.away : feed?.gameData?.teams?.home;
+
+  const teamBox = isHome
+    ? feed?.liveData?.boxscore?.teams?.home
+    : feed?.liveData?.boxscore?.teams?.away;
+  const oppBox = isHome
+    ? feed?.liveData?.boxscore?.teams?.away
+    : feed?.liveData?.boxscore?.teams?.home;
+
+  const playersDict = teamBox?.players || {};
+  const gamePlayersDict = feed?.gameData?.players || {};
+
+  let starters: StarterSlot[] = [];
+
+  // 1. Primaria: `boxTeam.battingOrder` (slots 1..9)
+  const rawOrder: number[] = Array.isArray(teamBox?.battingOrder)
+    ? teamBox.battingOrder
+    : [];
+  if (rawOrder.length >= 9) {
+    starters = rawOrder.slice(0, 9).map((pId: number, idx: number) => {
+      const pData = playersDict[`ID${pId}`] || {};
+      const gpData = gamePlayersDict[`ID${pId}`] || {};
+      const name = pData?.person?.fullName || gpData?.fullName || "Bateador";
+      const pos =
+        pData?.position?.abbreviation ||
+        gpData?.primaryPosition?.abbreviation ||
+        "DH";
+      return buildStarterSlot(idx + 1, Number(pId), name, pos);
+    });
+  }
+
+  // 2. Respaldo 1: `boxTeam.batters` con `battingOrder` por jugador
+  if (starters.length < 9 && Array.isArray(teamBox?.batters) && teamBox.batters.length > 0) {
+    const candidateIds: number[] = (teamBox.batters as number[]).filter((pId) => {
+      const p = playersDict[`ID${pId}`];
+      if (!p) return false;
+      const pos = p.position?.abbreviation;
+      const isPitcher =
+        pos === "P" ||
+        p.position?.type === "Pitcher" ||
+        p.position?.code === "1";
+      if (!isPitcher) return true;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
+      return allPos.includes("DH") || allPos.includes("PH") || Boolean(p.battingOrder);
+    });
+
+    candidateIds.sort((a, b) => {
+      const boA = playersDict[`ID${a}`]?.battingOrder
+        ? parseInt(playersDict[`ID${a}`].battingOrder, 10)
+        : 9999;
+      const boB = playersDict[`ID${b}`]?.battingOrder
+        ? parseInt(playersDict[`ID${b}`].battingOrder, 10)
+        : 9999;
+      return boA - boB;
+    });
+
+    const primaryStarters = candidateIds.filter((pId) => {
+      const bo = playersDict[`ID${pId}`]?.battingOrder
+        ? parseInt(playersDict[`ID${pId}`].battingOrder, 10)
+        : null;
+      return bo === null || bo % 100 === 0;
+    });
+
+    if (primaryStarters.length >= 9) {
+      starters = primaryStarters.slice(0, 9).map((pId, idx) => {
+        const pData = playersDict[`ID${pId}`] || {};
+        const gpData = gamePlayersDict[`ID${pId}`] || {};
+        const name = pData?.person?.fullName || gpData?.fullName || "Bateador";
+        const pos =
+          pData?.position?.abbreviation ||
+          gpData?.primaryPosition?.abbreviation ||
+          "DH";
+        return buildStarterSlot(idx + 1, Number(pId), name, pos);
+      });
+    }
+  }
+
+  // 3. Respaldo 2: `schedule?hydrate=lineups`
+  if (
+    starters.length < 9 &&
+    Array.isArray(fallbackSchedulePlayers) &&
+    fallbackSchedulePlayers.length >= 9
+  ) {
+    const filtered =
+      fallbackSchedulePlayers.length > 9
+        ? fallbackSchedulePlayers.filter(
+            (fp) =>
+              fp?.primaryPosition?.abbreviation !== "P" &&
+              fp?.primaryPosition?.code !== "1"
+          )
+        : fallbackSchedulePlayers;
+
+    if (filtered.length >= 9) {
+      starters = filtered.slice(0, 9).map((fp, idx) => {
+        const pId = Number(fp?.id || 0);
+        const pData = playersDict[`ID${pId}`] || {};
+        const gpData = gamePlayersDict[`ID${pId}`] || {};
+        const name =
+          fp?.fullName || pData?.person?.fullName || gpData?.fullName || "Bateador";
+        const pos =
+          fp?.primaryPosition?.abbreviation ||
+          pData?.position?.abbreviation ||
+          gpData?.primaryPosition?.abbreviation ||
+          "DH";
+        return buildStarterSlot(idx + 1, pId, name, pos);
+      });
+    }
+  }
+
+  if (starters.length < 9) {
+    return null;
+  }
+
+  const gamePk = Number(feed?.gamePk || feed?.gameData?.game?.pk || 0);
+  const gameDate = String(
+    feed?.gameData?.datetime?.officialDate ||
+      feed?.gameData?.datetime?.originalDate ||
+      ""
+  );
+  const { status, detailedState } = mapFeedGameStatus(feed);
+  const gameNumber = Number(feed?.gameData?.game?.gameNumber ?? 1);
+  const teamScore = Number(
+    feed?.liveData?.linescore?.teams?.[isHome ? "home" : "away"]?.runs ??
+      teamBox?.teamStats?.batting?.runs ??
+      0
+  );
+  const oppScore = Number(
+    feed?.liveData?.linescore?.teams?.[isHome ? "away" : "home"]?.runs ??
+      oppBox?.teamStats?.batting?.runs ??
+      0
+  );
+
+  return {
+    gamePk,
+    gameDate,
+    opp: oppInfo.name || oppTeamObj?.name || "Rival",
+    oppLogo: oppInfo.logoUrl,
+    isHome,
+    leonesScore: teamScore,
+    oppScore,
+    won: teamScore > oppScore,
+    scoreStr: `${teamScore}-${oppScore}`,
+    starters,
+    status,
+    isToday: gameDate === todayVet,
+    gameNumber,
+    detailedState,
+    teamId: targetTeamId,
+    teamName: teamInfo.name,
+  };
+}
+
+interface MlbPlayerFeedMeta {
+  batSide?: "R" | "L" | "S";
+  seasonBatting?: Record<string, unknown>;
+  fullName?: string;
+  position?: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function collectMlbPlayerMetaFromFeeds(feeds: Iterable<any>): Map<number, MlbPlayerFeedMeta> {
+  const metaMap = new Map<number, MlbPlayerFeedMeta>();
+
+  for (const feed of feeds) {
+    if (!feed) continue;
+    const gamePlayers = feed?.gameData?.players || {};
+    for (const [key, gp] of Object.entries(gamePlayers)) {
+      const pId = Number(String(key).replace(/^ID/, ""));
+      if (!pId) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const gPlayer = gp as any;
+      const rawCode = gPlayer?.batSide?.code;
+      const batSide: "R" | "L" | "S" | undefined =
+        rawCode === "R" || rawCode === "L" || rawCode === "S" ? rawCode : undefined;
+      const existing = metaMap.get(pId) || {};
+      metaMap.set(pId, {
+        ...existing,
+        batSide: batSide || existing.batSide,
+        fullName: gPlayer?.fullName || existing.fullName,
+        position: gPlayer?.primaryPosition?.abbreviation || existing.position,
+      });
+    }
+
+    const teamBoxes = [
+      feed?.liveData?.boxscore?.teams?.home,
+      feed?.liveData?.boxscore?.teams?.away,
+    ];
+    for (const box of teamBoxes) {
+      const boxPlayers = box?.players || {};
+      for (const [key, bp] of Object.entries(boxPlayers)) {
+        const pId = Number(String(key).replace(/^ID/, ""));
+        if (!pId) continue;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const bPlayer = bp as any;
+        const seasonBatting = bPlayer?.seasonStats?.batting;
+        const rawCode = bPlayer?.person?.batSide?.code;
+        const batSide: "R" | "L" | "S" | undefined =
+          rawCode === "R" || rawCode === "L" || rawCode === "S" ? rawCode : undefined;
+        const existing = metaMap.get(pId) || {};
+        const prevAtBats = Number(existing.seasonBatting?.atBats ?? 0);
+        const nextAtBats = Number(seasonBatting?.atBats ?? 0);
+        metaMap.set(pId, {
+          ...existing,
+          batSide: existing.batSide || batSide,
+          fullName: existing.fullName || bPlayer?.person?.fullName,
+          position: existing.position || bPlayer?.position?.abbreviation,
+          seasonBatting:
+            seasonBatting && nextAtBats >= prevAtBats
+              ? seasonBatting
+              : existing.seasonBatting,
+        });
+      }
+    }
+  }
+
+  return metaMap;
+}
+
+function buildPlayerStatsMapFromSources(
+  supabaseStats: BattingStats[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  feeds: Iterable<any>,
+  startersLists: (StarterSlot[] | undefined)[]
+): Record<number, TangoPlayer> {
+  const mlbMetaMap = collectMlbPlayerMetaFromFeeds(feeds);
+  const playerStatsMap: Record<number, TangoPlayer> = {};
+
+  // 1. Fuente primaria: estadísticas reales de temporada en Supabase (`batting_stats`)
+  for (const stat of supabaseStats) {
+    if (stat.atBats + stat.walks <= 0) continue;
+    const meta = mlbMetaMap.get(stat.playerId);
+    playerStatsMap[stat.playerId] = buildTangoPlayerFromBattingStats(
+      stat,
+      meta?.batSide,
+      meta?.position
+    );
+  }
+
+  // 2. Fuente secundaria: `seasonStats.batting` de MLB `feed/live` para refuerzos o recién debutados
+  const starterMeta = new Map<number, StarterSlot>();
+  for (const list of startersLists) {
+    if (!list) continue;
+    for (const s of list) {
+      if (s.playerId && !starterMeta.has(s.playerId)) {
+        starterMeta.set(s.playerId, s);
+      }
+    }
+  }
+
+  for (const [pId, meta] of mlbMetaMap.entries()) {
+    if (playerStatsMap[pId] || !meta.seasonBatting) continue;
+    const starter = starterMeta.get(pId);
+    const tangoPlayer = buildTangoPlayerFromMlbSeasonStats({
+      playerId: pId,
+      playerName: starter?.playerName || meta.fullName || "Pelotero",
+      position: starter?.position || meta.position,
+      batSide: meta.batSide,
+      seasonBatting: meta.seasonBatting,
+    });
+    if (tangoPlayer) {
+      playerStatsMap[pId] = tangoPlayer;
+    }
+  }
+
+  return playerStatsMap;
+}
+
+async function resolveFeedLineupForGame(
+  gamePk: number,
+  targetTeamId: number,
+  todayVet: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  feedByGamePk: Map<number, any>,
+  fallbackDate?: string
+): Promise<GameLineup | null> {
+  let feed = feedByGamePk.get(gamePk);
+  if (!feed) {
+    feed = await fetchGameLiveFeed(gamePk);
+    if (feed) {
+      feedByGamePk.set(gamePk, feed);
+    }
+  }
+
+  if (!feed) return null;
+
+  let lineup = extractTeamGameLineupFromFeed(feed, targetTeamId, todayVet);
+  if (!lineup) {
+    const homeId = Number(feed?.gameData?.teams?.home?.id || 0);
+    const awayId = Number(feed?.gameData?.teams?.away?.id || 0);
+    if (targetTeamId === homeId || targetTeamId === awayId) {
+      const isHome = homeId === targetTeamId;
+      const sched = await fetchScheduleLineupsForGame(
+        gamePk,
+        fallbackDate || feed?.gameData?.datetime?.officialDate || todayVet
+      );
+      const fallbackPlayers = isHome ? sched.homePlayers : sched.awayPlayers;
+      if (fallbackPlayers.length >= 9) {
+        lineup = extractTeamGameLineupFromFeed(
+          feed,
+          targetTeamId,
+          todayVet,
+          fallbackPlayers
+        );
+      }
+    }
+  }
+
+  return lineup;
+}
+
+async function resolveTodayAndRequestedLineups(
+  season: number,
+  targetTeamId: number,
+  targetGamePk?: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  existingFeeds: any[] = [],
+  prefetchedAvailableGames?: Awaited<ReturnType<typeof getCaracasAvailableGames>>
+): Promise<{
+  todayLineup: GameLineup | null;
+  todayLineupStatus: TodayLineupStatus;
+  requestedLineup: GameLineup | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  allFeeds: any[];
+}> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const feedByGamePk = new Map<number, any>();
+  for (const f of existingFeeds) {
+    const pk = Number(f?.gamePk || f?.gameData?.game?.pk || 0);
+    if (pk) feedByGamePk.set(pk, f);
+  }
+
+  const todayVet = getVenezuelanToday().dateString;
+  const availableGames =
+    prefetchedAvailableGames ?? (await getCaracasAvailableGames(season));
+  const todaysGames = availableGames.filter((g) => g.date === todayVet);
+
+  let todayLineup: GameLineup | null = null;
+  let todayLineupStatus: TodayLineupStatus;
+
+  if (todaysGames.length === 0) {
+    todayLineupStatus = {
+      hasGameToday: false,
+      isPublished: false,
+      message: "Sin juego programado para hoy — mostrando alineación más frecuente",
+    };
+  } else {
+    // `todaysGames` ya viene ordenado con `isLive` primero y luego `gameNumber DESC`
+    for (const g of todaysGames) {
+      const candidate = await resolveFeedLineupForGame(
+        g.gamePk,
+        LEONES_TEAM_ID,
+        todayVet,
+        feedByGamePk,
+        g.date
+      );
+      if (candidate && candidate.starters.length >= 9) {
+        todayLineup = {
+          ...candidate,
+          gameNumber: g.gameNumber ?? candidate.gameNumber,
+        };
+        break;
+      }
+    }
+
+    if (todayLineup) {
+      const statusText =
+        todayLineup.status === "Live"
+          ? "En Vivo"
+          : todayLineup.status === "Final"
+          ? "Final"
+          : "Pre-Juego";
+      const matchedAvail = todaysGames.find((g) => g.gamePk === todayLineup?.gamePk);
+      todayLineupStatus = {
+        hasGameToday: true,
+        isPublished: true,
+        gamePk: todayLineup.gamePk,
+        gameDate: todayLineup.gameDate,
+        opponent: matchedAvail?.opponent || todayLineup.opp,
+        status: todayLineup.status,
+        detailedState: todayLineup.detailedState,
+        gameNumber: todayLineup.gameNumber,
+        message: `Lineup oficial de hoy publicado (${statusText})`,
+      };
+    } else {
+      const primary = todaysGames[0];
+      const primaryStatus: "Live" | "Final" | "Preview" = primary.isLive
+        ? "Live"
+        : ["Final", "Completed", "Game Over", "Completed Early"].includes(
+            primary.status
+          )
+        ? "Final"
+        : "Preview";
+      todayLineupStatus = {
+        hasGameToday: true,
+        isPublished: false,
+        gamePk: primary.gamePk,
+        gameDate: primary.date,
+        opponent: primary.opponent,
+        status: primaryStatus,
+        detailedState: primary.status,
+        gameNumber: primary.gameNumber,
+        message: `Lineup de hoy aún no publicado (${primary.opponent}) — mostrando alineación más frecuente`,
+      };
+    }
+  }
+
+  let requestedLineup: GameLineup | null = null;
+  if (targetGamePk) {
+    if (
+      todayLineup &&
+      todayLineup.gamePk === targetGamePk &&
+      targetTeamId === LEONES_TEAM_ID
+    ) {
+      requestedLineup = todayLineup;
+    } else {
+      requestedLineup = await resolveFeedLineupForGame(
+        targetGamePk,
+        targetTeamId,
+        todayVet,
+        feedByGamePk
+      );
+    }
+  }
+
+  return {
+    todayLineup,
+    todayLineupStatus,
+    requestedLineup,
+    allFeeds: Array.from(feedByGamePk.values()),
+  };
+}
+
+/**
+ * Resuelve únicamente el lineup de un `gamePk` puntual y su `playerStatsMap`
+ * (útil cuando `season < activeSeason` usa snapshots JSON históricos).
+ */
+export async function getRequestedGameLineupAndStats(
+  gamePk: number,
+  season: number,
+  teamId = LEONES_TEAM_ID
+): Promise<{
+  requestedLineup: GameLineup | null;
+  playerStatsMap: Record<number, TangoPlayer>;
+}> {
+  const todayVet = getVenezuelanToday().dateString;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const feedByGamePk = new Map<number, any>();
+
+  const [requestedLineup, supabaseStats] = await Promise.all([
+    resolveFeedLineupForGame(gamePk, teamId, todayVet, feedByGamePk),
+    getBattingStats(season, "R", "all", 400, 0).catch(() => [] as BattingStats[]),
+  ]);
+
+  const playerStatsMap = buildPlayerStatsMapFromSources(
+    supabaseStats,
+    feedByGamePk.values(),
+    [requestedLineup?.starters]
+  );
+
+  return { requestedLineup, playerStatsMap };
+}
+
+export async function getDynamicBullpenAndLineups(
+  season = 2026,
+  options?: { targetGamePk?: number; teamId?: number }
+): Promise<BullpenAndLineupsData> {
+  const targetTeamId = options?.teamId || LEONES_TEAM_ID;
+  const targetGamePk = options?.targetGamePk;
+
+  const [feeds, availableGames, supabaseStats] = await Promise.all([
+    getSeasonLiveFeeds(season),
+    getCaracasAvailableGames(season),
+    getBattingStats(season, "R", "all", 400, 0).catch(() => [] as BattingStats[]),
+  ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bpRecords: any[] = [];
@@ -259,10 +808,39 @@ export async function getDynamicBullpenAndLineups(season = 2026): Promise<Bullpe
     }
   }
 
-  return getBullpenAndLineups(season, LEONES_TEAM_ID, {
-    bullpen_records: bpRecords,
-    lineup_records: luRecords,
-  });
+  const baseData = feeds.length
+    ? getBullpenAndLineups(season, LEONES_TEAM_ID, {
+        bullpen_records: bpRecords,
+        lineup_records: luRecords,
+      })
+    : getBullpenAndLineups(season, LEONES_TEAM_ID);
+
+  const { todayLineup, todayLineupStatus, requestedLineup, allFeeds } =
+    await resolveTodayAndRequestedLineups(
+      season,
+      targetTeamId,
+      targetGamePk,
+      feeds,
+      availableGames
+    );
+
+  const playerStatsMap = buildPlayerStatsMapFromSources(supabaseStats, allFeeds, [
+    todayLineup?.starters,
+    requestedLineup?.starters,
+    ...baseData.lineups.gameLineups.map((g) => g.starters),
+    ...baseData.lineups.topFrequentLineups.map((t) => t.starters),
+  ]);
+
+  return {
+    ...baseData,
+    lineups: {
+      ...baseData.lineups,
+      todayLineup,
+      todayLineupStatus,
+      requestedLineup,
+      playerStatsMap,
+    },
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

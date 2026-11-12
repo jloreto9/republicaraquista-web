@@ -41,18 +41,29 @@ const POS_FULL_MAP: Record<string, string> = {
 interface BullpenViewProps {
   initialData: BullpenAndLineupsData;
   season?: number;
+  initialTab?: "bullpen" | "budget" | "lineups";
+  initialLineupSubtab?: "card" | "frequent" | "heatmap" | "player" | "optimizer";
+  initialGamePk?: number;
+  initialTeamId?: number;
 }
 
-export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
+export function BullpenView({
+  initialData,
+  season = 2026,
+  initialTab = "bullpen",
+  initialLineupSubtab = "card",
+  initialGamePk,
+  initialTeamId = 695,
+}: BullpenViewProps) {
   const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
   const [data, setData] = useState<BullpenAndLineupsData>(initialData);
   const [currentSeason, setCurrentSeason] = useState<number>(globalSeason || season);
-  const [currentTeamId, setCurrentTeamId] = useState<number>(695);
+  const [currentTeamId, setCurrentTeamId] = useState<number>(initialTeamId);
   const [loading, setLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"bullpen" | "budget" | "lineups">("bullpen");
+  const [activeTab, setActiveTab] = useState<"bullpen" | "budget" | "lineups">(initialTab);
   const [lineupSubtab, setLineupSubtab] = useState<
     "card" | "frequent" | "heatmap" | "player" | "optimizer"
-  >("card");
+  >(initialLineupSubtab);
 
   // Dugout Scorecard Selector
   const [selectedGameIndex, setSelectedGameIndex] = useState<number>(0);
@@ -68,15 +79,17 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
 
   const handleSeasonOrTeamChange = async (
     newSeason: number,
-    newTeamId: number
+    newTeamId: number,
+    targetGamePk?: number
   ) => {
     setCurrentSeason(newSeason);
     setCurrentTeamId(newTeamId);
     setGlobalSeason(newSeason);
     setLoading(true);
     try {
+      const gamePkQuery = targetGamePk ? `&gamePk=${targetGamePk}` : "";
       const res = await fetch(
-        `/api/bullpen?season=${newSeason}&teamId=${newTeamId}`
+        `/api/bullpen?season=${newSeason}&teamId=${newTeamId}${gamePkQuery}`
       );
       const json = await res.json();
       if (json.success && json.data) {
@@ -107,8 +120,25 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
   }, [initialData]);
 
   useEffect(() => {
-    if (currentSeason >= 2026 && data.lineups.gameLineups.length <= 1) {
-      handleSeasonOrTeamChange(currentSeason, currentTeamId);
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (initialLineupSubtab) setLineupSubtab(initialLineupSubtab);
+  }, [initialLineupSubtab]);
+
+  useEffect(() => {
+    if (initialTeamId) setCurrentTeamId(initialTeamId);
+  }, [initialTeamId]);
+
+  useEffect(() => {
+    if (
+      currentSeason >= 2026 &&
+      data.lineups.gameLineups.length <= 1 &&
+      !data.lineups.todayLineup &&
+      !data.lineups.requestedLineup
+    ) {
+      handleSeasonOrTeamChange(currentSeason, currentTeamId, initialGamePk);
     }
   }, []);
 
@@ -1019,6 +1049,11 @@ export function BullpenView({ initialData, season = 2026 }: BullpenViewProps) {
             <TangoLineupOptimizerTab
               gameLineups={data.lineups.gameLineups}
               topFrequentLineups={data.lineups.topFrequentLineups}
+              todayLineup={data.lineups.todayLineup}
+              todayLineupStatus={data.lineups.todayLineupStatus}
+              requestedLineup={data.lineups.requestedLineup}
+              playerStatsMap={data.lineups.playerStatsMap}
+              initialGamePk={initialGamePk}
               teamName={activeTeam.name}
               season={currentSeason}
             />

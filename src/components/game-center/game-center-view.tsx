@@ -170,13 +170,14 @@ export function GameCenterView({ initialData }: GameCenterViewProps) {
     }
   }, []);
 
-  // Polling automático cada 15s si el juego está en vivo
+  // Polling automático cada 15s si está en vivo o cada 30s en pre-juego para detectar lineups
   useEffect(() => {
-    if (gameData.status !== "Live") return;
+    if (gameData.status !== "Live" && gameData.status !== "Preview") return;
 
+    const intervalMs = gameData.status === "Live" ? 15000 : 30000;
     const intervalId = setInterval(() => {
       fetchGame(selectedGamePk);
-    }, 15000);
+    }, intervalMs);
 
     return () => clearInterval(intervalId);
   }, [gameData.status, selectedGamePk, fetchGame]);
@@ -358,6 +359,8 @@ export function GameCenterView({ initialData }: GameCenterViewProps) {
                   <div className="text-slate-300 leading-relaxed text-[11px]">
                     {gameData.status === "Live"
                       ? "Juego en desarrollo. Las bases y conteo se actualizan en tiempo real conforme a la telemetría oficial de MLB Winter Leagues."
+                      : gameData.status === "Preview"
+                      ? "Encuentro programado. Las alineaciones oficiales se actualizan automáticamente previo al inicio del juego."
                       : "Encuentro concluido. Puede consultar el boxscore completo, jugada a jugada o elegir otro partido de la temporada en el selector superior."}
                   </div>
                 </div>
@@ -392,6 +395,7 @@ export function GameCenterView({ initialData }: GameCenterViewProps) {
 
       {activeTab === "boxscore" && (
         <BoxscoreLineupsTab
+          gamePk={gameData.gamePk}
           homeTeam={gameData.homeTeam}
           awayTeam={gameData.awayTeam}
           awayBatters={gameData.boxscore.awayBatters}

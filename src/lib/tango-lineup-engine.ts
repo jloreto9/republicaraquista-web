@@ -4,6 +4,9 @@ import {
   TangoLineupMetrics,
   TangoOptimizationResult,
 } from "@/types/tango-lineup";
+import { BattingStats } from "@/types/sports";
+import { computeWoba, computeWrcPlus } from "./matchup-engine";
+import { getPlayerHeadshotUrl } from "./constants";
 
 export const LVBP_REGULAR_SEASON_GAMES = 56;
 
@@ -465,43 +468,195 @@ function normalizeName(name: string): string {
     .trim();
 }
 
+function findCanonicalPlayer(playerId?: number, name?: string): TangoPlayer | undefined {
+  if (name) {
+    const norm = normalizeName(name);
+    if (norm && LEONES_REAL_STATS_MAP[norm]) {
+      return LEONES_REAL_STATS_MAP[norm];
+    }
+    if (norm) {
+      const bySubstr = Object.values(LEONES_REAL_STATS_MAP).find((p) => {
+        if (playerId && p.playerId === playerId) return true;
+        const pNorm = normalizeName(p.playerName);
+        return norm.includes(pNorm) || pNorm.includes(norm);
+      });
+      if (bySubstr) return bySubstr;
+    }
+  }
+  if (playerId) {
+    return Object.values(LEONES_REAL_STATS_MAP).find((p) => p.playerId === playerId);
+  }
+  return undefined;
+}
+
+function resolveValidPosition(position?: string, fallback = "UTIL"): string {
+  if (position && position !== "UTIL" && position !== "-") {
+    return position;
+  }
+  return fallback;
+}
+
 /**
- * Busca un jugador en la base de datos real o calibra sus estadísticas sabermétricas reales
+ * Construye un `TangoPlayer` desde estadísticas agregadas de temporada en Supabase (`batting_stats`).
+ */
+export function buildTangoPlayerFromBattingStats(
+  stats: BattingStats,
+  batSide?: "R" | "L" | "S",
+  position?: string
+): TangoPlayer {
+  const canonical = findCanonicalPlayer(stats.playerId, stats.playerName);
+  const woba = computeWoba(stats);
+  const wrcPlus = computeWrcPlus(woba);
+  const avg = Number(stats.avg ?? 0);
+  const obp = Number(stats.obp ?? 0);
+  const slg = Number(stats.slg ?? 0);
+  const iso = Number(Math.max(0, slg - avg).toFixed(3));
+
+  return {
+    playerId: stats.playerId,
+    playerName: stats.playerName,
+    position: resolveValidPosition(position, canonical?.position || "UTIL"),
+    bats: batSide || canonical?.bats || "R",
+    avg,
+    obp,
+    slg,
+    woba,
+    wrcPlus,
+    iso,
+    headshot: stats.playerAvatar || getPlayerHeadshotUrl(stats.playerId),
+    statsSource: "supabase",
+  };
+}
+
+/**
+ * Construye un `TangoPlayer` desde `seasonStats.batting` de MLB Stats API (`feed/live`),
+ * retornando `null` si el pelotero aún no registra apariciones válidas (AB + BB === 0).
+ */
+export function buildTangoPlayerFromMlbSeasonStats(params: {
+  playerId: number;
+  playerName: string;
+  position?: string;
+  batSide?: "R" | "L" | "S";
+  seasonBatting?: Record<string, unknown> | null;
+}): TangoPlayer | null {
+  const sb = params.seasonBatting;
+  if (!sb) return null;
+
+  const atBats = Number(sb.atBats ?? 0);
+  const hits = Number(sb.hits ?? 0);
+  const doubles = Number(sb.doubles ?? 0);
+  const triples = Number(sb.triples ?? 0);
+  const homeRuns = Number(sb.homeRuns ?? 0);
+  const baseOnBalls = Number(sb.baseOnBalls ?? 0);
+  const hbp = Number(sb.hitByPitch ?? 0);
+  const sf = Number(sb.sacFlies ?? 0);
+
+  if (atBats + baseOnBalls <= 0) {
+    return null;
+  }
+
+  const parseSlash = (val: unknown, fallback: number): number => {
+    const num = typeof val === "number" ? val : parseFloat(String(val ?? ""));
+    return Number.isFinite(num) ? Number(num.toFixed(3)) : Number(fallback.toFixed(3));
+  };
+
+  const avgFallback = atBats > 0 ? hits / atBats : 0;
+  const obpDen = atBats + baseOnBalls + hbp + sf;
+  const obpFallback = obpDen > 0 ? (hits + baseOnBalls + hbp) / obpDen : 0;
+  const slgFallback =
+    atBats > 0 ? (hits + doubles + 2 * triples + 3 * homeRuns) / atBats : 0;
+
+  const avg = parseSlash(sb.avg, avgFallback);
+  const obp = parseSlash(sb.obp, obpFallback);
+  const slg = parseSlash(sb.slg, slgFallback);
+  const iso = Number(Math.max(0, slg - avg).toFixed(3));
+
+  const tempBatting: BattingStats = {
+    playerId: params.playerId,
+    playerName: params.playerName,
+    playerAvatar: getPlayerHeadshotUrl(params.playerId),
+    teamId: 0,
+    teamName: "",
+    teamAbbr: "",
+    teamLogo: "",
+    games: Number(sb.gamesPlayed ?? 0),
+    atBats,
+    plateAppearances: Number(sb.plateAppearances ?? atBats + baseOnBalls + hbp + sf),
+    runs: Number(sb.runs ?? 0),
+    hits,
+    doubles,
+    triples,
+    homeRuns,
+    rbi: Number(sb.rbi ?? 0),
+    walks: baseOnBalls,
+    strikeouts: Number(sb.strikeOuts ?? 0),
+    stolenBases: Number(sb.stolenBases ?? 0),
+    caughtStealing: Number(sb.caughtStealing ?? 0),
+    hbp,
+    sf,
+    avg,
+    obp,
+    slg,
+    ops: Number((obp + slg).toFixed(3)),
+    iso,
+    babip: 0,
+  };
+
+  const woba = computeWoba(tempBatting);
+  const wrcPlus = computeWrcPlus(woba);
+  const canonical = findCanonicalPlayer(params.playerId, params.playerName);
+
+  return {
+    playerId: params.playerId,
+    playerName: params.playerName,
+    position: resolveValidPosition(params.position, canonical?.position || "UTIL"),
+    bats: params.batSide || canonical?.bats || "R",
+    avg,
+    obp,
+    slg,
+    woba,
+    wrcPlus,
+    iso,
+    headshot: getPlayerHeadshotUrl(params.playerId),
+    statsSource: "mlb",
+  };
+}
+
+/**
+ * Busca un jugador en la base de datos real (Supabase/MLB -> mapa canónico) o calibra fallback sintético.
  */
 export function resolvePlayerStats(
   name: string,
   position = "UTIL",
   playerId?: number,
-  defaultOrder = 5
+  defaultOrder = 5,
+  realStatsLookup?: Record<number, TangoPlayer>
 ): TangoPlayer {
+  // 1. Priorizar estadísticas reales de temporada activa (Supabase / MLB feed/live)
+  if (playerId && realStatsLookup?.[playerId] && realStatsLookup[playerId].statsSource !== "synthetic") {
+    const real = realStatsLookup[playerId];
+    const canonical = findCanonicalPlayer(playerId, name);
+    return {
+      ...real,
+      playerName: real.playerName || name,
+      position: resolveValidPosition(position, real.position),
+      bats: real.bats || canonical?.bats || "R",
+    };
+  }
+
+  // 2. Búsqueda en mapa canónico auditado (por nombre normalizado o playerId)
+  const canonicalMatch = findCanonicalPlayer(playerId, name);
+  if (canonicalMatch) {
+    return {
+      ...canonicalMatch,
+      position: resolveValidPosition(position, canonicalMatch.position),
+      playerId: playerId || canonicalMatch.playerId,
+      statsSource: "canonical_map",
+    };
+  }
+
+  // 3. Fallback sintético como último recurso
   const norm = normalizeName(name);
-
-  // 1. Búsqueda por nombre normalizado
-  if (LEONES_REAL_STATS_MAP[norm]) {
-    const match = LEONES_REAL_STATS_MAP[norm];
-    return {
-      ...match,
-      position: position !== "UTIL" ? position : match.position,
-      playerId: playerId || match.playerId,
-    };
-  }
-
-  // 2. Búsqueda por coincidencia de subcadena o ID
-  const entryByVal = Object.values(LEONES_REAL_STATS_MAP).find((p) => {
-    if (playerId && p.playerId === playerId) return true;
-    const pNorm = normalizeName(p.playerName);
-    return norm.includes(pNorm) || pNorm.includes(norm);
-  });
-
-  if (entryByVal) {
-    return {
-      ...entryByVal,
-      position: position !== "UTIL" ? position : entryByVal.position,
-      playerId: playerId || entryByVal.playerId,
-    };
-  }
-
-  // 3. Fallback defensivo para peloteros de refuerzo o rivales
   const baseAvg = defaultOrder <= 3 ? 0.285 : defaultOrder <= 5 ? 0.275 : 0.250;
   const baseObp = defaultOrder === 1 ? 0.365 : defaultOrder === 2 ? 0.360 : 0.330;
   const baseSlg = defaultOrder === 4 || defaultOrder === 5 ? 0.490 : 0.400;
@@ -522,6 +677,7 @@ export function resolvePlayerStats(
     wrcPlus: Math.round((woba / 0.320) * 100),
     iso,
     headshot: `https://midfield.mlbstatic.com/v1/people/${cleanId}/spots/120`,
+    statsSource: "synthetic",
   };
 }
 

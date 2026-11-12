@@ -1,3 +1,5 @@
+import { TangoPlayer } from "./tango-lineup";
+
 export interface RelieverInheritedStat {
   pitcherId: number;
   pitcherName: string;
@@ -26,6 +28,18 @@ export interface StarterSlot {
   badgeColor?: string;
 }
 
+export interface TodayLineupStatus {
+  hasGameToday: boolean;
+  isPublished: boolean;
+  gamePk?: number;
+  gameDate?: string;
+  opponent?: string;
+  status?: "Live" | "Final" | "Preview";
+  detailedState?: string;
+  gameNumber?: number;
+  message: string;
+}
+
 export interface GameLineup {
   gamePk: number;
   gameDate: string;
@@ -37,6 +51,12 @@ export interface GameLineup {
   won: boolean;
   scoreStr: string;
   starters: StarterSlot[];
+  status?: "Live" | "Final" | "Preview";
+  isToday?: boolean;
+  gameNumber?: number;
+  detailedState?: string;
+  teamId?: number;
+  teamName?: string;
 }
 
 export interface TopLineup {
@@ -175,5 +195,9 @@ export interface BullpenAndLineupsData {
     }[];
     playerImpacts: Record<string, PlayerLineupImpact>;
     availablePlayers: string[];
+    todayLineup?: GameLineup | null;
+    todayLineupStatus?: TodayLineupStatus;
+    requestedLineup?: GameLineup | null;
+    playerStatsMap?: Record<number, TangoPlayer>;
   };
 }

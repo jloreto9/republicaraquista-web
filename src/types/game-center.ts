@@ -94,6 +94,9 @@ export interface GameCenterBoxscoreBatter {
   so: number;
   avg: string;
   ops: string;
+  bats?: "R" | "L" | "S";
+  obp?: string;
+  slg?: string;
 }
 
 export interface GameCenterBoxscorePitcher {
@@ -122,6 +125,9 @@ export interface GameCenterAvailableGame {
   status: string;
   isHome: boolean;
   isLive: boolean;
+  gameNumber?: number;
+  isDoubleHeader?: boolean;
+  gameDatetime?: string;
 }
 
 export interface GameCenterData {

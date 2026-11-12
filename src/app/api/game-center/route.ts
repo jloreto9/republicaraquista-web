@@ -25,6 +25,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const cacheControl =
+      data.status === "Live"
+        ? "public, s-maxage=5, stale-while-revalidate=2"
+        : data.status === "Preview"
+        ? "public, s-maxage=30, stale-while-revalidate=15"
+        : "public, s-maxage=300, stale-while-revalidate=60";
+
     return NextResponse.json(
       {
         success: true,
@@ -33,9 +40,7 @@ export async function GET(request: NextRequest) {
       {
         status: 200,
         headers: {
-          "Cache-Control": data.status === "Live" 
-            ? "public, s-maxage=5, stale-while-revalidate=2"
-            : "public, s-maxage=300, stale-while-revalidate=60",
+          "Cache-Control": cacheControl,
         },
       }
     );
