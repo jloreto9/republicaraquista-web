@@ -20,18 +20,21 @@ import {
 import { BattedBall, PitchEvent, StrikeZoneMetrics, SprayPlayerOption } from "@/types/spray";
 import { getBullpenAndLineups } from "./bullpen";
 import { BullpenAndLineupsData, GameLineup, StarterSlot, TodayLineupStatus } from "@/types/bullpen";
-import { TangoPlayer } from "@/types/tango-lineup";
+import { ActiveRosterBatter, TangoPlayer } from "@/types/tango-lineup";
 import { BattingStats } from "@/types/sports";
 import { getKnownPitcherHand } from "./pitcher-hand-service";
 import { getBattingStats } from "./supabase";
 import { getVenezuelanToday } from "./utils";
 import {
+  ActiveRosterMlbBatter,
+  fetchTeamActiveRosterBatters,
   getCaracasAvailableGames,
   fetchScheduleLineupsForGame,
 } from "./game-center-service";
 import {
   buildTangoPlayerFromBattingStats,
   buildTangoPlayerFromMlbSeasonStats,
+  resolvePlayerStats,
 } from "./tango-lineup-engine";
 
 const LEONES_TEAM_ID = 695;
@@ -403,6 +406,23 @@ interface MlbPlayerFeedMeta {
   seasonBatting?: Record<string, unknown>;
   fullName?: string;
   position?: string;
+  playedPositions: Set<string>;
+  plateAppearances?: number;
+  atBats?: number;
+  gamesPlayed?: number;
+}
+
+const NON_DEFENSIVE_OR_PITCHER_POS = new Set(["P", "1", "PH", "PR", "", "-", "UTIL", "UT"]);
+
+function addObservedPosition(target: Set<string>, rawPos?: unknown) {
+  if (!rawPos) return;
+  const parts = String(rawPos).split(/[/,|]/);
+  for (const part of parts) {
+    const clean = part.trim().toUpperCase();
+    if (clean && !NON_DEFENSIVE_OR_PITCHER_POS.has(clean)) {
+      target.add(clean);
+    }
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -420,12 +440,16 @@ function collectMlbPlayerMetaFromFeeds(feeds: Iterable<any>): Map<number, MlbPla
       const rawCode = gPlayer?.batSide?.code;
       const batSide: "R" | "L" | "S" | undefined =
         rawCode === "R" || rawCode === "L" || rawCode === "S" ? rawCode : undefined;
-      const existing = metaMap.get(pId) || {};
+      const existing = metaMap.get(pId) || { playedPositions: new Set<string>() };
+      const playedPositions = existing.playedPositions;
+      addObservedPosition(playedPositions, gPlayer?.primaryPosition?.abbreviation);
+
       metaMap.set(pId, {
         ...existing,
         batSide: batSide || existing.batSide,
         fullName: gPlayer?.fullName || existing.fullName,
         position: gPlayer?.primaryPosition?.abbreviation || existing.position,
+        playedPositions,
       });
     }
 
@@ -444,18 +468,49 @@ function collectMlbPlayerMetaFromFeeds(feeds: Iterable<any>): Map<number, MlbPla
         const rawCode = bPlayer?.person?.batSide?.code;
         const batSide: "R" | "L" | "S" | undefined =
           rawCode === "R" || rawCode === "L" || rawCode === "S" ? rawCode : undefined;
-        const existing = metaMap.get(pId) || {};
+        const existing = metaMap.get(pId) || { playedPositions: new Set<string>() };
+        const playedPositions = existing.playedPositions;
+
+        addObservedPosition(playedPositions, bPlayer?.position?.abbreviation);
+        if (Array.isArray(bPlayer?.allPositions)) {
+          for (const ap of bPlayer.allPositions) {
+            addObservedPosition(playedPositions, ap?.abbreviation);
+          }
+        }
+
         const prevAtBats = Number(existing.seasonBatting?.atBats ?? 0);
         const nextAtBats = Number(seasonBatting?.atBats ?? 0);
+        const shouldUpdateSeason = Boolean(
+          seasonBatting && (!existing.seasonBatting || nextAtBats >= prevAtBats)
+        );
+
+        let plateAppearances = existing.plateAppearances;
+        let atBats = existing.atBats;
+        let gamesPlayed = existing.gamesPlayed;
+
+        if (shouldUpdateSeason && seasonBatting) {
+          const ab = Number(seasonBatting.atBats ?? 0);
+          const bb = Number(seasonBatting.baseOnBalls ?? 0);
+          const hbp = Number(seasonBatting.hitByPitch ?? 0);
+          const sf = Number(seasonBatting.sacFlies ?? 0);
+          const sh = Number(seasonBatting.sacBunts ?? 0);
+          plateAppearances = Number(
+            seasonBatting.plateAppearances ?? ab + bb + hbp + sf + sh
+          );
+          atBats = ab;
+          gamesPlayed = Number(seasonBatting.gamesPlayed ?? 0);
+        }
+
         metaMap.set(pId, {
           ...existing,
           batSide: existing.batSide || batSide,
           fullName: existing.fullName || bPlayer?.person?.fullName,
           position: existing.position || bPlayer?.position?.abbreviation,
-          seasonBatting:
-            seasonBatting && nextAtBats >= prevAtBats
-              ? seasonBatting
-              : existing.seasonBatting,
+          playedPositions,
+          seasonBatting: shouldUpdateSeason ? seasonBatting : existing.seasonBatting,
+          plateAppearances,
+          atBats,
+          gamesPlayed,
         });
       }
     }
@@ -511,6 +566,173 @@ function buildPlayerStatsMapFromSources(
   }
 
   return playerStatsMap;
+}
+
+/**
+ * Construye el pool de bateadores del roster activo cruzando el roster oficial de MLB Stats API
+ * (o fallback controlado cuando viene vacío) contra estadísticas reales y elegibilidad multi-posición.
+ */
+export function buildActiveRosterPool(params: {
+  activeRoster: ActiveRosterMlbBatter[];
+  supabaseStats: BattingStats[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  feeds: Iterable<any>;
+  teamId?: number;
+  fallbackPool?: StarterSlot[][];
+}): ActiveRosterBatter[] {
+  const targetTeamId = params.teamId ?? LEONES_TEAM_ID;
+  const feedArray = Array.isArray(params.feeds) ? params.feeds : Array.from(params.feeds);
+  const mlbMetaMap = collectMlbPlayerMetaFromFeeds(feedArray);
+  const playerStatsMap = buildPlayerStatsMapFromSources(
+    params.supabaseStats,
+    feedArray,
+    params.fallbackPool || []
+  );
+
+  const supabaseById = new Map<number, BattingStats>();
+  for (const stat of params.supabaseStats) {
+    if (stat.playerId && !supabaseById.has(stat.playerId)) {
+      supabaseById.set(stat.playerId, stat);
+    }
+  }
+
+  const baseEntries: ActiveRosterMlbBatter[] = [];
+  const seenIds = new Set<number>();
+
+  if (params.activeRoster.length > 0) {
+    for (const item of params.activeRoster) {
+      if (!item.playerId || seenIds.has(item.playerId)) continue;
+      seenIds.add(item.playerId);
+      baseEntries.push(item);
+    }
+  } else {
+    const teamMatchedStats =
+      targetTeamId > 0
+        ? params.supabaseStats.filter((s) => s.teamId === targetTeamId)
+        : params.supabaseStats;
+    const candidateStats =
+      teamMatchedStats.length > 0
+        ? teamMatchedStats
+        : targetTeamId > 0
+        ? params.supabaseStats.filter((s) => s.teamId === 0)
+        : params.supabaseStats;
+
+    for (const stat of candidateStats) {
+      if (!stat.playerId || seenIds.has(stat.playerId)) continue;
+      const meta = mlbMetaMap.get(stat.playerId);
+      if (meta?.position === "P" && stat.atBats + stat.walks <= 0) continue;
+      seenIds.add(stat.playerId);
+      baseEntries.push({
+        playerId: stat.playerId,
+        fullName: stat.playerName,
+        primaryPosition: meta?.position || "UTIL",
+        batSide: meta?.batSide,
+        rosterStatus: "Activo (Fallback)",
+      });
+    }
+
+    if (params.fallbackPool) {
+      for (const starters of params.fallbackPool) {
+        if (!Array.isArray(starters)) continue;
+        for (const slot of starters) {
+          if (!slot.playerId || seenIds.has(slot.playerId)) continue;
+          if (slot.position === "P") continue;
+          const meta = mlbMetaMap.get(slot.playerId);
+          seenIds.add(slot.playerId);
+          baseEntries.push({
+            playerId: slot.playerId,
+            fullName: slot.playerName,
+            primaryPosition: slot.position || meta?.position || "UTIL",
+            batSide: meta?.batSide,
+            rosterStatus: "Activo (Fallback)",
+          });
+        }
+      }
+    }
+  }
+
+  const pool: ActiveRosterBatter[] = [];
+
+  for (const entry of baseEntries) {
+    const sbStat = supabaseById.get(entry.playerId);
+    const meta = mlbMetaMap.get(entry.playerId);
+    const resolved = resolvePlayerStats(
+      entry.fullName,
+      entry.primaryPosition || meta?.position || "UTIL",
+      entry.playerId,
+      5,
+      playerStatsMap
+    );
+
+    const sbPa = sbStat
+      ? Number(
+          sbStat.plateAppearances ??
+            sbStat.pa ??
+            sbStat.atBats + sbStat.walks + (sbStat.hbp ?? 0) + (sbStat.sf ?? 0) + (sbStat.sh ?? 0)
+        )
+      : undefined;
+    const metaPa = meta?.plateAppearances;
+    const plateAppearances =
+      sbPa !== undefined && sbPa > 0
+        ? sbPa
+        : metaPa !== undefined
+        ? metaPa
+        : sbPa ?? 0;
+
+    const atBats =
+      sbStat && sbStat.atBats > 0 ? sbStat.atBats : meta?.atBats ?? sbStat?.atBats ?? 0;
+    const gamesPlayed =
+      sbStat && sbStat.games > 0 ? sbStat.games : meta?.gamesPlayed ?? sbStat?.games;
+
+    const eligiblePositions: string[] = [];
+    const pushPos = (rawPos?: string) => {
+      if (!rawPos) return;
+      for (const part of String(rawPos).split(/[/,|]/)) {
+        const clean = part.trim().toUpperCase();
+        if (clean && !NON_DEFENSIVE_OR_PITCHER_POS.has(clean) && !eligiblePositions.includes(clean)) {
+          eligiblePositions.push(clean);
+        }
+      }
+    };
+
+    pushPos(entry.primaryPosition);
+    if (meta) {
+      for (const p of meta.playedPositions) {
+        pushPos(p);
+      }
+      pushPos(meta.position);
+    }
+    pushPos(resolved.position);
+
+    if (eligiblePositions.length === 0) {
+      eligiblePositions.push("DH");
+    }
+
+    const displayPosition =
+      !NON_DEFENSIVE_OR_PITCHER_POS.has(entry.primaryPosition.toUpperCase())
+        ? entry.primaryPosition.toUpperCase()
+        : eligiblePositions[0] || resolved.position;
+
+    pool.push({
+      ...resolved,
+      position: displayPosition,
+      bats: entry.batSide || resolved.bats,
+      plateAppearances,
+      atBats,
+      gamesPlayed,
+      eligiblePositions,
+      rosterStatus: entry.rosterStatus,
+    });
+  }
+
+  pool.sort(
+    (a, b) =>
+      b.woba - a.woba ||
+      b.plateAppearances - a.plateAppearances ||
+      a.playerId - b.playerId
+  );
+
+  return pool;
 }
 
 async function resolveFeedLineupForGame(
@@ -715,10 +937,11 @@ export async function getDynamicBullpenAndLineups(
   const targetTeamId = options?.teamId || LEONES_TEAM_ID;
   const targetGamePk = options?.targetGamePk;
 
-  const [feeds, availableGames, supabaseStats] = await Promise.all([
+  const [feeds, availableGames, supabaseStats, activeRoster] = await Promise.all([
     getSeasonLiveFeeds(season),
     getCaracasAvailableGames(season),
     getBattingStats(season, "R", "all", 400, 0).catch(() => [] as BattingStats[]),
+    fetchTeamActiveRosterBatters(targetTeamId, season).catch(() => [] as ActiveRosterMlbBatter[]),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -824,12 +1047,22 @@ export async function getDynamicBullpenAndLineups(
       availableGames
     );
 
-  const playerStatsMap = buildPlayerStatsMapFromSources(supabaseStats, allFeeds, [
+  const starterLists = [
     todayLineup?.starters,
     requestedLineup?.starters,
     ...baseData.lineups.gameLineups.map((g) => g.starters),
     ...baseData.lineups.topFrequentLineups.map((t) => t.starters),
-  ]);
+  ];
+
+  const playerStatsMap = buildPlayerStatsMapFromSources(supabaseStats, allFeeds, starterLists);
+
+  const activeRosterPool = buildActiveRosterPool({
+    activeRoster,
+    supabaseStats,
+    feeds: allFeeds,
+    teamId: targetTeamId,
+    fallbackPool: starterLists.filter((s): s is StarterSlot[] => Array.isArray(s) && s.length > 0),
+  });
 
   return {
     ...baseData,
@@ -839,6 +1072,7 @@ export async function getDynamicBullpenAndLineups(
       todayLineupStatus,
       requestedLineup,
       playerStatsMap,
+      activeRosterPool,
     },
   };
 }

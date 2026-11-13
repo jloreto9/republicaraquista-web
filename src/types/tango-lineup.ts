@@ -43,3 +43,42 @@ export interface TangoOptimizationResult {
   deltaRunsPerGame: number;
   deltaRunsPerSeason: number;
 }
+
+export type TangoPositionSlot =
+  | "C"
+  | "1B"
+  | "2B"
+  | "3B"
+  | "SS"
+  | "LF"
+  | "CF"
+  | "RF"
+  | "OF"
+  | "DH";
+
+export interface ActiveRosterBatter extends TangoPlayer {
+  plateAppearances: number;
+  atBats: number;
+  gamesPlayed?: number;
+  eligiblePositions: string[];
+  rosterStatus?: string;
+}
+
+export type BestLineupConstraintMode = "defensive_valid" | "pure_bats";
+
+export interface BuildBestAvailableLineupParams {
+  pool: ActiveRosterBatter[];
+  mode?: BestLineupConstraintMode;
+  minPlateAppearances?: number;
+  excludedPlayerIds?: number[];
+  referenceLineup?: TangoPlayer[];
+}
+
+export interface BestAvailableLineupResult {
+  optimization: TangoOptimizationResult;
+  assignedPositions: Record<number, string>;
+  benchPlayers: ActiveRosterBatter[];
+  modeUsed: BestLineupConstraintMode;
+  effectiveMinPa: number;
+  relaxedConstraintNote?: string;
+}

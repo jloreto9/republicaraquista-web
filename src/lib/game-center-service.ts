@@ -204,6 +204,88 @@ export async function fetchScheduleLineupsForGame(
   return { homePlayers: [], awayPlayers: [] };
 }
 
+export interface ActiveRosterMlbBatter {
+  playerId: number;
+  fullName: string;
+  primaryPosition: string;
+  batSide?: "R" | "L" | "S";
+  rosterStatus?: string;
+}
+
+/**
+ * Consulta el roster activo vigente de un equipo en MLB Stats API filtrando lanzadores puros.
+ */
+export async function fetchTeamActiveRosterBatters(
+  teamId = LEONES_TEAM_ID,
+  season = 2026
+): Promise<ActiveRosterMlbBatter[]> {
+  try {
+    const res = await fetch(
+      `https://statsapi.mlb.com/api/v1/teams/${teamId}/roster?rosterType=active&season=${season}&hydrate=person`,
+      {
+        signal: AbortSignal.timeout(8000),
+        next: { revalidate: 120 },
+      }
+    );
+
+    if (!res.ok) {
+      console.warn(`MLB active roster HTTP ${res.status} para equipo ${teamId}`);
+      return [];
+    }
+
+    const json = await res.json();
+    const roster = Array.isArray(json?.roster) ? json.roster : [];
+    const batters: ActiveRosterMlbBatter[] = [];
+
+    for (const entry of roster) {
+      const playerId = Number(entry?.person?.id || 0);
+      if (!playerId) continue;
+
+      const posAbbr = String(
+        entry?.position?.abbreviation ||
+          entry?.person?.primaryPosition?.abbreviation ||
+          ""
+      )
+        .trim()
+        .toUpperCase();
+      const posCode = String(
+        entry?.position?.code || entry?.person?.primaryPosition?.code || ""
+      ).trim();
+      const posType = String(
+        entry?.position?.type || entry?.person?.primaryPosition?.type || ""
+      ).trim();
+
+      if (posAbbr === "P" || posCode === "1" || posType === "Pitcher") {
+        continue;
+      }
+
+      const rawBat = entry?.person?.batSide?.code;
+      const batSide: "R" | "L" | "S" | undefined =
+        rawBat === "R" || rawBat === "L" || rawBat === "S" ? rawBat : undefined;
+
+      const primaryPosition =
+        posAbbr && posAbbr !== "-" && posAbbr !== "PH" && posAbbr !== "PR"
+          ? posAbbr
+          : "UTIL";
+
+      batters.push({
+        playerId,
+        fullName: String(entry?.person?.fullName || "Pelotero"),
+        primaryPosition,
+        batSide,
+        rosterStatus: entry?.status?.description
+          ? String(entry.status.description)
+          : undefined,
+      });
+    }
+
+    return batters;
+  } catch (err) {
+    console.warn(`Fallo obteniendo roster activo MLB para equipo ${teamId}:`, err);
+    return [];
+  }
+}
+
 /**
  * Formatea bateadores del boxscore con cascada resiliente:
  * 1. `boxTeam.batters`

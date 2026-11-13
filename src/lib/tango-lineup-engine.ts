@@ -1,4 +1,8 @@
 import {
+  ActiveRosterBatter,
+  BestAvailableLineupResult,
+  BestLineupConstraintMode,
+  BuildBestAvailableLineupParams,
   TangoPlayer,
   TangoSlotContribution,
   TangoLineupMetrics,
@@ -810,5 +814,564 @@ export function optimizeTangoLineup(currentNine: TangoPlayer[]): TangoOptimizati
     optimizedMetrics,
     deltaRunsPerGame,
     deltaRunsPerSeason,
+  };
+}
+
+export const DEFENSIVE_LINEUP_SLOTS = [
+  "C",
+  "1B",
+  "2B",
+  "3B",
+  "SS",
+  "LF",
+  "CF",
+  "RF",
+  "DH",
+] as const;
+
+const EXCLUDED_POSITIONS = new Set(["P", "1", "PH", "PR", "", "-"]);
+
+function expandPositionToken(token: string): { positions: string[]; recognized: boolean } {
+  const clean = token.trim().toUpperCase();
+  if (!clean || EXCLUDED_POSITIONS.has(clean)) {
+    return { positions: [], recognized: false };
+  }
+
+  switch (clean) {
+    case "2":
+    case "C":
+      return { positions: ["C"], recognized: true };
+    case "3":
+    case "1B":
+      return { positions: ["1B"], recognized: true };
+    case "4":
+    case "2B":
+      return { positions: ["2B"], recognized: true };
+    case "5":
+    case "3B":
+      return { positions: ["3B"], recognized: true };
+    case "6":
+    case "SS":
+      return { positions: ["SS"], recognized: true };
+    case "7":
+    case "LF":
+      return { positions: ["LF"], recognized: true };
+    case "8":
+    case "CF":
+      return { positions: ["CF"], recognized: true };
+    case "9":
+    case "RF":
+      return { positions: ["RF"], recognized: true };
+    case "10":
+    case "D":
+    case "DH":
+      return { positions: ["DH"], recognized: true };
+    case "OF":
+      return { positions: ["LF", "CF", "RF"], recognized: true };
+    case "IF":
+    case "INF":
+      return { positions: ["1B", "2B", "3B", "SS"], recognized: true };
+    case "CI":
+      return { positions: ["1B", "3B"], recognized: true };
+    case "MI":
+      return { positions: ["2B", "SS"], recognized: true };
+    case "UTIL":
+    case "UT":
+    case "TWP":
+      return { positions: ["DH"], recognized: true };
+    default:
+      return { positions: [], recognized: false };
+  }
+}
+
+/**
+ * Normaliza posiciones elegibles de un bateador expandiendo `OF` (`LF/CF/RF`),
+ * `IF` (`1B/2B/3B/SS`) e incluyendo `DH` para todo jugador de posición, excluyendo `P`, `PH` y `PR`.
+ */
+export function normalizeEligiblePositions(rawPositions: string[]): Set<string> {
+  const result = new Set<string>();
+  let hasBatterToken = false;
+
+  for (const raw of rawPositions) {
+    if (!raw) continue;
+    const parts = String(raw).split(/[/,|]/);
+    for (const part of parts) {
+      const { positions, recognized } = expandPositionToken(part);
+      if (recognized) {
+        hasBatterToken = true;
+        for (const pos of positions) {
+          result.add(pos);
+        }
+      }
+    }
+  }
+
+  if (hasBatterToken) {
+    result.add("DH");
+  }
+
+  return result;
+}
+
+function buildSecondaryPositions(strictSet: Set<string>): Set<string> {
+  const secondary = new Set<string>(strictSet);
+  secondary.add("DH");
+
+  if (strictSet.has("LF") || strictSet.has("CF") || strictSet.has("RF")) {
+    secondary.add("LF");
+    secondary.add("CF");
+    secondary.add("RF");
+  }
+  if (strictSet.has("2B") || strictSet.has("SS")) {
+    secondary.add("2B");
+    secondary.add("SS");
+    secondary.add("3B");
+  }
+  if (strictSet.has("3B")) {
+    secondary.add("1B");
+    secondary.add("2B");
+  }
+  if (strictSet.has("C") || strictSet.has("LF") || strictSet.has("RF")) {
+    secondary.add("1B");
+  }
+
+  return secondary;
+}
+
+interface CandidateProfile {
+  batter: ActiveRosterBatter;
+  strictSet: Set<string>;
+  secondarySet: Set<string>;
+  primarySet: Set<string>;
+  ops: number;
+}
+
+function runDefensiveSearch(
+  candidates: CandidateProfile[],
+  mode: "strict" | "secondary" | "emergency"
+): { assignment: number[]; relaxedSlots: string[] } | null {
+  const n = candidates.length;
+  const slots = DEFENSIVE_LINEUP_SLOTS;
+
+  const isEligibleForSlot = (idx: number, slot: string): boolean => {
+    if (mode === "strict") return candidates[idx].strictSet.has(slot);
+    if (mode === "secondary") return candidates[idx].secondarySet.has(slot);
+    return true;
+  };
+
+  // Ordenar slots por menor cantidad de candidatos elegibles (MRV) para podar rápido
+  const slotEntries = slots.map((slot, slotIdx) => {
+    const eligibleIndices: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (isEligibleForSlot(i, slot)) {
+        eligibleIndices.push(i);
+      }
+    }
+    eligibleIndices.sort((a, b) => {
+      const aStrict = candidates[a].strictSet.has(slot) ? 1 : 0;
+      const bStrict = candidates[b].strictSet.has(slot) ? 1 : 0;
+      if (mode !== "strict" && aStrict !== bStrict) return bStrict - aStrict;
+      if (mode === "emergency") {
+        const aSec = candidates[a].secondarySet.has(slot) ? 1 : 0;
+        const bSec = candidates[b].secondarySet.has(slot) ? 1 : 0;
+        if (aSec !== bSec) return bSec - aSec;
+      }
+      const wobaDiff = candidates[b].batter.woba - candidates[a].batter.woba;
+      if (Math.abs(wobaDiff) > 1e-9) return wobaDiff;
+      const aPrimary = candidates[a].primarySet.has(slot) ? 1 : 0;
+      const bPrimary = candidates[b].primarySet.has(slot) ? 1 : 0;
+      if (aPrimary !== bPrimary) return bPrimary - aPrimary;
+      return candidates[b].ops - candidates[a].ops;
+    });
+
+    return { slot, slotIdx, eligibleIndices };
+  });
+
+  if (slotEntries.some((entry) => entry.eligibleIndices.length === 0)) {
+    return null;
+  }
+
+  slotEntries.sort((a, b) => a.eligibleIndices.length - b.eligibleIndices.length);
+
+  const used = new Uint8Array(n);
+  const currentAssignment = new Array<number>(9).fill(-1);
+  let bestAssignment: number[] | null = null;
+  let bestEmergencyCount = Infinity;
+  let bestWoba = -Infinity;
+  let bestNonStrictCount = Infinity;
+  let bestOps = -Infinity;
+  let bestPrimaryMatches = -Infinity;
+  let nodesVisited = 0;
+  const MAX_NODES = 100000;
+
+  const computeUpperBounds = (remainingCount: number): { maxWoba: number; maxOps: number } => {
+    let maxWoba = 0;
+    let maxOps = 0;
+    let taken = 0;
+    for (let i = 0; i < n && taken < remainingCount; i++) {
+      if (!used[i]) {
+        maxWoba += candidates[i].batter.woba;
+        maxOps += candidates[i].ops;
+        taken++;
+      }
+    }
+    return { maxWoba, maxOps };
+  };
+
+  const countMinUncoveredSecondary = (depth: number): number => {
+    if (mode !== "emergency") return 0;
+    let uncovered = 0;
+    for (let d = depth; d < 9; d++) {
+      const slot = slotEntries[d].slot;
+      let hasUnusedSecondary = false;
+      for (let i = 0; i < n; i++) {
+        if (!used[i] && candidates[i].secondarySet.has(slot)) {
+          hasUnusedSecondary = true;
+          break;
+        }
+      }
+      if (!hasUnusedSecondary) uncovered++;
+    }
+    return uncovered;
+  };
+
+  const dfs = (
+    depth: number,
+    wobaSum: number,
+    opsSum: number,
+    nonStrictCount: number,
+    emergencyCount: number,
+    primaryMatches: number
+  ) => {
+    if (nodesVisited >= MAX_NODES) return;
+    nodesVisited++;
+
+    if (depth === 9) {
+      let better = false;
+      if (mode === "emergency" && emergencyCount !== bestEmergencyCount) {
+        better = emergencyCount < bestEmergencyCount;
+      } else if (Math.abs(wobaSum - bestWoba) > 1e-9) {
+        better = wobaSum > bestWoba;
+      } else if (nonStrictCount !== bestNonStrictCount) {
+        better = nonStrictCount < bestNonStrictCount;
+      } else if (Math.abs(opsSum - bestOps) > 1e-9) {
+        better = opsSum > bestOps;
+      } else {
+        better = primaryMatches > bestPrimaryMatches;
+      }
+
+      if (better) {
+        bestEmergencyCount = emergencyCount;
+        bestWoba = wobaSum;
+        bestNonStrictCount = nonStrictCount;
+        bestOps = opsSum;
+        bestPrimaryMatches = primaryMatches;
+        bestAssignment = [...currentAssignment];
+      }
+      return;
+    }
+
+    if (mode === "emergency" && bestAssignment !== null) {
+      const lowerEmergency = emergencyCount + countMinUncoveredSecondary(depth);
+      if (lowerEmergency > bestEmergencyCount) {
+        return;
+      }
+    }
+
+    if (bestAssignment !== null && (mode !== "emergency" || emergencyCount === bestEmergencyCount)) {
+      const { maxWoba } = computeUpperBounds(9 - depth);
+      if (wobaSum + maxWoba < bestWoba - 1e-9) {
+        return;
+      }
+    }
+
+    const { slot, slotIdx, eligibleIndices } = slotEntries[depth];
+    for (const candIdx of eligibleIndices) {
+      if (used[candIdx]) continue;
+      if (nodesVisited >= MAX_NODES) break;
+
+      const cand = candidates[candIdx];
+      const isStrict = cand.strictSet.has(slot);
+      const isSecondary = cand.secondarySet.has(slot);
+      const isPrimary = cand.primarySet.has(slot);
+
+      used[candIdx] = 1;
+      currentAssignment[slotIdx] = candIdx;
+
+      dfs(
+        depth + 1,
+        wobaSum + cand.batter.woba,
+        opsSum + cand.ops,
+        nonStrictCount + (isStrict ? 0 : 1),
+        emergencyCount + (isSecondary ? 0 : 1),
+        primaryMatches + (isPrimary ? 1 : 0)
+      );
+
+      used[candIdx] = 0;
+      currentAssignment[slotIdx] = -1;
+    }
+  };
+
+  dfs(0, 0, 0, 0, 0, 0);
+
+  if (!bestAssignment) return null;
+
+  const finalAssignment: number[] = bestAssignment;
+  const relaxedSlots: string[] = [];
+  for (let sIdx = 0; sIdx < 9; sIdx++) {
+    const slot = slots[sIdx];
+    const candIdx = finalAssignment[sIdx];
+    if (!candidates[candIdx].strictSet.has(slot)) {
+      relaxedSlots.push(slot);
+    }
+  }
+
+  return { assignment: finalAssignment, relaxedSlots };
+}
+
+/**
+ * Selecciona los 9 bateadores que maximizan la suma ofensiva (`wOBA`) cubriendo las
+ * 9 posiciones reglamentarias (`C, 1B, 2B, 3B, SS, LF, CF, RF, DH`) sin repetir jugador.
+ */
+export function selectBestDefensiveNine(pool: ActiveRosterBatter[]): {
+  selected: ActiveRosterBatter[];
+  assignedPositions: Record<number, string>;
+  relaxedNote?: string;
+} {
+  if (pool.length < 9) {
+    return {
+      selected: [],
+      assignedPositions: {},
+      relaxedNote: `Solo hay ${pool.length} bateadores disponibles (se requieren 9 para cubrir las posiciones).`,
+    };
+  }
+
+  const sortedPool = [...pool].sort(
+    (a, b) =>
+      b.woba - a.woba ||
+      b.obp + b.slg - (a.obp + a.slg) ||
+      b.wrcPlus - a.wrcPlus ||
+      b.plateAppearances - a.plateAppearances ||
+      a.playerId - b.playerId
+  );
+
+  const candidates: CandidateProfile[] = sortedPool.map((batter) => {
+    const rawList =
+      batter.eligiblePositions && batter.eligiblePositions.length > 0
+        ? batter.eligiblePositions
+        : [batter.position];
+    const strictSet = normalizeEligiblePositions(rawList);
+    strictSet.add("DH");
+    const primarySet = new Set(expandPositionToken(batter.position).positions);
+    return {
+      batter,
+      strictSet,
+      secondarySet: buildSecondaryPositions(strictSet),
+      primarySet,
+      ops: batter.obp + batter.slg,
+    };
+  });
+
+  const stage1 = runDefensiveSearch(candidates, "strict");
+  if (stage1) {
+    const selected: ActiveRosterBatter[] = [];
+    const assignedPositions: Record<number, string> = {};
+    for (let sIdx = 0; sIdx < 9; sIdx++) {
+      const slot = DEFENSIVE_LINEUP_SLOTS[sIdx];
+      const batter = candidates[stage1.assignment[sIdx]].batter;
+      selected.push(batter);
+      assignedPositions[batter.playerId] = slot;
+    }
+    return { selected, assignedPositions };
+  }
+
+  const stage2a = runDefensiveSearch(candidates, "secondary");
+  if (stage2a) {
+    const selected: ActiveRosterBatter[] = [];
+    const assignedPositions: Record<number, string> = {};
+    for (let sIdx = 0; sIdx < 9; sIdx++) {
+      const slot = DEFENSIVE_LINEUP_SLOTS[sIdx];
+      const batter = candidates[stage2a.assignment[sIdx]].batter;
+      selected.push(batter);
+      assignedPositions[batter.playerId] = slot;
+    }
+    return {
+      selected,
+      assignedPositions,
+      relaxedNote:
+        stage2a.relaxedSlots.length > 0
+          ? `Flexibilidad posicional secundaria aplicada en ${stage2a.relaxedSlots.join(", ")} por falta de cobertura natural suficiente.`
+          : undefined,
+    };
+  }
+
+  const stage2b = runDefensiveSearch(candidates, "emergency");
+  if (stage2b) {
+    const selected: ActiveRosterBatter[] = [];
+    const assignedPositions: Record<number, string> = {};
+    for (let sIdx = 0; sIdx < 9; sIdx++) {
+      const slot = DEFENSIVE_LINEUP_SLOTS[sIdx];
+      const batter = candidates[stage2b.assignment[sIdx]].batter;
+      selected.push(batter);
+      assignedPositions[batter.playerId] = slot;
+    }
+    return {
+      selected,
+      assignedPositions,
+      relaxedNote:
+        stage2b.relaxedSlots.length > 0
+          ? `Cobertura de emergencia aplicada en ${stage2b.relaxedSlots.join(", ")} por ausencia de especialistas disponibles en el roster.`
+          : undefined,
+    };
+  }
+
+  return {
+    selected: [],
+    assignedPositions: {},
+    relaxedNote: "No fue posible conformar una alineación válida de 9 bateadores.",
+  };
+}
+
+function createEmptyMetrics(): TangoLineupMetrics {
+  return {
+    runsPerGame: 0,
+    runsPerSeason: 0,
+    teamWoba: 0,
+    platoonBalanceScore: 0,
+    contributions: [],
+  };
+}
+
+/**
+ * Construye el mejor lineup posible a partir de un pool de roster activo,
+ * aplicando exclusiones manuales, muestra mínima progresiva de PA, restricciones defensivas
+ * (o top-9 bates puros) y comparación contra un lineup de referencia.
+ */
+export function buildBestAvailableLineup(
+  params: BuildBestAvailableLineupParams
+): BestAvailableLineupResult {
+  const modeUsed: BestLineupConstraintMode = params.mode ?? "defensive_valid";
+  const requestedMinPa = Math.max(0, params.minPlateAppearances ?? 10);
+  const excludedSet = new Set(params.excludedPlayerIds ?? []);
+
+  const availablePool = params.pool.filter((p) => !excludedSet.has(p.playerId));
+
+  // Cascada progresiva de PA: [requestedMinPa, 5, 0] deduplicada y descendente
+  const thresholds = Array.from(
+    new Set([requestedMinPa, 5, 0].filter((v) => v <= requestedMinPa))
+  ).sort((a, b) => b - a);
+
+  let effectiveMinPa = thresholds[thresholds.length - 1] ?? 0;
+  let qualifiedPool = availablePool;
+
+  for (const threshold of thresholds) {
+    const filtered = availablePool.filter((p) => p.plateAppearances >= threshold);
+    if (filtered.length >= 9 || threshold === 0) {
+      effectiveMinPa = threshold;
+      qualifiedPool = filtered;
+      break;
+    }
+  }
+
+  const notes: string[] = [];
+  if (effectiveMinPa < requestedMinPa) {
+    notes.push(
+      `Umbral mínimo ajustado de ${requestedMinPa} a ${effectiveMinPa} PA para reunir al menos 9 bateadores disponibles.`
+    );
+  }
+
+  if (qualifiedPool.length < 9) {
+    const refMetrics =
+      params.referenceLineup && params.referenceLineup.length >= 9
+        ? calculateLineupMetrics(params.referenceLineup.slice(0, 9))
+        : createEmptyMetrics();
+    const emptyOpt = createEmptyMetrics();
+    notes.push(
+      `Solo hay ${qualifiedPool.length} bateadores disponibles tras filtros (se requieren 9 para armar el lineup).`
+    );
+    const benchPlayers = [...params.pool].sort(
+      (a, b) => b.woba - a.woba || b.plateAppearances - a.plateAppearances
+    );
+
+    return {
+      optimization: {
+        currentLineup: refMetrics.contributions,
+        optimizedLineup: [],
+        currentMetrics: refMetrics,
+        optimizedMetrics: emptyOpt,
+        deltaRunsPerGame: 0,
+        deltaRunsPerSeason: 0,
+      },
+      assignedPositions: {},
+      benchPlayers,
+      modeUsed,
+      effectiveMinPa,
+      relaxedConstraintNote: notes.join(" "),
+    };
+  }
+
+  let selectedNine: ActiveRosterBatter[];
+  let assignedPositions: Record<number, string> = {};
+
+  if (modeUsed === "pure_bats") {
+    selectedNine = [...qualifiedPool]
+      .sort(
+        (a, b) =>
+          b.woba - a.woba ||
+          b.wrcPlus - a.wrcPlus ||
+          b.obp - a.obp ||
+          b.plateAppearances - a.plateAppearances
+      )
+      .slice(0, 9);
+    for (const batter of selectedNine) {
+      assignedPositions[batter.playerId] = batter.position || "DH";
+    }
+  } else {
+    const defensiveResult = selectBestDefensiveNine(qualifiedPool);
+    selectedNine = defensiveResult.selected;
+    assignedPositions = defensiveResult.assignedPositions;
+    if (defensiveResult.relaxedNote) {
+      notes.push(defensiveResult.relaxedNote);
+    }
+  }
+
+  const selectedWithAssignedPos: ActiveRosterBatter[] = selectedNine.map((player) => ({
+    ...player,
+    position: assignedPositions[player.playerId] || player.position,
+  }));
+
+  const baseOpt = optimizeTangoLineup(selectedWithAssignedPos);
+  let optimization: TangoOptimizationResult = baseOpt;
+
+  if (params.referenceLineup && params.referenceLineup.length >= 9) {
+    const refNine = params.referenceLineup.slice(0, 9);
+    const currentMetrics = calculateLineupMetrics(refNine);
+    const optimizedMetrics = baseOpt.optimizedMetrics;
+    optimization = {
+      currentLineup: currentMetrics.contributions,
+      optimizedLineup: baseOpt.optimizedLineup,
+      currentMetrics,
+      optimizedMetrics,
+      deltaRunsPerGame: Number(
+        (optimizedMetrics.runsPerGame - currentMetrics.runsPerGame).toFixed(2)
+      ),
+      deltaRunsPerSeason: Number(
+        (optimizedMetrics.runsPerSeason - currentMetrics.runsPerSeason).toFixed(1)
+      ),
+    };
+  }
+
+  const selectedIds = new Set(selectedNine.map((p) => p.playerId));
+  const benchPlayers = params.pool
+    .filter((p) => !selectedIds.has(p.playerId))
+    .sort((a, b) => b.woba - a.woba || b.plateAppearances - a.plateAppearances);
+
+  return {
+    optimization,
+    assignedPositions,
+    benchPlayers,
+    modeUsed,
+    effectiveMinPa,
+    relaxedConstraintNote: notes.length > 0 ? notes.join(" ") : undefined,
   };
 }

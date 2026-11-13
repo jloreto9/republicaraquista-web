@@ -1,4 +1,4 @@
-import { TangoPlayer } from "./tango-lineup";
+import { ActiveRosterBatter, TangoPlayer } from "./tango-lineup";
 
 export interface RelieverInheritedStat {
   pitcherId: number;
@@ -199,5 +199,6 @@ export interface BullpenAndLineupsData {
     todayLineupStatus?: TodayLineupStatus;
     requestedLineup?: GameLineup | null;
     playerStatsMap?: Record<number, TangoPlayer>;
+    activeRosterPool?: ActiveRosterBatter[];
   };
 }

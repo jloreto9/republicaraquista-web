@@ -1053,6 +1053,7 @@ export function BullpenView({
               todayLineupStatus={data.lineups.todayLineupStatus}
               requestedLineup={data.lineups.requestedLineup}
               playerStatsMap={data.lineups.playerStatsMap}
+              activeRosterPool={data.lineups.activeRosterPool}
               initialGamePk={initialGamePk}
               teamName={activeTeam.name}
               season={currentSeason}
