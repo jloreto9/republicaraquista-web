@@ -44,8 +44,10 @@ export function middleware(req: NextRequest) {
     });
   }
 
-  // B. Bloqueo de crawlers agresivos y bots no deseados
-  if (userAgent && AGGRESSIVE_BOT_PATTERN.test(userAgent)) {
+  // B. Bloqueo de crawlers agresivos y bots no deseados (excluir rutas legales para verificadores OAuth)
+  const isLegalVerificationPath =
+    pathname === "/privacy" || pathname === "/terms" || pathname === "/privacidad";
+  if (!isLegalVerificationPath && userAgent && AGGRESSIVE_BOT_PATTERN.test(userAgent)) {
     return new NextResponse("Access Denied", {
       status: 403,
       headers: {
