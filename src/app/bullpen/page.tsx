@@ -64,16 +64,18 @@ export default async function BullpenPage({ searchParams }: BullpenPageProps) {
   const resolvedTeamId = initialTeamId ?? 695;
 
   const activeSeason = await getActiveSeason();
+  const season = activeSeason;
+  const isDynamicSeason = season >= activeSeason;
   const [baseData, bullpenBudget, fallbackRequested] = await Promise.all([
-    activeSeason >= 2026
-      ? getDynamicBullpenAndLineups(activeSeason, {
+    isDynamicSeason
+      ? getDynamicBullpenAndLineups(season, {
           targetGamePk: initialGamePk,
           teamId: resolvedTeamId,
         })
-      : Promise.resolve(getBullpenAndLineups(activeSeason, resolvedTeamId)),
-    getBullpenBudget(activeSeason, resolvedTeamId),
-    activeSeason < 2026 && initialGamePk
-      ? getRequestedGameLineupAndStats(initialGamePk, activeSeason, resolvedTeamId)
+      : Promise.resolve(getBullpenAndLineups(season, resolvedTeamId)),
+    getBullpenBudget(season, resolvedTeamId),
+    !isDynamicSeason && initialGamePk
+      ? getRequestedGameLineupAndStats(initialGamePk, season, resolvedTeamId)
       : Promise.resolve(null),
   ]);
 

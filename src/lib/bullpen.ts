@@ -98,12 +98,7 @@ export function getBullpenAndLineups(
   };
 
   try {
-    const data =
-      overrideData &&
-      ((overrideData.bullpen_records && overrideData.bullpen_records.length > 0) ||
-        (overrideData.lineup_records && overrideData.lineup_records.length > 0))
-        ? overrideData
-        : SNAPSHOTS[season];
+    const data = overrideData !== undefined ? overrideData : SNAPSHOTS[season];
     if (!data) {
       console.warn(`Snapshot no disponible para temporada ${season}`);
       return emptyResult;
@@ -135,25 +130,28 @@ export function getBullpenAndLineups(
     bpRecords.forEach((b: RawBullpenRecord) => {
       const pName = b.pitcher_name || "Desconocido";
       const pId = Number(b.pitcher_id || 0);
-      const ir = Number(b.inherited_runners || 0);
-      const irs = Number(b.inherited_scored || 0);
+      const ir = Math.max(0, Number(b.inherited_runners || 0) || 0);
+      const irs = Math.max(0, Number(b.inherited_scored || 0) || 0);
+      const mapKey = pId > 0 ? `id:${pId}` : `name:${pName}`;
 
       totalIr += ir;
       totalIrs += irs;
 
-      if (!pitcherMap[pName]) {
-        pitcherMap[pName] = {
+      if (!pitcherMap[mapKey]) {
+        pitcherMap[mapKey] = {
           pitcherId: pId,
           pitcherName: pName,
           appearances: 0,
           ir: 0,
           irs: 0,
         };
+      } else if (pName !== "Desconocido" && pitcherMap[mapKey].pitcherName === "Desconocido") {
+        pitcherMap[mapKey].pitcherName = pName;
       }
 
-      pitcherMap[pName].appearances += 1;
-      pitcherMap[pName].ir += ir;
-      pitcherMap[pName].irs += irs;
+      pitcherMap[mapKey].appearances += 1;
+      pitcherMap[mapKey].ir += ir;
+      pitcherMap[mapKey].irs += irs;
     });
 
     const relievers: RelieverInheritedStat[] = Object.values(pitcherMap).map((p) => {
@@ -169,12 +167,20 @@ export function getBullpenAndLineups(
       };
     });
 
-    // Ordenar relevistas por IR descendente, luego por mejor IRS%
-    relievers.sort((a, b) => b.ir - a.ir || a.irsPctNum - b.irsPctNum);
+    // Ordenar relevistas por IR descendente, luego por mejor ratio exacto IRS/IR
+    relievers.sort(
+      (a, b) =>
+        b.ir - a.ir ||
+        (a.ir > 0 ? a.irs / a.ir : 1) - (b.ir > 0 ? b.irs / b.ir : 1)
+    );
 
-    // Mejor relevista apagafuegos con mín. 5 IR
+    // Mejor relevista apagafuegos con mín. 5 IR (ordenado por ratio exacto IRS/IR)
     const qualifiedRelievers = relievers.filter((r) => r.ir >= 5);
-    qualifiedRelievers.sort((a, b) => a.irsPctNum - b.irsPctNum || b.ir - a.ir);
+    qualifiedRelievers.sort(
+      (a, b) =>
+        (a.ir > 0 ? a.irs / a.ir : 1) - (b.ir > 0 ? b.irs / b.ir : 1) ||
+        b.ir - a.ir
+    );
 
     const bestRelieverObj = qualifiedRelievers[0];
     const bestReliever = bestRelieverObj ? bestRelieverObj.pitcherName : "N/A";
@@ -185,16 +191,22 @@ export function getBullpenAndLineups(
     const overallIrsPct =
       totalIr > 0 ? `${((totalIrs / totalIr) * 100).toFixed(1)}%` : "0.0%";
 
-    // Logs detallados
-    const logs: InheritedLog[] = bpRecords.slice(0, 50).map((b: RawBullpenRecord) => ({
-      gamePk: Number(b.game_pk || b.game_id || 0),
-      gameDate: String(b.game_date || ""),
-      opp: String(b.opposing_team || "Rival"),
-      inning: Number(b.inning || 1),
-      pitcher: String(b.pitcher_name || "Desconocido"),
-      ir: Number(b.inherited_runners || 0),
-      irs: Number(b.inherited_scored || 0),
-    }));
+    // Logs detallados (solo relevos con corredores heredados; hasta 150 salidas por temporada)
+    const logs: InheritedLog[] = bpRecords
+      .filter(
+        (b: RawBullpenRecord) =>
+          Number(b.inherited_runners || 0) > 0 || Number(b.inherited_scored || 0) > 0
+      )
+      .slice(0, 150)
+      .map((b: RawBullpenRecord) => ({
+        gamePk: Number(b.game_pk || b.game_id || 0),
+        gameDate: String(b.game_date || ""),
+        opp: String(b.opposing_team || "Rival"),
+        inning: Math.max(1, Number(b.inning || 1)),
+        pitcher: String(b.pitcher_name || "Desconocido"),
+        ir: Math.max(0, Number(b.inherited_runners || 0) || 0),
+        irs: Math.max(0, Number(b.inherited_scored || 0) || 0),
+      }));
 
     // ── 2. PROCESAR LINEUPS ──
     const gameLineups: GameLineup[] = [];

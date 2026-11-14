@@ -57,7 +57,7 @@ export function BullpenView({
 }: BullpenViewProps) {
   const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
   const [data, setData] = useState<BullpenAndLineupsData>(initialData);
-  const [currentSeason, setCurrentSeason] = useState<number>(globalSeason || season);
+  const [currentSeason, setCurrentSeason] = useState<number>(season);
   const [currentTeamId, setCurrentTeamId] = useState<number>(initialTeamId);
   const [loading, setLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"bullpen" | "budget" | "lineups">(initialTab);
@@ -133,6 +133,7 @@ export function BullpenView({
 
   useEffect(() => {
     if (
+      (!globalSeason || globalSeason === currentSeason) &&
       currentSeason >= 2026 &&
       data.lineups.gameLineups.length <= 1 &&
       !data.lineups.todayLineup &&
@@ -141,6 +142,15 @@ export function BullpenView({
       handleSeasonOrTeamChange(currentSeason, currentTeamId, initialGamePk);
     }
   }, []);
+
+  const irRelievers = useMemo(
+    () => data.bullpen.relievers.filter((r) => r.ir > 0),
+    [data.bullpen.relievers]
+  );
+  const maxIr = useMemo(
+    () => Math.max(...irRelievers.map((x) => x.ir), 1),
+    [irRelievers]
+  );
 
   const selectedPlayerImpact = useMemo(() => {
     const defaultPlayer = data.lineups.availablePlayers[0] || "";
@@ -348,51 +358,66 @@ export function BullpenView({
                   </h3>
                 </div>
 
-                <div className="space-y-3 pt-1">
-                  {data.bullpen.relievers.slice(0, 10).map((r) => {
-                    const maxIr = Math.max(...data.bullpen.relievers.map((x) => x.ir), 1);
-                    const irWidth = Math.max(10, (r.ir / maxIr) * 100);
-                    const irsWidth = r.ir > 0 ? (r.irs / r.ir) * irWidth : 0;
+                {irRelievers.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400">
+                    Ningún relevista ha heredado corredores en base (IR &gt; 0) en esta temporada.
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-3 pt-1">
+                      {irRelievers.slice(0, 10).map((r) => {
+                        const irWidth = r.ir > 0 ? Math.max(10, (r.ir / maxIr) * 100) : 0;
+                        const irsWidth =
+                          r.ir > 0 ? Math.min(irWidth, (r.irs / r.ir) * irWidth) : 0;
 
-                    return (
-                      <div key={r.pitcherName} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-slate-200">{r.pitcherName}</span>
-                          <div className="flex items-center space-x-2 font-mono text-[11px]">
-                            <span className="text-[#38BDF8]">{r.ir} IR</span>
-                            <span>/</span>
-                            <span className="text-rose-400">{r.irs} IRS</span>
-                            <span className="text-[#FDB827] font-bold">({r.irsPct})</span>
+                        return (
+                          <div
+                            key={
+                              r.pitcherId
+                                ? `chart-${r.pitcherId}`
+                                : `chart-${r.pitcherName}`
+                            }
+                            className="space-y-1"
+                          >
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-semibold text-slate-200">{r.pitcherName}</span>
+                              <div className="flex items-center space-x-2 font-mono text-[11px]">
+                                <span className="text-[#38BDF8]">{r.ir} IR</span>
+                                <span>/</span>
+                                <span className="text-rose-400">{r.irs} IRS</span>
+                                <span className="text-[#FDB827] font-bold">({r.irsPct})</span>
+                              </div>
+                            </div>
+
+                            <div className="relative w-full bg-[#070B19] h-3 rounded-full overflow-hidden border border-white/5">
+                              {/* Barra Total IR */}
+                              <div
+                                className="absolute top-0 left-0 h-full bg-[#38BDF8]/60 rounded-full"
+                                style={{ width: `${irWidth}%` }}
+                              />
+                              {/* Barra IRS (anotados) */}
+                              <div
+                                className="absolute top-0 left-0 h-full bg-rose-500 rounded-full"
+                                style={{ width: `${irsWidth}%` }}
+                              />
+                            </div>
                           </div>
-                        </div>
+                        );
+                      })}
+                    </div>
 
-                        <div className="relative w-full bg-[#070B19] h-3 rounded-full overflow-hidden border border-white/5">
-                          {/* Barra Total IR */}
-                          <div
-                            className="absolute top-0 left-0 h-full bg-[#38BDF8]/60 rounded-full"
-                            style={{ width: `${irWidth}%` }}
-                          />
-                          {/* Barra IRS (anotados) */}
-                          <div
-                            className="absolute top-0 left-0 h-full bg-rose-500 rounded-full"
-                            style={{ width: `${irsWidth}%` }}
-                          />
-                        </div>
+                    <div className="flex items-center justify-end space-x-4 pt-2 text-[10px] font-mono text-slate-400">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#38BDF8]" />
+                        <span>Corredores Heredados (IR)</span>
                       </div>
-                    );
-                  })}
-                </div>
-
-                <div className="flex items-center justify-end space-x-4 pt-2 text-[10px] font-mono text-slate-400">
-                  <div className="flex items-center space-x-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#38BDF8]" />
-                    <span>Corredores Heredados (IR)</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                    <span>Anotaron (IRS)</span>
-                  </div>
-                </div>
+                      <div className="flex items-center space-x-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                        <span>Anotaron (IRS)</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Tabla por Relevista */}
@@ -409,7 +434,12 @@ export function BullpenView({
                     <thead className="sticky top-0 bg-[#0D152B] z-10 border-b border-[#1E2B4D] text-slate-400 text-[11px]">
                       <tr>
                         <th className="py-2 px-3">Lanzador Relevista</th>
-                        <th className="py-2 px-2 text-center">Juegos</th>
+                        <th
+                          className="py-2 px-2 text-center"
+                          title="Relevos donde ingresó con corredores heredados en base"
+                        >
+                          Salidas c/ IR
+                        </th>
                         <th className="py-2 px-2 text-center text-[#38BDF8] font-bold">Total IR</th>
                         <th className="py-2 px-2 text-center text-rose-400 font-bold">Total IRS</th>
                         <th className="py-2 px-3 text-right text-[#FDB827] font-bold">% IRS</th>
@@ -417,10 +447,17 @@ export function BullpenView({
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {data.bullpen.relievers.map((r) => (
-                        <tr key={r.pitcherName} className="hover:bg-white/[0.02]">
+                        <tr
+                          key={r.pitcherId ? `row-${r.pitcherId}` : `row-${r.pitcherName}`}
+                          className="hover:bg-white/[0.02]"
+                        >
                           <td className="py-2.5 px-3 font-semibold text-slate-100 truncate">
                             <Link
-                              href="/pitching"
+                              href={
+                                r.pitcherId
+                                  ? `/pitching?playerId=${r.pitcherId}`
+                                  : "/pitching"
+                              }
                               title={`Ver Pitching Summary de ${r.pitcherName}`}
                               className="hover:underline hover:text-[#FDB827] inline-flex items-center gap-1 group"
                             >
@@ -443,14 +480,16 @@ export function BullpenView({
                             <span
                               className={cn(
                                 "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                r.irsPctNum <= 20
+                                r.ir === 0
+                                  ? "bg-slate-500/10 text-slate-400 border-slate-500/30"
+                                  : r.irsPctNum <= 20
                                   ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                                   : r.irsPctNum > 20 && r.irsPctNum <= 40
                                   ? "bg-amber-500/10 text-[#FDB827] border-amber-500/30"
                                   : "bg-rose-500/10 text-rose-400 border-rose-500/30"
                               )}
                             >
-                              {r.irsPct}
+                              {r.ir === 0 ? "—" : r.irsPct}
                             </span>
                           </td>
                         </tr>
@@ -492,7 +531,10 @@ export function BullpenView({
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {data.bullpen.logs.map((log, idx) => (
-                      <tr key={`log-${idx}`} className="hover:bg-white/[0.02]">
+                      <tr
+                        key={`log-${log.gamePk}-${log.pitcher}-${log.inning}-${idx}`}
+                        className="hover:bg-white/[0.02]"
+                      >
                         <td className="py-2 px-3 text-slate-400 font-mono text-[11px]">
                           {log.gameDate}
                         </td>

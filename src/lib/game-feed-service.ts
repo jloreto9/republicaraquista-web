@@ -83,9 +83,12 @@ function formatSpanishDate(isoDate?: string): string {
 }
 
 /**
- * Consulta en Supabase todos los juegos jugados o en curso de Leones en la temporada dada.
+ * Consulta en Supabase todos los juegos jugados o en curso de un equipo en la temporada dada.
  */
-export async function getLeonesPlayedGames(season = 2026): Promise<GameOption[]> {
+export async function getTeamPlayedGames(
+  season = 2026,
+  teamId = LEONES_TEAM_ID
+): Promise<GameOption[]> {
   if (!supabase) return [];
 
   try {
@@ -93,28 +96,28 @@ export async function getLeonesPlayedGames(season = 2026): Promise<GameOption[]>
       .from("games")
       .select("id, game_date, season, game_type, status, home_team_id, away_team_id, home_score, away_score")
       .eq("season", season)
-      .or("home_team_id.eq.695,away_team_id.eq.695")
+      .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
       .in("status", ["Final", "Completed", "Completed Early", "Game Over", "Live", "In Progress"])
       .order("game_date", { ascending: false });
 
     if (error || !rawGames) {
-      console.error("Error al consultar juegos jugados de Leones:", error);
+      console.error(`Error al consultar juegos jugados del equipo ${teamId}:`, error);
       return [];
     }
 
     const games = (rawGames as unknown as SupabaseGameRow[]).map((g, idx, arr) => {
-      const isHome = Number(g.home_team_id) === LEONES_TEAM_ID;
+      const isHome = Number(g.home_team_id) === teamId;
       const oppId = isHome ? Number(g.away_team_id) : Number(g.home_team_id);
       const oppTeam = getTeam(oppId);
-      const caracasScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
+      const teamScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
       const oppScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
-      const won = caracasScore > oppScore;
+      const won = teamScore > oppScore;
 
       return {
         id: Number(g.id),
         date: formatSpanishDate(g.game_date),
         opponent: isHome ? `vs ${oppTeam.name}` : `@ ${oppTeam.name}`,
-        score: `${caracasScore}-${oppScore}`,
+        score: `${teamScore}-${oppScore}`,
         result: (won ? "W" : "L") as "W" | "L",
         gameNumber: arr.length - idx,
       };
@@ -122,9 +125,16 @@ export async function getLeonesPlayedGames(season = 2026): Promise<GameOption[]>
 
     return games;
   } catch (err) {
-    console.error("Fallo obteniendo juegos jugados de Leones:", err);
+    console.error(`Fallo obteniendo juegos jugados del equipo ${teamId}:`, err);
     return [];
   }
+}
+
+/**
+ * Consulta en Supabase todos los juegos jugados o en curso de Leones en la temporada dada.
+ */
+export async function getLeonesPlayedGames(season = 2026): Promise<GameOption[]> {
+  return getTeamPlayedGames(season, LEONES_TEAM_ID);
 }
 
 /**
@@ -160,11 +170,11 @@ export async function fetchGameLiveFeed(gamePk: number): Promise<any | null> {
 }
 
 /**
- * Descarga en paralelo los feeds de todos los juegos disputados por Leones en la temporada.
+ * Descarga en paralelo los feeds de todos los juegos disputados por un equipo en la temporada.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getSeasonLiveFeeds(season = 2026): Promise<any[]> {
-  const games = await getLeonesPlayedGames(season);
+export async function getSeasonLiveFeeds(season = 2026, teamId = LEONES_TEAM_ID): Promise<any[]> {
+  const games = await getTeamPlayedGames(season, teamId);
   if (!games.length) return [];
 
   const feeds = await Promise.all(
@@ -930,15 +940,48 @@ export async function getRequestedGameLineupAndStats(
   return { requestedLineup, playerStatsMap };
 }
 
+/**
+ * Extrae el inning de entrada real de cada lanzador desde `liveData.plays.allPlays`
+ * escaneando los medios innings defensivos del equipo objetivo.
+ */
+export function extractRelieverEntryInnings(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  feed: any,
+  targetTeamId: number
+): Map<number, number> {
+  const entryInnings = new Map<number, number>();
+  const homeId = Number(feed?.gameData?.teams?.home?.id || 0);
+  const awayId = Number(feed?.gameData?.teams?.away?.id || 0);
+  if (targetTeamId !== homeId && targetTeamId !== awayId) {
+    return entryInnings;
+  }
+
+  const defensiveHalf = targetTeamId === homeId ? "top" : "bottom";
+  const plays = feed?.liveData?.plays?.allPlays;
+  if (!Array.isArray(plays)) return entryInnings;
+
+  for (const play of plays) {
+    if (play?.about?.halfInning !== defensiveHalf) continue;
+    const pitcherId = Number(play?.matchup?.pitcher?.id || 0);
+    const inning = Number(play?.about?.inning || 0);
+    if (pitcherId > 0 && inning > 0 && !entryInnings.has(pitcherId)) {
+      entryInnings.set(pitcherId, inning);
+    }
+  }
+
+  return entryInnings;
+}
+
 export async function getDynamicBullpenAndLineups(
   season = 2026,
   options?: { targetGamePk?: number; teamId?: number }
 ): Promise<BullpenAndLineupsData> {
   const targetTeamId = options?.teamId || LEONES_TEAM_ID;
   const targetGamePk = options?.targetGamePk;
+  const targetTeamInfo = getTeam(targetTeamId);
 
   const [feeds, availableGames, supabaseStats, activeRoster] = await Promise.all([
-    getSeasonLiveFeeds(season),
+    getSeasonLiveFeeds(season, targetTeamId),
     getCaracasAvailableGames(season),
     getBattingStats(season, "R", "all", 400, 0).catch(() => [] as BattingStats[]),
     fetchTeamActiveRosterBatters(targetTeamId, season).catch(() => [] as ActiveRosterMlbBatter[]),
@@ -952,43 +995,58 @@ export async function getDynamicBullpenAndLineups(
   for (const feed of feeds) {
     const gamePk = feed?.gamePk || feed?.gameData?.game?.pk;
     const gameDate = feed?.gameData?.datetime?.officialDate || feed?.gameData?.datetime?.originalDate || "";
-    const isHome = feed?.gameData?.teams?.home?.id === LEONES_TEAM_ID;
+    const homeId = Number(feed?.gameData?.teams?.home?.id || 0);
+    const awayId = Number(feed?.gameData?.teams?.away?.id || 0);
+    if (targetTeamId !== homeId && targetTeamId !== awayId) continue;
+
+    const isHome = homeId === targetTeamId;
     const oppTeamObj = isHome ? feed?.gameData?.teams?.away : feed?.gameData?.teams?.home;
-    const oppTeamName = oppTeamObj?.name || "Rival";
-    const oppTeamId = oppTeamObj?.id || 0;
+    const oppTeamId = Number(oppTeamObj?.id || 0);
+    const oppInfo = getTeam(oppTeamId);
+    const oppTeamName = oppTeamObj?.name || (oppTeamId > 0 ? oppInfo.name : "Rival");
+    const oppTeamAbbr = oppTeamObj?.abbreviation || (oppTeamId > 0 ? oppInfo.abbreviation : "RIV");
 
     const box = feed?.liveData?.boxscore;
     const teamBox = isHome ? box?.teams?.home : box?.teams?.away;
     const oppBox = isHome ? box?.teams?.away : box?.teams?.home;
 
-    const leonesScore = teamBox?.teamStats?.batting?.runs ?? 0;
-    const oppScore = oppBox?.teamStats?.batting?.runs ?? 0;
-    const leonesWon = leonesScore > oppScore;
+    const teamScore = Number(
+      teamBox?.teamStats?.batting?.runs ??
+        feed?.liveData?.linescore?.teams?.[isHome ? "home" : "away"]?.runs ??
+        0
+    );
+    const oppScore = Number(
+      oppBox?.teamStats?.batting?.runs ??
+        feed?.liveData?.linescore?.teams?.[isHome ? "away" : "home"]?.runs ??
+        0
+    );
+    const teamWon = teamScore > oppScore;
 
     // 1. Extraer Bullpen (Relevistas con IR / IRS)
-    const pitchersList = teamBox?.pitchers || [];
+    const pitchersList: number[] = Array.isArray(teamBox?.pitchers) ? teamBox.pitchers : [];
     const playersDict = teamBox?.players || {};
+    const entryInnings = extractRelieverEntryInnings(feed, targetTeamId);
 
     pitchersList.forEach((pId: number) => {
       const pData = playersDict[`ID${pId}`];
       const stats = pData?.stats?.pitching;
       if (!stats) return;
 
-      const isStarter = stats.gamesStarted > 0;
-      const ir = stats.inheritedRunners ?? 0;
-      const irs = stats.inheritedRunnersScored ?? 0;
+      const isStarter = pitchersList[0] === pId || Number(stats.gamesStarted ?? 0) > 0;
+      const ir = Math.max(0, Number(stats.inheritedRunners ?? 0) || 0);
+      const irs = Math.max(0, Number(stats.inheritedRunnersScored ?? 0) || 0);
 
-      // Registrar relevistas que hayan heredado corredores o lanzado como relevo
-      if (!isStarter && (ir > 0 || stats.gamesPitched > 0)) {
+      // Registrar únicamente relevistas con corredores heredados (paridad con snapshots históricos)
+      if (!isStarter && (ir > 0 || irs > 0)) {
         bpRecords.push({
-          team_id: LEONES_TEAM_ID,
+          team_id: targetTeamId,
           game_pk: gamePk,
           game_id: gamePk,
           game_date: gameDate,
           opposing_team: oppTeamName,
           pitcher_id: pId,
           pitcher_name: pData?.person?.fullName || "Relevista",
-          inning: 0,
+          inning: entryInnings.get(pId) ?? 1,
           inherited_runners: ir,
           inherited_scored: irs,
         });
@@ -1009,34 +1067,40 @@ export async function getDynamicBullpenAndLineups(
       });
 
       luRecords.push({
-        team_id: LEONES_TEAM_ID,
+        team_id: targetTeamId,
         game_pk: gamePk,
         game_id: gamePk,
         season,
         game_date: gameDate,
         opponent_id: oppTeamId,
-        home_team: isHome ? "Leones del Caracas" : oppTeamName,
-        away_team: isHome ? oppTeamName : "Leones del Caracas",
+        home_team: isHome ? targetTeamInfo.name : oppTeamName,
+        away_team: isHome ? oppTeamName : targetTeamInfo.name,
         opposing_team: oppTeamName,
         is_home: isHome,
-        leones_score: leonesScore,
+        leones_score: teamScore,
         opposing_score: oppScore,
-        leones_won: leonesWon,
-        score_str: `${leonesScore}-${oppScore}`,
+        leones_won: teamWon,
+        score_str: `${teamScore}-${oppScore}`,
         full_score_str: isHome
-          ? `CAR ${leonesScore} - ${oppScore} ${oppTeamObj?.abbreviation || "RIV"}`
-          : `${oppTeamObj?.abbreviation || "RIV"} ${oppScore} - ${leonesScore} CAR`,
+          ? `${targetTeamInfo.abbreviation} ${teamScore} - ${oppScore} ${oppTeamAbbr}`
+          : `${oppTeamAbbr} ${oppScore} - ${teamScore} ${targetTeamInfo.abbreviation}`,
         starters,
       });
     }
   }
 
-  const baseData = feeds.length
-    ? getBullpenAndLineups(season, LEONES_TEAM_ID, {
-        bullpen_records: bpRecords,
-        lineup_records: luRecords,
-      })
-    : getBullpenAndLineups(season, LEONES_TEAM_ID);
+  const baseData =
+    feeds.length > 0
+      ? getBullpenAndLineups(season, targetTeamId, {
+          bullpen_records: bpRecords,
+          lineup_records: luRecords,
+        })
+      : season >= 2026
+      ? getBullpenAndLineups(season, targetTeamId, {
+          bullpen_records: [],
+          lineup_records: [],
+        })
+      : getBullpenAndLineups(season, targetTeamId);
 
   const { todayLineup, todayLineupStatus, requestedLineup, allFeeds } =
     await resolveTodayAndRequestedLineups(

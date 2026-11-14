@@ -556,10 +556,10 @@ async function runTests() {
       const firstTodayId = data.lineups.todayLineup.starters[0].playerId;
       assert.equal(data.lineups.playerStatsMap?.[firstTodayId]?.statsSource, "mlb");
 
-      // Verificar que juego Pre-Game de hoy no contamina KPIs históricos ni gameLineups
-      const baseline = getBullpenAndLineups(2026, 695);
-      assert.equal(data.lineups.kpis.totalGames, baseline.lineups.kpis.totalGames);
-      assert.equal(data.lineups.gameLineups.length, baseline.lineups.gameLineups.length);
+      // Verificar que juego Pre-Game de hoy no contamina KPIs históricos ni gameLineups,
+      // y que feeds.length === 0 en season >= 2026 no filtra el snapshot obsoleto de Leones (695)
+      assert.equal(data.lineups.kpis.totalGames, 0);
+      assert.equal(data.lineups.gameLineups.length, 0);
     });
 
     await checkAsync("4b. getDynamicBullpenAndLineups cuando juego de hoy está Scheduled sin lineup publicado", async () => {
