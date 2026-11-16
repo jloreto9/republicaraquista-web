@@ -7,7 +7,7 @@ import {
   getPlayerHeadshotUrl,
 } from "./constants";
 import { isDayGame } from "./utils";
-import { TeamStanding, GameSummary, SeasonKPIs, BattingStats, PitchingStats } from "@/types/sports";
+import { TeamStanding, GameSummary, SeasonKPIs, BattingStats, PitchingStats, FieldingStats } from "@/types/sports";
 
 export interface SupabaseGameRow {
   id: number;
@@ -1432,7 +1432,7 @@ interface MlbSeasonPitchingMeta {
 async function fetchMlbSeasonStatsSplits(
   season: number,
   phase: string,
-  group: "hitting" | "pitching"
+  group: "hitting" | "pitching" | "fielding"
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any[]> {
   try {
@@ -1952,4 +1952,191 @@ export async function getTeamGamesMap(
   });
   const maxGames = Math.max(...standings.map((s) => s.gamesPlayed), 0);
   return { teamGamesMap, teamWinPctMap, maxGames };
+}
+
+const NON_DEFENSIVE_POSITIONS = new Set(["DH", "PH", "PR"]);
+
+/**
+ * Convierte innings en notación de béisbol ("9.2") a valor decimal exacto (9.6667).
+ */
+export function parseBaseballInningsToDecimal(inn?: string | number | null): number {
+  if (inn === null || inn === undefined) return 0;
+  const raw = String(inn).trim();
+  if (!raw) return 0;
+  const [wholeStr, fracStr = "0"] = raw.split(".");
+  const whole = parseInt(wholeStr, 10);
+  const partialOuts = parseInt(fracStr[0] || "0", 10);
+  if (!Number.isFinite(whole) || whole < 0) return 0;
+  const safeOuts = Number.isFinite(partialOuts) && partialOuts >= 0 ? Math.min(partialOuts, 2) : 0;
+  return whole + safeOuts / 3;
+}
+
+/**
+ * Convierte innings decimales a notación estándar de béisbol ("15.0", "15.1", "15.2").
+ */
+export function formatDecimalToBaseballInnings(ipDecimal: number): string {
+  if (!Number.isFinite(ipDecimal) || ipDecimal <= 0) return "0.0";
+  const totalOuts = Math.round(ipDecimal * 3);
+  const whole = Math.floor(totalOuts / 3);
+  const rem = totalOuts % 3;
+  return `${whole}.${rem}`;
+}
+
+/**
+ * Obtiene estadísticas individuales de fildeo desde MLB Stats API por temporada, fase y equipo.
+ */
+export async function getFieldingStats(
+  season = ACTIVE_SEASON,
+  phase = "R",
+  teamId: string | number = "all",
+  limit = 1000,
+  minChances = 0
+): Promise<FieldingStats[]> {
+  const normalized = normalizePhase(phase);
+  const splits =
+    normalized === "all"
+      ? (
+          await Promise.all([
+            fetchMlbSeasonStatsSplits(season, "R", "fielding"),
+            fetchMlbSeasonStatsSplits(season, "L", "fielding"),
+            fetchMlbSeasonStatsSplits(season, "F", "fielding"),
+          ])
+        ).flat()
+      : await fetchMlbSeasonStatsSplits(season, phase, "fielding");
+
+  if (!splits.length) return [];
+
+  const hasTeamFilter = teamId !== undefined && teamId !== null && teamId !== "all";
+  const targetTeamId = hasTeamFilter ? Number(teamId) : null;
+
+  const grouped = new Map<
+    string,
+    {
+      playerId: number;
+      playerName: string;
+      teamId: number;
+      position: string;
+      games: number;
+      gamesStarted: number;
+      outs: number;
+      putouts: number;
+      assists: number;
+      errors: number;
+      doublePlays: number;
+      triplePlays: number;
+      caughtStealing: number;
+      stolenBases: number;
+      passedBalls: number;
+      fallbackRf9: number;
+    }
+  >();
+
+  for (const s of splits) {
+    const pId = Number(s?.player?.id || 0);
+    const tId = Number(s?.team?.id || 0);
+    if (!pId || !LVBP_TEAM_IDS.includes(tId)) continue;
+    if (targetTeamId !== null && tId !== targetTeamId) continue;
+
+    const posAbbr = String(s?.position?.abbreviation || "UT").trim().toUpperCase();
+    if (NON_DEFENSIVE_POSITIONS.has(posAbbr)) continue;
+
+    const st = s?.stat || {};
+    const games = Number(st.gamesPlayed ?? st.games ?? 0);
+    const putouts = Number(st.putOuts ?? 0);
+    const assists = Number(st.assists ?? 0);
+    const errors = Number(st.errors ?? 0);
+    const chances = Number(st.chances ?? putouts + assists + errors);
+
+    if (games === 0 && chances === 0) continue;
+
+    const key = `${pId}-${tId}-${posAbbr}`;
+    const outs = Math.round(parseBaseballInningsToDecimal(st.innings) * 3);
+
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, {
+        playerId: pId,
+        playerName: String(s?.player?.fullName || "Desconocido"),
+        teamId: tId,
+        position: posAbbr,
+        games,
+        gamesStarted: Number(st.gamesStarted ?? 0),
+        outs,
+        putouts,
+        assists,
+        errors,
+        doublePlays: Number(st.doublePlays ?? 0),
+        triplePlays: Number(st.triplePlays ?? 0),
+        caughtStealing: Number(st.caughtStealing ?? 0),
+        stolenBases: Number(st.stolenBases ?? 0),
+        passedBalls: Number(st.passedBall ?? 0),
+        fallbackRf9: Number(st.rangeFactorPer9Inn ?? 0),
+      });
+    } else {
+      existing.games += games;
+      existing.gamesStarted += Number(st.gamesStarted ?? 0);
+      existing.outs += outs;
+      existing.putouts += putouts;
+      existing.assists += assists;
+      existing.errors += errors;
+      existing.doublePlays += Number(st.doublePlays ?? 0);
+      existing.triplePlays += Number(st.triplePlays ?? 0);
+      existing.caughtStealing += Number(st.caughtStealing ?? 0);
+      existing.stolenBases += Number(st.stolenBases ?? 0);
+      existing.passedBalls += Number(st.passedBall ?? 0);
+    }
+  }
+
+  const results: FieldingStats[] = Array.from(grouped.values()).map((f) => {
+    const team = getTeam(f.teamId);
+    const totalChances = f.putouts + f.assists + f.errors;
+    const inningsDecimal = f.outs / 3;
+    const innings = formatDecimalToBaseballInnings(inningsDecimal);
+    const fieldingPct =
+      totalChances > 0 ? Number(((f.putouts + f.assists) / totalChances).toFixed(3)) : 0.0;
+    const rangeFactorPer9 =
+      inningsDecimal > 0
+        ? Number((((f.putouts + f.assists) * 9) / inningsDecimal).toFixed(2))
+        : Number((Number.isFinite(f.fallbackRf9) ? f.fallbackRf9 : 0).toFixed(2));
+    const sbAttempts = f.caughtStealing + f.stolenBases;
+    const caughtStealingPct =
+      sbAttempts > 0 ? Number((f.caughtStealing / sbAttempts).toFixed(3)) : 0.0;
+
+    return {
+      playerId: f.playerId,
+      playerName: f.playerName,
+      playerAvatar: getPlayerHeadshotUrl(f.playerId),
+      teamId: team.id,
+      teamName: team.name,
+      teamAbbr: team.abbreviation,
+      teamLogo: team.logoUrl,
+      position: f.position,
+      games: f.games,
+      gamesStarted: f.gamesStarted,
+      innings,
+      inningsDecimal: Number(inningsDecimal.toFixed(2)),
+      putouts: f.putouts,
+      assists: f.assists,
+      errors: f.errors,
+      totalChances,
+      fieldingPct,
+      doublePlays: f.doublePlays,
+      triplePlays: f.triplePlays,
+      rangeFactorPer9,
+      caughtStealing: f.caughtStealing,
+      stolenBases: f.stolenBases,
+      caughtStealingPct,
+      passedBalls: f.passedBalls,
+    };
+  });
+
+  const qualified =
+    minChances > 0 ? results.filter((f) => f.totalChances >= minChances) : results;
+  qualified.sort(
+    (a, b) =>
+      b.totalChances - a.totalChances ||
+      b.fieldingPct - a.fieldingPct ||
+      b.games - a.games
+  );
+  return limit ? qualified.slice(0, limit) : qualified;
 }

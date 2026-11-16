@@ -1,14 +1,14 @@
 import { Suspense } from "react";
 import { Header } from "@/components/layout/header";
 import { IndividualesView } from "@/components/stats/individuales-view";
-import { getBattingStats, getPitchingStats, getTeamGamesMap } from "@/lib/supabase";
+import { getBattingStats, getPitchingStats, getFieldingStats, getTeamGamesMap } from "@/lib/supabase";
 import { getActiveSeason } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Líderes Individuales | República Caraquista",
-  description: "Estadísticas individuales de bateo y pitcheo de la LVBP y Leones del Caracas.",
+  description: "Estadísticas individuales de bateo, pitcheo y fildeo de la LVBP y Leones del Caracas.",
 };
 
 export default async function IndividualesPage() {
@@ -16,10 +16,12 @@ export default async function IndividualesPage() {
   const [
     initialBattingStats,
     initialPitchingStats,
+    initialFieldingStats,
     { teamGamesMap, teamWinPctMap, maxGames },
   ] = await Promise.all([
     getBattingStats(activeSeason, "R", "all", 500, 0),
     getPitchingStats(activeSeason, "R", "all", 500, 0.0),
+    getFieldingStats(activeSeason, "R", "all", 1000, 0),
     getTeamGamesMap(activeSeason, "R"),
   ]);
 
@@ -42,6 +44,7 @@ export default async function IndividualesPage() {
           <IndividualesView
             initialBattingStats={initialBattingStats}
             initialPitchingStats={initialPitchingStats}
+            initialFieldingStats={initialFieldingStats}
             initialSeason={activeSeason}
             initialTeamGamesMap={teamGamesMap}
             initialTeamWinPctMap={teamWinPctMap}

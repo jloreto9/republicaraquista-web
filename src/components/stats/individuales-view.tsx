@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { BattingStats, PitchingStats } from "@/types/sports";
+import { BattingStats, PitchingStats, FieldingStats } from "@/types/sports";
 import { StatsFilters } from "@/components/stats/stats-filters";
 import { BattingTable } from "@/components/stats/batting-table";
 import { PitchingTable } from "@/components/stats/pitching-table";
+import { FieldingTable } from "@/components/stats/fielding-table";
 import { AwardsView } from "@/components/stats/awards-view";
 import { PlayerSplitsView } from "@/components/stats/splits/player-splits-view";
 import { Flame, Target, Shield, Loader2, Sparkles, Zap, Trophy } from "lucide-react";
@@ -14,6 +15,7 @@ import { useSeason } from "@/context/season-context";
 interface IndividualesViewProps {
   initialBattingStats: BattingStats[];
   initialPitchingStats: PitchingStats[];
+  initialFieldingStats?: FieldingStats[];
   initialSeason?: number;
   initialTeamGamesMap?: Record<number, number>;
   initialTeamWinPctMap?: Record<number, number>;
@@ -46,6 +48,7 @@ function resolveSplitPlayerFromParams(
 export function IndividualesView({
   initialBattingStats,
   initialPitchingStats,
+  initialFieldingStats = [],
   initialSeason = 2026,
   initialTeamGamesMap = {},
   initialTeamWinPctMap = {},
@@ -74,6 +77,7 @@ export function IndividualesView({
 
   const [battingStats, setBattingStats] = useState<BattingStats[]>(initialBattingStats);
   const [pitchingStats, setPitchingStats] = useState<PitchingStats[]>(initialPitchingStats);
+  const [fieldingStats, setFieldingStats] = useState<FieldingStats[]>(initialFieldingStats);
   const [loading, setLoading] = useState<boolean>(false);
 
   // Estado para pre-seleccionar jugador al navegar a splits desde las tablas
@@ -106,12 +110,15 @@ export function IndividualesView({
     async function fetchLeagueStats() {
       setLoading(true);
       try {
-        const [batRes, pitRes] = await Promise.all([
+        const [batRes, pitRes, fldRes] = await Promise.all([
           fetch(
             `/api/stats/batting?season=${season}&phase=${selectedPhase}&team_id=all&limit=500`
           ),
           fetch(
             `/api/stats/pitching?season=${season}&phase=${selectedPhase}&team_id=all&limit=500`
+          ),
+          fetch(
+            `/api/stats/fielding?season=${season}&phase=${selectedPhase}&team_id=all&limit=1000`
           ),
         ]);
 
@@ -141,7 +148,14 @@ export function IndividualesView({
           }
         }
 
-        if (batRes.ok || pitRes.ok) {
+        if (fldRes.ok) {
+          const fldJson = await fldRes.json();
+          if (isMounted) {
+            setFieldingStats(fldJson.data || fldJson.stats || []);
+          }
+        }
+
+        if (batRes.ok || pitRes.ok || fldRes.ok) {
           loadedScopeRef.current = { season, phase: selectedPhase };
         }
       } catch (err) {
@@ -166,9 +180,10 @@ export function IndividualesView({
     return maxGames;
   }, [selectedTeam, teamGamesMap, maxGames]);
 
-  // Umbrales oficiales de calificación (3.1 AP/Juego para bateo, 1.0 IP/Juego para pitcheo)
+  // Umbrales oficiales de calificación (3.1 AP/J bateo, 1.0 IP/J pitcheo, 0.5 TC/J fildeo)
   const minPaThreshold = Math.round(currentTeamGames * 3.1);
   const minIpThreshold = Number((currentTeamGames * 1.0).toFixed(1));
+  const minTcThreshold = currentTeamGames > 0 ? Math.max(5, Math.round(currentTeamGames * 0.5)) : 0;
 
   // Label para el botón toggle de StatsFilters
   const thresholdBadgeLabel =
@@ -176,6 +191,8 @@ export function IndividualesView({
       ? `≥ ${minPaThreshold} AP`
       : activeTab === "pitching"
       ? `≥ ${minIpThreshold.toFixed(1)} IP`
+      : activeTab === "fielding"
+      ? `≥ ${minTcThreshold} TC`
       : undefined;
 
   const teamBattingStats = useMemo(() => {
@@ -189,6 +206,12 @@ export function IndividualesView({
     const targetId = Number(selectedTeam);
     return pitchingStats.filter((p) => p.teamId === targetId);
   }, [pitchingStats, selectedTeam]);
+
+  const teamFieldingStats = useMemo(() => {
+    if (selectedTeam === "all") return fieldingStats;
+    const targetId = Number(selectedTeam);
+    return fieldingStats.filter((f) => f.teamId === targetId);
+  }, [fieldingStats, selectedTeam]);
 
   // Filtrado de bateadores
   const displayedBattingStats = useMemo(() => {
@@ -220,6 +243,20 @@ export function IndividualesView({
     });
   }, [teamPitchingStats, qualifyingOnly, selectedTeam, teamGamesMap, maxGames, currentTeamGames]);
 
+  // Filtrado de defensores
+  const displayedFieldingStats = useMemo(() => {
+    if (!qualifyingOnly) return teamFieldingStats;
+    return teamFieldingStats.filter((f) => {
+      const tGames = teamGamesMap[f.teamId];
+      const teamGames =
+        selectedTeam !== "all"
+          ? currentTeamGames
+          : (typeof tGames === "number" ? tGames : maxGames);
+      const reqTc = teamGames > 0 ? Math.max(5, Math.round(teamGames * 0.5)) : 0;
+      return (f.totalChances || 0) >= reqTc;
+    });
+  }, [teamFieldingStats, qualifyingOnly, selectedTeam, teamGamesMap, maxGames, currentTeamGames]);
+
   const handleSelectBatterForSplits = (playerId: number) => {
     setTargetSplitPlayer({ id: playerId, type: "batter" });
     setActiveTab("splits");
@@ -227,6 +264,14 @@ export function IndividualesView({
 
   const handleSelectPitcherForSplits = (playerId: number) => {
     setTargetSplitPlayer({ id: playerId, type: "pitcher" });
+    setActiveTab("splits");
+  };
+
+  const handleSelectFielderForSplits = (playerId: number) => {
+    const isPitcherOnly =
+      fieldingStats.some((f) => f.playerId === playerId && f.position === "P") &&
+      !battingStats.some((b) => b.playerId === playerId && b.atBats > 0);
+    setTargetSplitPlayer({ id: playerId, type: isPitcherOnly ? "pitcher" : "batter" });
     setActiveTab("splits");
   };
 
@@ -433,16 +478,40 @@ export function IndividualesView({
           season={season}
         />
       ) : (
-        <div className="p-12 text-center rounded-xl bg-[#0D152B] border border-[#1E2B4D] space-y-3">
-          <Shield className="w-8 h-8 text-[#FDB827] mx-auto opacity-80" />
-          <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider font-mono">
-            Módulo de Fildeo & Defensa Individual
-          </h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-            Las estadísticas defensivas (PO, A, E, TC, FPCT y RF/9) están siendo procesadas por el
-            pipeline diario de jugadas de la LVBP. La tabla defensiva completa estará activa en la
-            próxima sincronización de la base de datos.
-          </p>
+        <div className="space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono text-slate-400 px-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span>
+                Mostrando {displayedFieldingStats.length} de {teamFieldingStats.length} registros defensivos{" "}
+                {qualifyingOnly ? "(solo calificados)" : "(todos)"}
+              </span>
+              {qualifyingOnly && minTcThreshold > 0 && (
+                <span className="bg-[#1E2B4D] text-[#FDB827] text-[10px] px-2 py-0.5 rounded font-mono font-bold border border-[#FDB827]/30">
+                  Mínimo: {minTcThreshold} TC
+                </span>
+              )}
+            </div>
+            <span className="text-[#FDB827]">Orden por defecto: TC descendente</span>
+          </div>
+          {displayedFieldingStats.length === 0 ? (
+            <div className="p-8 text-center rounded-xl bg-[#0D152B] border border-[#1E2B4D] text-slate-400 text-xs space-y-3">
+              <p>
+                Ningún defensor alcanza el mínimo requerido de {minTcThreshold} lances totales (TC) con los filtros actuales.
+              </p>
+              <button
+                type="button"
+                onClick={() => setQualifyingOnly(false)}
+                className="px-3 py-1.5 rounded-lg bg-[#1E2B4D] hover:bg-[#FDB827] text-[#FDB827] hover:text-[#070B19] text-xs font-semibold transition-all border border-[#FDB827]/30"
+              >
+                Ver todos los registros defensivos
+              </button>
+            </div>
+          ) : (
+            <FieldingTable
+              stats={displayedFieldingStats}
+              onSelectPlayerForSplits={handleSelectFielderForSplits}
+            />
+          )}
         </div>
       )}
     </div>

@@ -80,7 +80,8 @@ export function StatsFilters({
           </div>
 
           {/* Qualifying switch toggle */}
-          {onToggleQualifying && (activeTab === "batting" || activeTab === "pitching") && (
+          {onToggleQualifying &&
+            (activeTab === "batting" || activeTab === "pitching" || activeTab === "fielding") && (
             <button
               type="button"
               onClick={() => onToggleQualifying(!qualifyingOnly)}
@@ -92,7 +93,9 @@ export function StatsFilters({
               title={
                 activeTab === "batting"
                   ? "Regla oficial de bateo: Mínimo 3.1 Apariciones al Plato por juego del equipo"
-                  : "Regla oficial de pitcheo: Mínimo 1.0 Entrada Lanzada por juego del equipo"
+                  : activeTab === "pitching"
+                  ? "Regla oficial de pitcheo: Mínimo 1.0 Entrada Lanzada por juego del equipo"
+                  : "Mínimo de oportunidades defensivas (lances totales) según juegos disputados por el equipo"
               }
             >
               <div
@@ -107,7 +110,11 @@ export function StatsFilters({
                 />
               </div>
               <span>
-                {activeTab === "batting" ? "Solo Calificados (3.1 AP/J)" : "Solo Calificados (1.0 IP/J)"}
+                {activeTab === "batting"
+                  ? "Solo Calificados (3.1 AP/J)"
+                  : activeTab === "pitching"
+                  ? "Solo Calificados (1.0 IP/J)"
+                  : "Solo Calificados (TC mín.)"}
               </span>
               {thresholdLabel && (
                 <span

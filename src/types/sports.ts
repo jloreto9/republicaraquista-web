@@ -141,10 +141,19 @@ export interface FieldingStats {
   teamLogo: string;
   position: string;
   games: number;
+  gamesStarted?: number;
+  innings?: string;
+  inningsDecimal?: number;
   putouts: number;
   assists: number;
   errors: number;
   totalChances: number;
   fieldingPct: number;
   doublePlays: number;
+  triplePlays?: number;
+  rangeFactorPer9?: number;
+  caughtStealing?: number;
+  stolenBases?: number;
+  caughtStealingPct?: number;
+  passedBalls?: number;
 }
