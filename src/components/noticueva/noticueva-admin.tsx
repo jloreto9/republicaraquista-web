@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { NotiCuevaPost } from "@/types/noticueva";
 import { FormattedContent } from "./formatted-content";
+import { LineupCardGeneratorPanel } from "@/components/admin/lineup-card-generator-panel";
 import { PushBroadcastPanel } from "@/components/admin/push-broadcast-panel";
 import {
   Lock,
@@ -835,6 +836,9 @@ export function NotiCuevaAdmin() {
           </div>
         )}
       </div>
+
+      {/* Generador de Tarjeta Oficial de Lineup (9:16) */}
+      <LineupCardGeneratorPanel adminPassword={password} />
 
       {/* Panel de Despacho de Notificaciones Web Push */}
       <PushBroadcastPanel adminPassword={password} />
