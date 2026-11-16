@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPitchingStats, getTeamGamesMap } from "@/lib/supabase";
+import {
+  getPitchingStats,
+  getStatsCacheControlHeader,
+  getTeamGamesMap,
+  parseStatsDateRange,
+} from "@/lib/supabase";
 import { getActiveSeason } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +12,18 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const dateRange = parseStatsDateRange(searchParams);
+    if (!dateRange.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: dateRange.error,
+        },
+        { status: 400 }
+      );
+    }
+
+    const { startDate, endDate } = dateRange;
     const season = searchParams.get("season")
       ? parseInt(searchParams.get("season")!, 10)
       : await getActiveSeason();
@@ -20,8 +37,8 @@ export async function GET(request: NextRequest) {
       : 0.0;
 
     const [stats, { teamGamesMap, teamWinPctMap, maxGames }] = await Promise.all([
-      getPitchingStats(season, phase, teamId, limit, minIp),
-      getTeamGamesMap(season, phase),
+      getPitchingStats(season, phase, teamId, limit, minIp, startDate, endDate),
+      getTeamGamesMap(season, phase, startDate, endDate),
     ]);
 
     return NextResponse.json(
@@ -30,6 +47,8 @@ export async function GET(request: NextRequest) {
         season,
         phase,
         team_id: teamId,
+        startDate,
+        endDate,
         count: stats.length,
         maxGames,
         teamGamesMap,
@@ -39,7 +58,7 @@ export async function GET(request: NextRequest) {
       {
         status: 200,
         headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60",
+          "Cache-Control": getStatsCacheControlHeader(endDate),
         },
       }
     );

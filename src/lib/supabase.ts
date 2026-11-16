@@ -6,7 +6,7 @@ import {
   ACTIVE_SEASON,
   getPlayerHeadshotUrl,
 } from "./constants";
-import { isDayGame } from "./utils";
+import { isDayGame, getVenezuelanToday } from "./utils";
 import { TeamStanding, GameSummary, SeasonKPIs, BattingStats, PitchingStats, FieldingStats } from "@/types/sports";
 
 export interface SupabaseGameRow {
@@ -104,8 +104,8 @@ interface RawBattingRow {
   sh?: number | null;
   players?: { full_name?: string | null } | { full_name?: string | null }[] | null;
   games?:
-    | { season?: number | null; game_type?: string | null; status?: string | null }
-    | { season?: number | null; game_type?: string | null; status?: string | null }[]
+    | { season?: number | null; game_type?: string | null; status?: string | null; game_date?: string | null }
+    | { season?: number | null; game_type?: string | null; status?: string | null; game_date?: string | null }[]
     | null;
 }
 
@@ -123,8 +123,8 @@ interface RawPitchingRow {
   hr?: number | null;
   players?: { full_name?: string | null } | { full_name?: string | null }[] | null;
   games?:
-    | { season?: number | null; game_type?: string | null; status?: string | null }
-    | { season?: number | null; game_type?: string | null; status?: string | null }[]
+    | { season?: number | null; game_type?: string | null; status?: string | null; game_date?: string | null }
+    | { season?: number | null; game_type?: string | null; status?: string | null; game_date?: string | null }[]
     | null;
 }
 
@@ -1497,80 +1497,83 @@ async function fetchMlbSeasonPitchingMetaMap(
   return map;
 }
 
+export const INVALID_DATE_RANGE_ERROR =
+  "Rango de fechas inválido. Usa formato YYYY-MM-DD y verifica que la fecha inicial sea menor o igual a la final.";
+
+function isValidIsoDateString(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return (
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth() === m - 1 &&
+    dt.getUTCDate() === d
+  );
+}
+
 /**
- * Obtiene estadísticas agregadas de bateo por jugador para una temporada y fase.
+ * Extrae y valida `startDate` y `endDate` desde los parámetros de búsqueda de la API.
  */
-export async function getBattingStats(
-  season = ACTIVE_SEASON,
-  phase = "R",
-  teamId: string | number = "all",
-  limit = 250,
-  minAb = 0
-): Promise<BattingStats[]> {
-  let dbPromise: Promise<{ data: unknown[] | null; error: unknown }> = Promise.resolve({
-    data: null,
-    error: null,
-  });
+export function parseStatsDateRange(searchParams: URLSearchParams):
+  | { ok: true; startDate?: string; endDate?: string }
+  | { ok: false; error: string } {
+  const startDate = searchParams.get("startDate")?.trim() || undefined;
+  const endDate = searchParams.get("endDate")?.trim() || undefined;
 
-  if (supabase) {
-    let query = supabase
-      .from("batting_stats")
-      .select(
-        "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players!inner(full_name), games!inner(season, game_type, status)"
-      )
-      .eq("games.season", season)
-      .limit(10000);
-
-    if (phase && phase !== "all") {
-      const normalized = normalizePhase(phase);
-      const targetTypes =
-        normalized === "regular"
-          ? ["R", "regular"]
-          : normalized === "round_robin"
-          ? ["L", "round_robin"]
-          : normalized === "final"
-          ? ["F", "W", "final"]
-          : normalized === "wildcard_playin"
-          ? ["D", "wildcard_playin"]
-          : [phase];
-      query = query.in("games.game_type", targetTypes);
-    }
-
-    if (teamId && teamId !== "all") {
-      query = query.eq("team_id", Number(teamId));
-    }
-
-    dbPromise = Promise.resolve(query).catch((err) => ({ data: null, error: err }));
+  if (!startDate && !endDate) {
+    return { ok: true };
   }
 
-  const [canonicalPlayedGames, dbResult, gidpMap] = await Promise.all([
-    getCanonicalPlayedGames(season, { phase }),
-    dbPromise,
-    fetchMlbSeasonGidpMap(season, phase, "hitting"),
-  ]);
-
-  if (dbResult.error) {
-    console.error("Error al consultar batting_stats:", dbResult.error);
+  if (
+    !startDate ||
+    !endDate ||
+    !isValidIsoDateString(startDate) ||
+    !isValidIsoDateString(endDate) ||
+    startDate > endDate
+  ) {
+    return { ok: false, error: INVALID_DATE_RANGE_ERROR };
   }
 
-  const dbRows = (dbResult.data || []) as RawBattingRow[];
-  const mergedRows: RawBattingRow[] = [...dbRows];
+  return { ok: true, startDate, endDate };
+}
 
-  const hasTeamFilter = teamId !== undefined && teamId !== null && teamId !== "all";
-  const targetTeamId = hasTeamFilter ? Number(teamId) : null;
-
-  for (const game of canonicalPlayedGames) {
-    const cached =
-      reconciledBoxscoreCache.get(Number(game.id)) ||
-      (game.game_pk ? reconciledBoxscoreCache.get(Number(game.game_pk)) : undefined);
-    if (!cached) continue;
-
-    for (const bRow of cached.batting_stats) {
-      if (targetTeamId !== null && Number(bRow.team_id) !== targetTeamId) continue;
-      mergedRows.push(bRow);
-    }
+/**
+ * Calcula el encabezado `Cache-Control` según si `endDate` ya cerró (anterior a hoy en VET UTC-4).
+ */
+export function getStatsCacheControlHeader(endDate?: string): string {
+  const todayVet = getVenezuelanToday().dateString;
+  if (endDate && endDate < todayVet) {
+    return "public, max-age=3600, s-maxage=3600, stale-while-revalidate=300";
   }
+  return "public, max-age=300, s-maxage=300, stale-while-revalidate=60";
+}
 
+function getDateRangeRevalidateSeconds(endDate?: string): number {
+  const todayVet = getVenezuelanToday().dateString;
+  return endDate && endDate < todayVet ? 3600 : 300;
+}
+
+function parseTargetTeamId(teamId: string | number = "all"): number | null {
+  if (teamId === undefined || teamId === null || teamId === "all" || teamId === "") {
+    return null;
+  }
+  const parsed = Number(teamId);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseFiniteStatNumber(val: unknown): number | null {
+  if (val === null || val === undefined || val === "") return null;
+  const parsed = Number(val);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function aggregateBattingRows(
+  mergedRows: RawBattingRow[],
+  gidpMap: Map<number, number>,
+  minAb: number,
+  limit: number,
+  dateFilter?: { startDate: string; endDate: string }
+): BattingStats[] {
   if (mergedRows.length === 0) {
     return [];
   }
@@ -1604,6 +1607,10 @@ export async function getBattingStats(
   mergedRows.forEach((row: RawBattingRow) => {
     const gObj = Array.isArray(row.games) ? row.games[0] : row.games;
     if (!isPlayedGameStatus(gObj?.status)) return;
+    if (dateFilter && gObj?.game_date) {
+      const gDate = String(gObj.game_date).slice(0, 10);
+      if (!gDate || gDate < dateFilter.startDate || gDate > dateFilter.endDate) return;
+    }
     if (!hasBatterAppearance(row)) return;
 
     const pId = Number(row.player_id);
@@ -1726,15 +1733,284 @@ export async function getBattingStats(
 }
 
 /**
- * Obtiene estadísticas agregadas de pitcheo por jugador para una temporada y fase.
+ * Obtiene estadísticas agregadas de bateo por jugador para una temporada y fase (o rango de fechas).
  */
-export async function getPitchingStats(
+export async function getBattingStats(
   season = ACTIVE_SEASON,
   phase = "R",
   teamId: string | number = "all",
   limit = 250,
-  minIp = 0.0
-): Promise<PitchingStats[]> {
+  minAb = 0,
+  startDate?: string,
+  endDate?: string
+): Promise<BattingStats[]> {
+  if (startDate && endDate) {
+    const targetTeamId = parseTargetTeamId(teamId);
+    if (targetTeamId !== null && !LVBP_TEAM_IDS.includes(targetTeamId)) {
+      return [];
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let mlbSplits: any[] = [];
+    let mlbOk = false;
+
+    try {
+      const url = `https://statsapi.mlb.com/api/v1/stats?stats=byDateRange&sportId=17&leagueId=135&group=hitting&season=${season}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&playerPool=all&limit=1000`;
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(5000),
+        next: { revalidate: getDateRangeRevalidateSeconds(endDate) },
+        headers: MLB_FETCH_HEADERS,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        mlbSplits = Array.isArray(data?.stats?.[0]?.splits) ? data.stats[0].splits : [];
+        mlbOk = mlbSplits.length > 0;
+      }
+    } catch (err) {
+      console.warn("Error fetching MLB batting stats byDateRange:", err);
+    }
+
+    if (mlbOk) {
+      const playerMap = new Map<
+        number,
+        {
+          playerId: number;
+          playerName: string;
+          teamsWeight: Record<number, number>;
+          splitCount: number;
+          games: number;
+          pa: number;
+          ab: number;
+          r: number;
+          h: number;
+          doubles: number;
+          triples: number;
+          hr: number;
+          rbi: number;
+          bb: number;
+          so: number;
+          sb: number;
+          cs: number;
+          gidp: number;
+          hbp: number;
+          sf: number;
+          sh: number;
+          singleAvg: number | null;
+          singleObp: number | null;
+          singleSlg: number | null;
+          singleOps: number | null;
+          singleBabip: number | null;
+        }
+      >();
+
+      for (const s of mlbSplits) {
+        if (s?.sport?.id !== undefined && Number(s.sport.id) !== 17) continue;
+        const pId = Number(s?.player?.id || 0);
+        const tId = Number(s?.team?.id || 0);
+        if (!pId || !LVBP_TEAM_IDS.includes(tId)) continue;
+        if (targetTeamId !== null && tId !== targetTeamId) continue;
+
+        const st = s?.stat || {};
+        const games = Number(st.gamesPlayed ?? st.games ?? 0);
+        const ab = Number(st.atBats ?? 0);
+        const r = Number(st.runs ?? 0);
+        const h = Number(st.hits ?? 0);
+        const doubles = Number(st.doubles ?? 0);
+        const triples = Number(st.triples ?? 0);
+        const hr = Number(st.homeRuns ?? 0);
+        const rbi = Number(st.rbi ?? 0);
+        const bb = Number(st.baseOnBalls ?? 0);
+        const so = Number(st.strikeOuts ?? 0);
+        const sb = Number(st.stolenBases ?? 0);
+        const cs = Number(st.caughtStealing ?? 0);
+        const gidp = Number(st.groundIntoDoublePlay ?? 0);
+        const hbp = Number(st.hitByPitch ?? 0);
+        const sf = Number(st.sacFlies ?? 0);
+        const sh = Number(st.sacBunts ?? 0);
+        const pa = parseFiniteStatNumber(st.plateAppearances) ?? ab + bb + hbp + sf + sh;
+
+        if (games === 0 && pa === 0 && r === 0 && sb === 0 && cs === 0) continue;
+
+        const existing = playerMap.get(pId);
+        if (!existing) {
+          playerMap.set(pId, {
+            playerId: pId,
+            playerName: String(s?.player?.fullName || "Desconocido"),
+            teamsWeight: { [tId]: Math.max(1, pa || games) },
+            splitCount: 1,
+            games,
+            pa,
+            ab,
+            r,
+            h,
+            doubles,
+            triples,
+            hr,
+            rbi,
+            bb,
+            so,
+            sb,
+            cs,
+            gidp,
+            hbp,
+            sf,
+            sh,
+            singleAvg: parseFiniteStatNumber(st.avg),
+            singleObp: parseFiniteStatNumber(st.obp),
+            singleSlg: parseFiniteStatNumber(st.slg),
+            singleOps: parseFiniteStatNumber(st.ops),
+            singleBabip: parseFiniteStatNumber(st.babip),
+          });
+        } else {
+          existing.splitCount += 1;
+          existing.teamsWeight[tId] = (existing.teamsWeight[tId] || 0) + Math.max(1, pa || games);
+          existing.games += games;
+          existing.pa += pa;
+          existing.ab += ab;
+          existing.r += r;
+          existing.h += h;
+          existing.doubles += doubles;
+          existing.triples += triples;
+          existing.hr += hr;
+          existing.rbi += rbi;
+          existing.bb += bb;
+          existing.so += so;
+          existing.sb += sb;
+          existing.cs += cs;
+          existing.gidp += gidp;
+          existing.hbp += hbp;
+          existing.sf += sf;
+          existing.sh += sh;
+        }
+      }
+
+      const results: BattingStats[] = Array.from(playerMap.values()).map((p) => {
+        let primaryTeamId = targetTeamId ?? 695;
+        let maxWeight = -1;
+        for (const [tidStr, weight] of Object.entries(p.teamsWeight)) {
+          if (weight > maxWeight) {
+            maxWeight = weight;
+            primaryTeamId = Number(tidStr);
+          }
+        }
+
+        const team = getTeam(primaryTeamId);
+        const calcAvg = p.ab > 0 ? Number((p.h / p.ab).toFixed(3)) : 0.0;
+        const obpDen = p.ab + p.bb + p.hbp + p.sf;
+        const calcObp = obpDen > 0 ? Number(((p.h + p.bb + p.hbp) / obpDen).toFixed(3)) : 0.0;
+        const calcSlg =
+          p.ab > 0
+            ? Number(((p.h + p.doubles + 2 * p.triples + 3 * p.hr) / p.ab).toFixed(3))
+            : 0.0;
+        const babipDen = p.ab - p.so - p.hr + p.sf;
+        const calcBabip =
+          babipDen > 0 ? Number(((p.h - p.hr) / babipDen).toFixed(3)) : 0.0;
+
+        const useSingle = p.splitCount === 1;
+        const avg = useSingle && p.singleAvg !== null ? Number(p.singleAvg.toFixed(3)) : calcAvg;
+        const obp = useSingle && p.singleObp !== null ? Number(p.singleObp.toFixed(3)) : calcObp;
+        const slg = useSingle && p.singleSlg !== null ? Number(p.singleSlg.toFixed(3)) : calcSlg;
+        const ops =
+          useSingle && p.singleOps !== null
+            ? Number(p.singleOps.toFixed(3))
+            : Number((obp + slg).toFixed(3));
+        const babip =
+          useSingle && p.singleBabip !== null ? Number(p.singleBabip.toFixed(3)) : calcBabip;
+        const iso = Number((slg - avg).toFixed(3));
+
+        return {
+          playerId: p.playerId,
+          playerName: p.playerName,
+          playerAvatar: getPlayerHeadshotUrl(p.playerId),
+          teamId: team.id,
+          teamName: team.name,
+          teamAbbr: team.abbreviation,
+          teamLogo: team.logoUrl,
+          games: p.games,
+          atBats: p.ab,
+          plateAppearances: p.pa,
+          pa: p.pa,
+          runs: p.r,
+          hits: p.h,
+          doubles: p.doubles,
+          triples: p.triples,
+          homeRuns: p.hr,
+          rbi: p.rbi,
+          walks: p.bb,
+          strikeouts: p.so,
+          stolenBases: p.sb,
+          caughtStealing: p.cs,
+          gidp: p.gidp,
+          hbp: p.hbp,
+          sf: p.sf,
+          sh: p.sh,
+          avg,
+          obp,
+          slg,
+          ops,
+          iso,
+          babip,
+        };
+      });
+
+      const qualified = minAb > 0 ? results.filter((p) => p.atBats >= minAb) : results;
+      qualified.sort((a, b) => b.ops - a.ops || b.hits - a.hits);
+      return limit ? qualified.slice(0, limit) : qualified;
+    }
+
+    // Fallback a Supabase batting_stats unido con games filtrado por game_date
+    const fallbackRows: RawBattingRow[] = [];
+    if (supabase) {
+      try {
+        let query = supabase
+          .from("batting_stats")
+          .select(
+            "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players!inner(full_name), games!inner(season, game_type, status, game_date)"
+          )
+          .eq("games.season", season)
+          .gte("games.game_date", startDate)
+          .lte("games.game_date", endDate)
+          .limit(10000);
+
+        if (targetTeamId !== null) {
+          query = query.eq("team_id", targetTeamId);
+        }
+
+        const dbResult = await Promise.resolve(query).catch((err) => ({ data: null, error: err }));
+        if (dbResult.error) {
+          console.error("Error al consultar batting_stats por rango de fechas:", dbResult.error);
+        }
+        if (Array.isArray(dbResult.data)) {
+          fallbackRows.push(...(dbResult.data as RawBattingRow[]));
+        }
+      } catch (err) {
+        console.error("Error en fallback de batting_stats por rango de fechas:", err);
+      }
+    }
+
+    const cachedGames = seasonGamesCache.get(season)?.games || [];
+    for (const game of cachedGames) {
+      const gDate = String(game.game_date || "").slice(0, 10);
+      if (!gDate || gDate < startDate || gDate > endDate) continue;
+      const cached =
+        reconciledBoxscoreCache.get(Number(game.id)) ||
+        (game.game_pk ? reconciledBoxscoreCache.get(Number(game.game_pk)) : undefined);
+      if (!cached) continue;
+      for (const bRow of cached.batting_stats) {
+        if (targetTeamId !== null && Number(bRow.team_id) !== targetTeamId) continue;
+        fallbackRows.push({
+          ...bRow,
+          games: {
+            ...(bRow.games || { season, game_type: "regular", status: game.status || "Final" }),
+            game_date: gDate,
+          },
+        });
+      }
+    }
+
+    return aggregateBattingRows(fallbackRows, new Map(), minAb, limit, { startDate, endDate });
+  }
+
   let dbPromise: Promise<{ data: unknown[] | null; error: unknown }> = Promise.resolve({
     data: null,
     error: null,
@@ -1742,9 +2018,9 @@ export async function getPitchingStats(
 
   if (supabase) {
     let query = supabase
-      .from("pitching_stats")
+      .from("batting_stats")
       .select(
-        "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players!inner(full_name), games!inner(season, game_type, status)"
+        "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players!inner(full_name), games!inner(season, game_type, status)"
       )
       .eq("games.season", season)
       .limit(10000);
@@ -1771,18 +2047,18 @@ export async function getPitchingStats(
     dbPromise = Promise.resolve(query).catch((err) => ({ data: null, error: err }));
   }
 
-  const [canonicalPlayedGames, dbResult, pitchingMetaMap] = await Promise.all([
+  const [canonicalPlayedGames, dbResult, gidpMap] = await Promise.all([
     getCanonicalPlayedGames(season, { phase }),
     dbPromise,
-    fetchMlbSeasonPitchingMetaMap(season, phase),
+    fetchMlbSeasonGidpMap(season, phase, "hitting"),
   ]);
 
   if (dbResult.error) {
-    console.error("Error al consultar pitching_stats:", dbResult.error);
+    console.error("Error al consultar batting_stats:", dbResult.error);
   }
 
-  const dbRows = (dbResult.data || []) as RawPitchingRow[];
-  const mergedRows: RawPitchingRow[] = [...dbRows];
+  const dbRows = (dbResult.data || []) as RawBattingRow[];
+  const mergedRows: RawBattingRow[] = [...dbRows];
 
   const hasTeamFilter = teamId !== undefined && teamId !== null && teamId !== "all";
   const targetTeamId = hasTeamFilter ? Number(teamId) : null;
@@ -1793,12 +2069,22 @@ export async function getPitchingStats(
       (game.game_pk ? reconciledBoxscoreCache.get(Number(game.game_pk)) : undefined);
     if (!cached) continue;
 
-    for (const pRow of cached.pitching_stats) {
-      if (targetTeamId !== null && Number(pRow.team_id) !== targetTeamId) continue;
-      mergedRows.push(pRow);
+    for (const bRow of cached.batting_stats) {
+      if (targetTeamId !== null && Number(bRow.team_id) !== targetTeamId) continue;
+      mergedRows.push(bRow);
     }
   }
 
+  return aggregateBattingRows(mergedRows, gidpMap, minAb, limit);
+}
+
+function aggregatePitchingRows(
+  mergedRows: RawPitchingRow[],
+  pitchingMetaMap: Map<number, MlbSeasonPitchingMeta>,
+  minIp: number,
+  limit: number,
+  dateFilter?: { startDate: string; endDate: string }
+): PitchingStats[] {
   if (mergedRows.length === 0) {
     return [];
   }
@@ -1826,6 +2112,10 @@ export async function getPitchingStats(
   mergedRows.forEach((row: RawPitchingRow) => {
     const gObj = Array.isArray(row.games) ? row.games[0] : row.games;
     if (!isPlayedGameStatus(gObj?.status)) return;
+    if (dateFilter && gObj?.game_date) {
+      const gDate = String(gObj.game_date).slice(0, 10);
+      if (!gDate || gDate < dateFilter.startDate || gDate > dateFilter.endDate) return;
+    }
     if (!hasPitcherAppearance(row)) return;
 
     const pId = Number(row.player_id);
@@ -1931,16 +2221,486 @@ export async function getPitchingStats(
 }
 
 /**
- * Obtiene los juegos disputados y porcentaje de victorias por franquicia, más el máximo de juegos en la fase.
+ * Obtiene estadísticas agregadas de pitcheo por jugador para una temporada y fase (o rango de fechas).
+ */
+export async function getPitchingStats(
+  season = ACTIVE_SEASON,
+  phase = "R",
+  teamId: string | number = "all",
+  limit = 250,
+  minIp = 0.0,
+  startDate?: string,
+  endDate?: string
+): Promise<PitchingStats[]> {
+  if (startDate && endDate) {
+    const targetTeamId = parseTargetTeamId(teamId);
+    if (targetTeamId !== null && !LVBP_TEAM_IDS.includes(targetTeamId)) {
+      return [];
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let mlbSplits: any[] = [];
+    let mlbOk = false;
+
+    try {
+      const url = `https://statsapi.mlb.com/api/v1/stats?stats=byDateRange&sportId=17&leagueId=135&group=pitching&season=${season}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&playerPool=all&limit=1000`;
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(5000),
+        next: { revalidate: getDateRangeRevalidateSeconds(endDate) },
+        headers: MLB_FETCH_HEADERS,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        mlbSplits = Array.isArray(data?.stats?.[0]?.splits) ? data.stats[0].splits : [];
+        mlbOk = mlbSplits.length > 0;
+      }
+    } catch (err) {
+      console.warn("Error fetching MLB pitching stats byDateRange:", err);
+    }
+
+    if (mlbOk) {
+      const pitcherMap = new Map<
+        number,
+        {
+          playerId: number;
+          playerName: string;
+          teamsWeight: Record<number, number>;
+          splitCount: number;
+          games: number;
+          gamesStarted: number;
+          outs: number;
+          hits: number;
+          runs: number;
+          earnedRuns: number;
+          walks: number;
+          strikeouts: number;
+          homeRuns: number;
+          gidp: number;
+          hbp: number;
+          wins: number;
+          losses: number;
+          saves: number;
+          singleEra: number | null;
+          singleWhip: number | null;
+          singleK9: number | null;
+          singleBb9: number | null;
+          singleKToBb: number | null;
+        }
+      >();
+
+      for (const s of mlbSplits) {
+        if (s?.sport?.id !== undefined && Number(s.sport.id) !== 17) continue;
+        const pId = Number(s?.player?.id || 0);
+        const tId = Number(s?.team?.id || 0);
+        if (!pId || !LVBP_TEAM_IDS.includes(tId)) continue;
+        if (targetTeamId !== null && tId !== targetTeamId) continue;
+
+        const st = s?.stat || {};
+        const games = Number(st.gamesPitched ?? st.gamesPlayed ?? st.games ?? 0);
+        const gamesStarted = Number(st.gamesStarted ?? 0);
+        const rawIp = st.inningsPitched;
+        const splitOuts =
+          rawIp !== undefined && rawIp !== null && String(rawIp).trim() !== ""
+            ? Math.round(parseBaseballInningsToDecimal(rawIp) * 3)
+            : Number(st.outsPitched ?? st.outs ?? 0);
+        const hits = Number(st.hits ?? 0);
+        const runs = Number(st.runs ?? 0);
+        const earnedRuns = Number(st.earnedRuns ?? 0);
+        const walks = Number(st.baseOnBalls ?? 0);
+        const strikeouts = Number(st.strikeOuts ?? 0);
+        const homeRuns = Number(st.homeRuns ?? 0);
+        const gidp = Number(st.groundIntoDoublePlay ?? 0);
+        const hbp = Number(st.hitBatsmen ?? st.hitByPitch ?? 0);
+        const wins = Number(st.wins ?? 0);
+        const losses = Number(st.losses ?? 0);
+        const saves = Number(st.saves ?? 0);
+
+        if (
+          games === 0 &&
+          splitOuts === 0 &&
+          hits === 0 &&
+          runs === 0 &&
+          earnedRuns === 0 &&
+          walks === 0 &&
+          strikeouts === 0 &&
+          homeRuns === 0 &&
+          hbp === 0
+        ) {
+          continue;
+        }
+
+        const existing = pitcherMap.get(pId);
+        if (!existing) {
+          pitcherMap.set(pId, {
+            playerId: pId,
+            playerName: String(s?.player?.fullName || "Desconocido"),
+            teamsWeight: { [tId]: Math.max(1, splitOuts || games) },
+            splitCount: 1,
+            games,
+            gamesStarted,
+            outs: splitOuts,
+            hits,
+            runs,
+            earnedRuns,
+            walks,
+            strikeouts,
+            homeRuns,
+            gidp,
+            hbp,
+            wins,
+            losses,
+            saves,
+            singleEra: parseFiniteStatNumber(st.era),
+            singleWhip: parseFiniteStatNumber(st.whip),
+            singleK9: parseFiniteStatNumber(st.strikeoutsPer9Inn),
+            singleBb9: parseFiniteStatNumber(st.walksPer9Inn),
+            singleKToBb: parseFiniteStatNumber(st.strikeoutWalkRatio),
+          });
+        } else {
+          existing.splitCount += 1;
+          existing.teamsWeight[tId] =
+            (existing.teamsWeight[tId] || 0) + Math.max(1, splitOuts || games);
+          existing.games += games;
+          existing.gamesStarted += gamesStarted;
+          existing.outs += splitOuts;
+          existing.hits += hits;
+          existing.runs += runs;
+          existing.earnedRuns += earnedRuns;
+          existing.walks += walks;
+          existing.strikeouts += strikeouts;
+          existing.homeRuns += homeRuns;
+          existing.gidp += gidp;
+          existing.hbp += hbp;
+          existing.wins += wins;
+          existing.losses += losses;
+          existing.saves += saves;
+        }
+      }
+
+      const results: PitchingStats[] = Array.from(pitcherMap.values()).map((p) => {
+        let primaryTeamId = targetTeamId ?? 695;
+        let maxWeight = -1;
+        for (const [tidStr, weight] of Object.entries(p.teamsWeight)) {
+          if (weight > maxWeight) {
+            maxWeight = weight;
+            primaryTeamId = Number(tidStr);
+          }
+        }
+
+        const team = getTeam(primaryTeamId);
+        const ipDecimal = p.outs / 3;
+        const inningsPitched = Number(ipDecimal.toFixed(2));
+        const inningsDisplay = formatDecimalToBaseballInnings(ipDecimal);
+
+        const calcEra = ipDecimal > 0 ? Number(((p.earnedRuns * 9) / ipDecimal).toFixed(2)) : 0.0;
+        const calcWhip =
+          ipDecimal > 0 ? Number(((p.hits + p.walks) / ipDecimal).toFixed(2)) : 0.0;
+        const calcK9 =
+          ipDecimal > 0 ? Number(((p.strikeouts * 9) / ipDecimal).toFixed(2)) : 0.0;
+        const calcBb9 = ipDecimal > 0 ? Number(((p.walks * 9) / ipDecimal).toFixed(2)) : 0.0;
+        const calcKToBb =
+          p.walks > 0 ? Number((p.strikeouts / p.walks).toFixed(2)) : p.strikeouts;
+
+        const useSingle = p.splitCount === 1;
+        const era =
+          useSingle && p.singleEra !== null ? Number(p.singleEra.toFixed(2)) : calcEra;
+        const whip =
+          useSingle && p.singleWhip !== null ? Number(p.singleWhip.toFixed(2)) : calcWhip;
+        const kPer9 =
+          useSingle && p.singleK9 !== null ? Number(p.singleK9.toFixed(2)) : calcK9;
+        const bbPer9 =
+          useSingle && p.singleBb9 !== null ? Number(p.singleBb9.toFixed(2)) : calcBb9;
+        const kToBb =
+          useSingle && p.singleKToBb !== null ? Number(p.singleKToBb.toFixed(2)) : calcKToBb;
+
+        return {
+          playerId: p.playerId,
+          playerName: p.playerName,
+          playerAvatar: getPlayerHeadshotUrl(p.playerId),
+          teamId: team.id,
+          teamName: team.name,
+          teamAbbr: team.abbreviation,
+          teamLogo: team.logoUrl,
+          games: p.games,
+          gamesStarted: p.gamesStarted,
+          inningsPitched,
+          inningsDisplay,
+          hits: p.hits,
+          runs: p.runs,
+          earnedRuns: p.earnedRuns,
+          walks: p.walks,
+          strikeouts: p.strikeouts,
+          homeRuns: p.homeRuns,
+          gidp: p.gidp,
+          hbp: p.hbp,
+          wins: p.wins,
+          losses: p.losses,
+          saves: p.saves,
+          era,
+          whip,
+          kPer9,
+          bbPer9,
+          kToBb,
+        };
+      });
+
+      const qualified = minIp > 0 ? results.filter((p) => p.inningsPitched >= minIp) : results;
+      qualified.sort((a, b) => a.era - b.era || b.strikeouts - a.strikeouts);
+      return limit ? qualified.slice(0, limit) : qualified;
+    }
+
+    // Fallback a Supabase pitching_stats unido con games filtrado por game_date
+    const fallbackRows: RawPitchingRow[] = [];
+    if (supabase) {
+      try {
+        let query = supabase
+          .from("pitching_stats")
+          .select(
+            "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players!inner(full_name), games!inner(season, game_type, status, game_date)"
+          )
+          .eq("games.season", season)
+          .gte("games.game_date", startDate)
+          .lte("games.game_date", endDate)
+          .limit(10000);
+
+        if (targetTeamId !== null) {
+          query = query.eq("team_id", targetTeamId);
+        }
+
+        const dbResult = await Promise.resolve(query).catch((err) => ({ data: null, error: err }));
+        if (dbResult.error) {
+          console.error("Error al consultar pitching_stats por rango de fechas:", dbResult.error);
+        }
+        if (Array.isArray(dbResult.data)) {
+          fallbackRows.push(...(dbResult.data as RawPitchingRow[]));
+        }
+      } catch (err) {
+        console.error("Error en fallback de pitching_stats por rango de fechas:", err);
+      }
+    }
+
+    const cachedGames = seasonGamesCache.get(season)?.games || [];
+    for (const game of cachedGames) {
+      const gDate = String(game.game_date || "").slice(0, 10);
+      if (!gDate || gDate < startDate || gDate > endDate) continue;
+      const cached =
+        reconciledBoxscoreCache.get(Number(game.id)) ||
+        (game.game_pk ? reconciledBoxscoreCache.get(Number(game.game_pk)) : undefined);
+      if (!cached) continue;
+      for (const pRow of cached.pitching_stats) {
+        if (targetTeamId !== null && Number(pRow.team_id) !== targetTeamId) continue;
+        fallbackRows.push({
+          ...pRow,
+          games: {
+            ...(pRow.games || { season, game_type: "regular", status: game.status || "Final" }),
+            game_date: gDate,
+          },
+        });
+      }
+    }
+
+    return aggregatePitchingRows(fallbackRows, new Map(), minIp, limit, { startDate, endDate });
+  }
+
+  let dbPromise: Promise<{ data: unknown[] | null; error: unknown }> = Promise.resolve({
+    data: null,
+    error: null,
+  });
+
+  if (supabase) {
+    let query = supabase
+      .from("pitching_stats")
+      .select(
+        "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players!inner(full_name), games!inner(season, game_type, status)"
+      )
+      .eq("games.season", season)
+      .limit(10000);
+
+    if (phase && phase !== "all") {
+      const normalized = normalizePhase(phase);
+      const targetTypes =
+        normalized === "regular"
+          ? ["R", "regular"]
+          : normalized === "round_robin"
+          ? ["L", "round_robin"]
+          : normalized === "final"
+          ? ["F", "W", "final"]
+          : normalized === "wildcard_playin"
+          ? ["D", "wildcard_playin"]
+          : [phase];
+      query = query.in("games.game_type", targetTypes);
+    }
+
+    if (teamId && teamId !== "all") {
+      query = query.eq("team_id", Number(teamId));
+    }
+
+    dbPromise = Promise.resolve(query).catch((err) => ({ data: null, error: err }));
+  }
+
+  const [canonicalPlayedGames, dbResult, pitchingMetaMap] = await Promise.all([
+    getCanonicalPlayedGames(season, { phase }),
+    dbPromise,
+    fetchMlbSeasonPitchingMetaMap(season, phase),
+  ]);
+
+  if (dbResult.error) {
+    console.error("Error al consultar pitching_stats:", dbResult.error);
+  }
+
+  const dbRows = (dbResult.data || []) as RawPitchingRow[];
+  const mergedRows: RawPitchingRow[] = [...dbRows];
+
+  const hasTeamFilter = teamId !== undefined && teamId !== null && teamId !== "all";
+  const targetTeamId = hasTeamFilter ? Number(teamId) : null;
+
+  for (const game of canonicalPlayedGames) {
+    const cached =
+      reconciledBoxscoreCache.get(Number(game.id)) ||
+      (game.game_pk ? reconciledBoxscoreCache.get(Number(game.game_pk)) : undefined);
+    if (!cached) continue;
+
+    for (const pRow of cached.pitching_stats) {
+      if (targetTeamId !== null && Number(pRow.team_id) !== targetTeamId) continue;
+      mergedRows.push(pRow);
+    }
+  }
+
+  return aggregatePitchingRows(mergedRows, pitchingMetaMap, minIp, limit);
+}
+
+/**
+ * Obtiene los juegos disputados y porcentaje de victorias por franquicia, más el máximo de juegos en la fase o rango de fechas.
  */
 export async function getTeamGamesMap(
   season = ACTIVE_SEASON,
-  phase = "R"
+  phase = "R",
+  startDate?: string,
+  endDate?: string
 ): Promise<{
   teamGamesMap: Record<number, number>;
   teamWinPctMap: Record<number, number>;
   maxGames: number;
 }> {
+  if (startDate && endDate) {
+    const teamGamesMap: Record<number, number> = {};
+    const teamWinPctMap: Record<number, number> = {};
+    const revalidate = getDateRangeRevalidateSeconds(endDate);
+    const encStart = encodeURIComponent(startDate);
+    const encEnd = encodeURIComponent(endDate);
+
+    const hittingUrl = `https://statsapi.mlb.com/api/v1/teams/stats?season=${season}&sportIds=17&leagueIds=135&group=hitting&stats=byDateRange&startDate=${encStart}&endDate=${encEnd}`;
+    const pitchingUrl = `https://statsapi.mlb.com/api/v1/teams/stats?season=${season}&sportIds=17&leagueIds=135&group=pitching&stats=byDateRange&startDate=${encStart}&endDate=${encEnd}`;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fetchTeamSplits = async (url: string): Promise<any[]> => {
+      try {
+        const res = await fetch(url, {
+          signal: AbortSignal.timeout(5000),
+          next: { revalidate },
+          headers: MLB_FETCH_HEADERS,
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data?.stats?.[0]?.splits) ? data.stats[0].splits : [];
+      } catch (err) {
+        console.warn("Error fetching MLB teams/stats byDateRange:", err);
+        return [];
+      }
+    };
+
+    const [hittingSplits, pitchingSplits] = await Promise.all([
+      fetchTeamSplits(hittingUrl),
+      fetchTeamSplits(pitchingUrl),
+    ]);
+
+    let hasMlbTeamData = false;
+
+    for (const s of hittingSplits) {
+      const tid = Number(s?.team?.id || 0);
+      if (!LVBP_TEAM_IDS.includes(tid)) continue;
+      hasMlbTeamData = true;
+      teamGamesMap[tid] = Number(s?.stat?.gamesPlayed ?? 0);
+    }
+
+    for (const s of pitchingSplits) {
+      const tid = Number(s?.team?.id || 0);
+      if (!LVBP_TEAM_IDS.includes(tid)) continue;
+      hasMlbTeamData = true;
+      const gp = Number(s?.stat?.gamesPlayed ?? 0);
+      if (teamGamesMap[tid] === undefined || (teamGamesMap[tid] === 0 && gp > 0)) {
+        teamGamesMap[tid] = gp;
+      }
+      const wins = Number(s?.stat?.wins ?? 0);
+      const losses = Number(s?.stat?.losses ?? 0);
+      const dec = wins + losses;
+      teamWinPctMap[tid] = dec > 0 ? wins / dec : 0.0;
+    }
+
+    if (hasMlbTeamData) {
+      for (const tid of LVBP_TEAM_IDS) {
+        if (teamGamesMap[tid] === undefined) teamGamesMap[tid] = 0;
+        if (teamWinPctMap[tid] === undefined) teamWinPctMap[tid] = 0.0;
+      }
+      const maxGames = Math.max(...Object.values(teamGamesMap), 0);
+      return { teamGamesMap, teamWinPctMap, maxGames };
+    }
+
+    // Fallback a getCanonicalPlayedGames(season, { phase: "all" }) filtrado por game_date
+    try {
+      const playedGames = await getCanonicalPlayedGames(season, { phase: "all" });
+      const winsMap: Record<number, number> = {};
+      const lossesMap: Record<number, number> = {};
+      for (const tid of LVBP_TEAM_IDS) {
+        teamGamesMap[tid] = 0;
+        teamWinPctMap[tid] = 0.0;
+        winsMap[tid] = 0;
+        lossesMap[tid] = 0;
+      }
+
+      for (const g of playedGames) {
+        const gDate = String(g.game_date || "").slice(0, 10);
+        if (!gDate || gDate < startDate || gDate > endDate) continue;
+
+        const homeId = Number(g.home_team_id);
+        const awayId = Number(g.away_team_id);
+        const homeScore = Number(g.home_score ?? 0);
+        const awayScore = Number(g.away_score ?? 0);
+        const hasWinner = homeScore !== awayScore;
+
+        if (LVBP_TEAM_IDS.includes(homeId)) {
+          teamGamesMap[homeId] += 1;
+          if (hasWinner) {
+            if (homeScore > awayScore) winsMap[homeId] += 1;
+            else lossesMap[homeId] += 1;
+          }
+        }
+        if (LVBP_TEAM_IDS.includes(awayId)) {
+          teamGamesMap[awayId] += 1;
+          if (hasWinner) {
+            if (awayScore > homeScore) winsMap[awayId] += 1;
+            else lossesMap[awayId] += 1;
+          }
+        }
+      }
+
+      for (const tid of LVBP_TEAM_IDS) {
+        const dec = winsMap[tid] + lossesMap[tid];
+        teamWinPctMap[tid] = dec > 0 ? winsMap[tid] / dec : 0.0;
+      }
+
+      const maxGames = Math.max(...Object.values(teamGamesMap), 0);
+      return { teamGamesMap, teamWinPctMap, maxGames };
+    } catch (err) {
+      console.warn("Error en fallback de getTeamGamesMap por rango de fechas:", err);
+      for (const tid of LVBP_TEAM_IDS) {
+        teamGamesMap[tid] = 0;
+        teamWinPctMap[tid] = 0.0;
+      }
+      return { teamGamesMap, teamWinPctMap, maxGames: 0 };
+    }
+  }
+
   const phaseKey =
     phase === "L" ? "round_robin" : phase === "F" ? "final" : phase === "all" ? "all" : "regular";
   const standings = await getStandings(season, phaseKey);
@@ -1982,32 +2742,14 @@ export function formatDecimalToBaseballInnings(ipDecimal: number): string {
   return `${whole}.${rem}`;
 }
 
-/**
- * Obtiene estadísticas individuales de fildeo desde MLB Stats API por temporada, fase y equipo.
- */
-export async function getFieldingStats(
-  season = ACTIVE_SEASON,
-  phase = "R",
-  teamId: string | number = "all",
-  limit = 1000,
-  minChances = 0
-): Promise<FieldingStats[]> {
-  const normalized = normalizePhase(phase);
-  const splits =
-    normalized === "all"
-      ? (
-          await Promise.all([
-            fetchMlbSeasonStatsSplits(season, "R", "fielding"),
-            fetchMlbSeasonStatsSplits(season, "L", "fielding"),
-            fetchMlbSeasonStatsSplits(season, "F", "fielding"),
-          ])
-        ).flat()
-      : await fetchMlbSeasonStatsSplits(season, phase, "fielding");
-
+function aggregateFieldingSplits(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  splits: any[],
+  targetTeamId: number | null,
+  limit: number,
+  minChances: number
+): FieldingStats[] {
   if (!splits.length) return [];
-
-  const hasTeamFilter = teamId !== undefined && teamId !== null && teamId !== "all";
-  const targetTeamId = hasTeamFilter ? Number(teamId) : null;
 
   const grouped = new Map<
     string,
@@ -2037,7 +2779,11 @@ export async function getFieldingStats(
     if (!pId || !LVBP_TEAM_IDS.includes(tId)) continue;
     if (targetTeamId !== null && tId !== targetTeamId) continue;
 
-    const posAbbr = String(s?.position?.abbreviation || "UT").trim().toUpperCase();
+    const posAbbr = String(
+      s?.stat?.position?.abbreviation || s?.position?.abbreviation || "UT"
+    )
+      .trim()
+      .toUpperCase();
     if (NON_DEFENSIVE_POSITIONS.has(posAbbr)) continue;
 
     const st = s?.stat || {};
@@ -2139,4 +2885,93 @@ export async function getFieldingStats(
       b.games - a.games
   );
   return limit ? qualified.slice(0, limit) : qualified;
+}
+
+/**
+ * Obtiene estadísticas individuales de fildeo desde MLB Stats API por temporada, fase y equipo (o rango de fechas).
+ */
+export async function getFieldingStats(
+  season = ACTIVE_SEASON,
+  phase = "R",
+  teamId: string | number = "all",
+  limit = 1000,
+  minChances = 0,
+  startDate?: string,
+  endDate?: string
+): Promise<FieldingStats[]> {
+  const targetTeamId = parseTargetTeamId(teamId);
+  if (targetTeamId !== null && !LVBP_TEAM_IDS.includes(targetTeamId)) {
+    return [];
+  }
+
+  if (startDate && endDate) {
+    const teamsToFetch = targetTeamId !== null ? [targetTeamId] : LVBP_TEAM_IDS;
+    const revalidate = getDateRangeRevalidateSeconds(endDate);
+    const encStart = encodeURIComponent(startDate);
+    const encEnd = encodeURIComponent(endDate);
+
+    const perTeamSplits = await Promise.all(
+      teamsToFetch.map(async (tid) => {
+        try {
+          const url = `https://statsapi.mlb.com/api/v1/teams/${tid}/roster/fullSeason?season=${season}&hydrate=person(stats(type=byDateRange,group=fielding,startDate=${encStart},endDate=${encEnd},season=${season},sportId=17))`;
+          const res = await fetch(url, {
+            signal: AbortSignal.timeout(5000),
+            next: { revalidate },
+            headers: MLB_FETCH_HEADERS,
+          });
+          if (!res.ok) return [];
+          const data = await res.json();
+          const roster = Array.isArray(data?.roster) ? data.roster : [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const extracted: any[] = [];
+          for (const item of roster) {
+            const person = item?.person;
+            const pId = Number(person?.id || 0);
+            if (!pId) continue;
+            const fullName = String(person?.fullName || "Desconocido");
+            const statBlocks = Array.isArray(person?.stats) ? person.stats : [];
+            for (const block of statBlocks) {
+              const blockSplits = Array.isArray(block?.splits) ? block.splits : [];
+              for (const sp of blockSplits) {
+                if (sp?.sport?.id !== undefined && Number(sp.sport.id) !== 17) continue;
+                const stTeamId = Number(sp?.team?.id || 0);
+                if (!stTeamId || !LVBP_TEAM_IDS.includes(stTeamId) || stTeamId !== tid) {
+                  continue;
+                }
+                const posAbbr = String(
+                  sp?.stat?.position?.abbreviation || sp?.position?.abbreviation || "UT"
+                ).trim();
+                extracted.push({
+                  player: { id: pId, fullName },
+                  team: { id: stTeamId },
+                  position: { abbreviation: posAbbr },
+                  stat: sp?.stat || {},
+                });
+              }
+            }
+          }
+          return extracted;
+        } catch (err) {
+          console.warn(`Error fetching MLB fielding roster byDateRange (team ${tid}):`, err);
+          return [];
+        }
+      })
+    );
+
+    return aggregateFieldingSplits(perTeamSplits.flat(), targetTeamId, limit, minChances);
+  }
+
+  const normalized = normalizePhase(phase);
+  const splits =
+    normalized === "all"
+      ? (
+          await Promise.all([
+            fetchMlbSeasonStatsSplits(season, "R", "fielding"),
+            fetchMlbSeasonStatsSplits(season, "L", "fielding"),
+            fetchMlbSeasonStatsSplits(season, "F", "fielding"),
+          ])
+        ).flat()
+      : await fetchMlbSeasonStatsSplits(season, phase, "fielding");
+
+  return aggregateFieldingSplits(splits, targetTeamId, limit, minChances);
 }

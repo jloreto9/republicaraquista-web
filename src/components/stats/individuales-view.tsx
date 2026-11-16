@@ -9,7 +9,8 @@ import { PitchingTable } from "@/components/stats/pitching-table";
 import { FieldingTable } from "@/components/stats/fielding-table";
 import { AwardsView } from "@/components/stats/awards-view";
 import { PlayerSplitsView } from "@/components/stats/splits/player-splits-view";
-import { Flame, Target, Shield, Loader2, Sparkles, Zap, Trophy } from "lucide-react";
+import { StatheadIndividualSearch } from "@/components/stats/stathead-individual-search";
+import { Flame, Target, Shield, Loader2, Sparkles, Zap, Trophy, Search } from "lucide-react";
 import { useSeason } from "@/context/season-context";
 
 interface IndividualesViewProps {
@@ -22,7 +23,7 @@ interface IndividualesViewProps {
   initialMaxGames?: number;
 }
 
-type IndividualesTab = "batting" | "pitching" | "awards" | "splits" | "fielding";
+type IndividualesTab = "batting" | "pitching" | "awards" | "splits" | "fielding" | "stathead";
 
 function resolveTabFromParams(params: ReturnType<typeof useSearchParams>): IndividualesTab {
   const tabParam = params?.get("tab");
@@ -30,6 +31,7 @@ function resolveTabFromParams(params: ReturnType<typeof useSearchParams>): Indiv
   if (tabParam === "pitching") return "pitching";
   if (tabParam === "awards" || tabParam === "premios") return "awards";
   if (tabParam === "fielding") return "fielding";
+  if (tabParam === "stathead" || tabParam === "buscador") return "stathead";
   return "batting";
 }
 
@@ -347,6 +349,22 @@ export function IndividualesView({
             <Shield className="w-3.5 h-3.5 shrink-0" />
             <span>Fildeo</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("stathead")}
+            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === "stathead"
+                ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)] font-bold"
+                : "bg-[#0D152B] text-slate-300 hover:text-slate-100 hover:bg-[#131E3D] border border-[#1E2B4D]"
+            }`}
+          >
+            <Search
+              className={`w-3.5 h-3.5 shrink-0 ${
+                activeTab === "stathead" ? "text-[#070B19]" : "text-[#FDB827]"
+              }`}
+            />
+            <span>Buscador</span>
+          </button>
         </div>
 
         {/* Selector de Temporada */}
@@ -367,7 +385,7 @@ export function IndividualesView({
       </div>
 
       {/* Barra de Filtros General (para Bateo, Pitcheo, Premios y Fildeo) */}
-      {activeTab !== "splits" && (
+      {activeTab !== "splits" && activeTab !== "stathead" && (
         <StatsFilters
           selectedPhase={selectedPhase}
           onSelectPhase={setSelectedPhase}
@@ -381,7 +399,14 @@ export function IndividualesView({
       )}
 
       {/* Contenedor de Datos con Spinner */}
-      {loading ? (
+      {activeTab === "stathead" ? (
+        <StatheadIndividualSearch
+          season={season}
+          onSelectBatterForSplits={handleSelectBatterForSplits}
+          onSelectPitcherForSplits={handleSelectPitcherForSplits}
+          onSelectFielderForSplits={handleSelectFielderForSplits}
+        />
+      ) : loading ? (
         <div className="p-12 flex flex-col items-center justify-center space-y-3 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
           <Loader2 className="w-6 h-6 text-[#FDB827] animate-spin" />
           <span className="text-xs font-mono text-slate-400">
