@@ -1,4 +1,3 @@
-import { supabase } from "./supabase";
 import { getTeam } from "./constants";
 import { calculateSlashLine, calculatePitchingSplit, formatRate } from "./situational-engine";
 import {
@@ -23,8 +22,8 @@ import { BullpenAndLineupsData, GameLineup, StarterSlot, TodayLineupStatus } fro
 import { ActiveRosterBatter, TangoPlayer } from "@/types/tango-lineup";
 import { BattingStats } from "@/types/sports";
 import { getKnownPitcherHand } from "./pitcher-hand-service";
-import { getBattingStats } from "./supabase";
-import { getVenezuelanToday } from "./utils";
+import { getBattingStats, getCanonicalPlayedGames, supabase } from "./supabase";
+import { getVenezuelanDate, getVenezuelanToday } from "./utils";
 import {
   ActiveRosterMlbBatter,
   fetchTeamActiveRosterBatters,
@@ -43,19 +42,6 @@ const LEONES_TEAM_ID = 695;
 // (En serverless dura mientras el contenedor viva; para juegos Final es inmutable)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const feedCache = new Map<number, any>();
-
-interface SupabaseGameRow {
-  id: number;
-  game_pk?: number;
-  game_date?: string;
-  season?: number;
-  game_type?: string;
-  status?: string;
-  home_team_id: number;
-  away_team_id: number;
-  home_score?: number;
-  away_score?: number;
-}
 
 const MONTH_NAMES = [
   "Ene",
@@ -83,39 +69,67 @@ function formatSpanishDate(isoDate?: string): string {
 }
 
 /**
- * Consulta en Supabase todos los juegos jugados o en curso de un equipo en la temporada dada.
+ * Obtiene todos los juegos jugados o en curso de un equipo en la temporada dada
+ * combinando Supabase + MLB Stats API de forma canónica.
  */
 export async function getTeamPlayedGames(
   season = 2026,
   teamId = LEONES_TEAM_ID
 ): Promise<GameOption[]> {
-  if (!supabase) return [];
-
   try {
-    const { data: rawGames, error } = await supabase
-      .from("games")
-      .select("id, game_date, season, game_type, status, home_team_id, away_team_id, home_score, away_score")
-      .eq("season", season)
-      .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
-      .in("status", ["Final", "Completed", "Completed Early", "Game Over", "Live", "In Progress"])
-      .order("game_date", { ascending: false });
+    const rawGames = await getCanonicalPlayedGames(season, {
+      phase: "all",
+      teamId,
+      includeLive: true,
+    });
 
-    if (error || !rawGames) {
-      console.error(`Error al consultar juegos jugados del equipo ${teamId}:`, error);
+    let effectiveGames = rawGames || [];
+    if (effectiveGames.length === 0 && supabase) {
+      const { data: sbGames, error } = await supabase
+        .from("games")
+        .select("id, game_date, season, game_type, status, home_team_id, away_team_id, home_score, away_score")
+        .eq("season", season)
+        .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+        .in("status", ["Final", "Completed", "Completed Early", "Game Over", "Live", "In Progress"])
+        .order("game_date", { ascending: false });
+
+      if (!error && sbGames) {
+        effectiveGames = sbGames;
+      }
+    }
+
+    if (effectiveGames.length === 0) {
       return [];
     }
 
-    const games = (rawGames as unknown as SupabaseGameRow[]).map((g, idx, arr) => {
+    const sortedGames = [...effectiveGames].sort((a, b) => {
+      const dateA =
+        getVenezuelanDate(a.game_date, a.game_datetime) || (a.game_date || "").slice(0, 10);
+      const dateB =
+        getVenezuelanDate(b.game_date, b.game_datetime) || (b.game_date || "").slice(0, 10);
+      if (dateA !== dateB) {
+        return dateB.localeCompare(dateA);
+      }
+      const tsA = a.game_datetime ? new Date(a.game_datetime).getTime() : 0;
+      const tsB = b.game_datetime ? new Date(b.game_datetime).getTime() : 0;
+      if (tsA !== tsB) {
+        return tsB - tsA;
+      }
+      return Number(b.id) - Number(a.id);
+    });
+
+    const games = sortedGames.map((g, idx, arr) => {
       const isHome = Number(g.home_team_id) === teamId;
       const oppId = isHome ? Number(g.away_team_id) : Number(g.home_team_id);
       const oppTeam = getTeam(oppId);
       const teamScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
       const oppScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
       const won = teamScore > oppScore;
+      const effDate = getVenezuelanDate(g.game_date, g.game_datetime) || g.game_date;
 
       return {
         id: Number(g.id),
-        date: formatSpanishDate(g.game_date),
+        date: formatSpanishDate(effDate),
         opponent: isHome ? `vs ${oppTeam.name}` : `@ ${oppTeam.name}`,
         score: `${teamScore}-${oppScore}`,
         result: (won ? "W" : "L") as "W" | "L",

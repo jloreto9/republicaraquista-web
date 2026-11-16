@@ -4,7 +4,11 @@ import {
   TeamStreakItem,
   RachasTabData,
 } from "@/types/streaks";
-import { supabase } from "./supabase";
+import {
+  getCanonicalPlayedGames,
+  getCanonicalGameBoxscoreRows,
+  type SupabaseGameRow,
+} from "./supabase";
 import { LVBP_TEAMS, LVBP_TEAM_IDS, getTeam, getPlayerHeadshotUrl } from "./constants";
 
 const LEONES_ID = 695;
@@ -584,55 +588,39 @@ export async function getStreaksData(season: number): Promise<RachasTabData> {
     return BASELINE_2025_STREAKS;
   }
 
-  if (!supabase) {
-    console.warn("Supabase no configurado; retornando línea base limpia de rachas.");
-    return CLEAN_ZERO_STREAKS;
-  }
-
   try {
-    // 1. Consultar juegos de la temporada para calcular rachas de equipo
-    const { data: rawGames, error: gamesErr } = await supabase
-      .from("games")
-      .select("*")
-      .eq("season", season)
-      .in("status", ["Final", "Completed", "Completed Early", "Game Over"]);
+    // 1. Obtener juegos canónicos de la temporada (Supabase + MLB Stats API) para rachas de equipo
+    const rawGames = await getCanonicalPlayedGames(season, { phase: "regular" });
 
-    if (gamesErr || !rawGames || rawGames.length === 0) {
-      // Si la temporada actual aún no tiene juegos en BD, usar fallback de respaldo
+    if (!rawGames || rawGames.length === 0) {
+      // Si la temporada actual aún no tiene juegos disputados, usar fallback de respaldo
       return BASELINE_2025_STREAKS;
     }
 
     const teamStreaks = computeTeamStreaks(rawGames, LEONES_ID);
 
     // 2. Mapa de juegos indexados por ID y GamePk
-    const gamesMap: Record<number, any> = {};
-    const gameIdList: number[] = [];
+    const gamesMap: Record<number, SupabaseGameRow> = {};
+    const gameIdSet = new Set<number>();
     for (const g of rawGames) {
+      const isLeonesGame =
+        Number(g.home_team_id) === LEONES_ID || Number(g.away_team_id) === LEONES_ID;
       if (g.id) {
         gamesMap[g.id] = g;
-        gameIdList.push(g.id);
+        if (isLeonesGame) gameIdSet.add(Number(g.id));
       }
       if (g.game_pk) {
         gamesMap[g.game_pk] = g;
-        gameIdList.push(g.game_pk);
+        if (isLeonesGame) gameIdSet.add(Number(g.game_pk));
       }
     }
+    const gameIdList = Array.from(gameIdSet);
 
-    // 3. Consultar boxscores de bateo y pitcheo de Leones (team 695)
-    const [{ data: batRows }, { data: pitRows }] = await Promise.all([
-      supabase
-        .from("batting_stats")
-        .select("*, players(full_name)")
-        .in("game_id", gameIdList)
-        .eq("team_id", LEONES_ID)
-        .limit(2000),
-      supabase
-        .from("pitching_stats")
-        .select("*, players(full_name)")
-        .in("game_id", gameIdList)
-        .eq("team_id", LEONES_ID)
-        .limit(2000),
-    ]);
+    // 3. Consultar boxscores canónicos de bateo y pitcheo de Leones (team 695)
+    const { battingRows: batRows, pitchingRows: pitRows } =
+      gameIdList.length > 0
+        ? await getCanonicalGameBoxscoreRows(season, gameIdList, LEONES_ID)
+        : { battingRows: [], pitchingRows: [] };
 
     const { hittingStreaks, onBaseStreaks } = computeBatterStreaks(batRows || [], gamesMap);
     const pitchingStreaks = computePitcherStreaks(pitRows || [], gamesMap);

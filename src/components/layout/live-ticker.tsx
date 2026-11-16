@@ -2,17 +2,20 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { TickerGame, TickerResponse } from "@/types/ticker";
 import { useSeason } from "@/context/season-context";
 
 export function LiveTicker() {
   const { season } = useSeason();
+  const router = useRouter();
   const [games, setGames] = useState<TickerGame[]>([]);
   const [dateLabel, setDateLabel] = useState<string>("Jornada LVBP");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const hasLiveRef = useRef<boolean>(false);
   const isFetchingRef = useRef<boolean>(false);
+  const prevLiveGameIdsRef = useRef<Set<number>>(new Set());
 
   const fetchTicker = useCallback(async () => {
     if (isFetchingRef.current) return;
@@ -26,6 +29,15 @@ export function LiveTicker() {
       if (res.ok) {
         const json: TickerResponse = await res.json();
         if (json.success && json.games) {
+          const liveToFinalDetected = json.games.some(
+            (g) =>
+              prevLiveGameIdsRef.current.has(g.gamePk) &&
+              !g.isLive &&
+              g.status === "Final"
+          );
+          prevLiveGameIdsRef.current = new Set(
+            json.games.filter((g) => g.isLive === true).map((g) => g.gamePk)
+          );
           hasLiveRef.current = json.games.some((g) => g.isLive);
           setGames((prev) => {
             const isSame =
@@ -41,6 +53,9 @@ export function LiveTicker() {
             return isSame ? prev : json.games;
           });
           if (json.dateLabel) setDateLabel(json.dateLabel);
+          if (liveToFinalDetected) {
+            router.refresh();
+          }
         }
       }
     } catch (err) {
@@ -49,7 +64,7 @@ export function LiveTicker() {
       setIsLoading(false);
       isFetchingRef.current = false;
     }
-  }, [season]);
+  }, [season, router]);
 
   useEffect(() => {
     let timerId: NodeJS.Timeout | null = null;

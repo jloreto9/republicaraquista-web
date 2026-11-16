@@ -11,7 +11,12 @@ import {
   GameMVP,
 } from "@/types/leones-stats";
 import { ACTIVE_SEASON, getTeam, getPlayerHeadshotUrl, JOSE_RONDON_ID } from "./constants";
-import { supabase, getBattingStats, getPitchingStats } from "./supabase";
+import {
+  getBattingStats,
+  getPitchingStats,
+  getCanonicalPlayedGames,
+  getCanonicalGameBoxscoreRows,
+} from "./supabase";
 import { getSeasonWpaLeaders } from "./wpa-engine";
 import { isDayGame, getVenezuelanDate } from "./utils";
 import { fetchGameLiveFeed } from "./game-feed-service";
@@ -253,6 +258,25 @@ export function isPechofriadaGame(
   return maxLead >= 5;
 }
 
+function sortGamesByDate<
+  T extends { id?: number | string; game_date?: string | null; game_datetime?: string | null }
+>(games: T[], direction: "asc" | "desc" = "asc"): T[] {
+  const sign = direction === "asc" ? 1 : -1;
+  return [...games].sort((a, b) => {
+    const dateA = getVenezuelanDate(a.game_date, a.game_datetime) || (a.game_date || "").slice(0, 10);
+    const dateB = getVenezuelanDate(b.game_date, b.game_datetime) || (b.game_date || "").slice(0, 10);
+    if (dateA !== dateB) {
+      return dateA.localeCompare(dateB) * sign;
+    }
+    const tsA = a.game_datetime ? new Date(a.game_datetime).getTime() : 0;
+    const tsB = b.game_datetime ? new Date(b.game_datetime).getTime() : 0;
+    if (tsA !== tsB) {
+      return (tsA - tsB) * sign;
+    }
+    return (Number(a.id || 0) - Number(b.id || 0)) * sign;
+  });
+}
+
 /**
  * Obtiene las estadísticas de situación de Leones del Caracas.
  */
@@ -262,38 +286,15 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
     return BASELINE_2025_STATS;
   }
 
-  // Si estamos en otra temporada o 2026-2027 sin conexión Supabase, retornamos base limpia
-  if (!supabase) {
-    return CLEAN_ZERO_STATS;
-  }
-
   try {
-    const { data: rawGames } = await supabase
-      .from("games")
-      .select("*")
-      .eq("season", season)
-      .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
-      .in("game_type", ["R", "regular"])
-      .or("home_team_id.eq.695,away_team_id.eq.695");
+    const rawGames = await getCanonicalPlayedGames(season, { phase: "regular", teamId: 695 });
 
     if (!rawGames || rawGames.length === 0) {
       return CLEAN_ZERO_STATS;
     }
 
     // Ordenar cronológicamente para racha y últimos 10 juegos
-    const sortedGames = [...rawGames].sort((a, b) => {
-      const da = a.game_datetime
-        ? new Date(a.game_datetime).getTime()
-        : a.game_date
-        ? new Date(a.game_date).getTime()
-        : 0;
-      const db = b.game_datetime
-        ? new Date(b.game_datetime).getTime()
-        : b.game_date
-        ? new Date(b.game_date).getTime()
-        : 0;
-      return da !== db ? da - db : Number(a.id) - Number(b.id);
-    });
+    const sortedGames = sortGamesByDate(rawGames, "asc");
 
     let wins = 0;
     let losses = 0;
@@ -319,15 +320,16 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
     );
     let rondonGameIds = new Set<number>();
     try {
-      const { data: rondonRows } = await supabase
-        .from("batting_stats")
-        .select("game_id, ab, bb, hbp, sf, sh, r, sb")
-        .in("game_id", allGameIdentifiers)
-        .eq("player_id", JOSE_RONDON_ID);
+      const { battingRows: rondonRows } = await getCanonicalGameBoxscoreRows(
+        season,
+        allGameIdentifiers,
+        695
+      );
 
       if (rondonRows && rondonRows.length > 0) {
         // Un bateador vio acción real si consumió turnos/apariciones al plato (PA) o anotó carrera / robó base
         const playedRows = rondonRows.filter((r) => {
+          if (Number(r.player_id) !== JOSE_RONDON_ID) return false;
           const activity =
             Number(r.ab || 0) +
             Number(r.bb || 0) +
@@ -344,11 +346,6 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       console.warn("Fallo consulta de juegos disputados por José Rondón:", err);
     }
 
-    let withRondonWins = 0;
-    let withRondonLosses = 0;
-    let withoutRondonWins = 0;
-    let withoutRondonLosses = 0;
-
     const daysCount = { 0: { w: 0, l: 0 }, 1: { w: 0, l: 0 }, 2: { w: 0, l: 0 }, 3: { w: 0, l: 0 }, 4: { w: 0, l: 0 }, 5: { w: 0, l: 0 }, 6: { w: 0, l: 0 } };
     let octW = 0, octL = 0, novW = 0, novL = 0, decW = 0, decL = 0;
 
@@ -364,17 +361,6 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
       if (won) wins++; else losses++;
       if (isHome) { if (won) homeWins++; else homeLosses++; }
       else { if (won) awayWins++; else awayLosses++; }
-
-      const gId = Number(g.id);
-      const gPk = Number(g.game_pk || 0);
-      const rondonPlayed = rondonGameIds.has(gId) || (gPk > 0 && rondonGameIds.has(gPk));
-      if (rondonPlayed) {
-        if (won) withRondonWins++;
-        else withRondonLosses++;
-      } else {
-        if (won) withoutRondonWins++;
-        else withoutRondonLosses++;
-      }
 
       const isDay = isDayGame(g.game_datetime, g.is_day_game);
       if (isDay) { if (won) dayWins++; else dayLosses++; }
@@ -438,7 +424,7 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
           (isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0));
 
         try {
-          const feed = await fetchGameLiveFeed(Number(g.id));
+          const feed = await fetchGameLiveFeed(Number(g.game_pk || g.id));
           if (!feed) {
             if (isExtraInningGame(null, null, g.current_inning)) {
               if (baseWon) extraWins++;
@@ -501,12 +487,28 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
             pechofriadas++;
           }
 
-          // Decisiones oficiales de pitcheo
+          // Decisiones oficiales de pitcheo y verificación directa de participación de José Rondón
           const winnerId = dec.winner?.id;
           const loserId = dec.loser?.id;
           const saveId = dec.save?.id;
 
           const leoBox = box.teams?.[isHome ? "home" : "away"] || {};
+          const rondonBoxBatting = leoBox.players?.[`ID${JOSE_RONDON_ID}`]?.stats?.batting;
+          if (rondonBoxBatting) {
+            const rondonActivity =
+              Number(rondonBoxBatting.atBats ?? 0) +
+              Number(rondonBoxBatting.baseOnBalls ?? 0) +
+              Number(rondonBoxBatting.hitByPitch ?? 0) +
+              Number(rondonBoxBatting.sacFlies ?? 0) +
+              Number(rondonBoxBatting.sacBunts ?? 0) +
+              Number(rondonBoxBatting.runs ?? 0) +
+              Number(rondonBoxBatting.stolenBases ?? 0);
+            if (rondonActivity > 0) {
+              rondonGameIds.add(Number(g.id));
+              if (g.game_pk) rondonGameIds.add(Number(g.game_pk));
+            }
+          }
+
           const pitchers = (leoBox.pitchers || []).map(Number);
           const starterId = pitchers[0];
           const relievers = pitchers.slice(1);
@@ -521,6 +523,25 @@ export async function getLeonesAdvancedStats(season = ACTIVE_SEASON): Promise<Le
         }
       })
     );
+
+    let withRondonWins = 0;
+    let withRondonLosses = 0;
+    let withoutRondonWins = 0;
+    let withoutRondonLosses = 0;
+
+    sortedGames.forEach((g, idx) => {
+      const won = gameOutcomes[idx];
+      const gId = Number(g.id);
+      const gPk = Number(g.game_pk || 0);
+      const rondonPlayed = rondonGameIds.has(gId) || (gPk > 0 && rondonGameIds.has(gPk));
+      if (rondonPlayed) {
+        if (won) withRondonWins++;
+        else withRondonLosses++;
+      } else {
+        if (won) withoutRondonWins++;
+        else withoutRondonLosses++;
+      }
+    });
 
     // Fallbacks defensivos si fallara la red de MLB
     const effectiveStarters =
@@ -591,20 +612,8 @@ export async function getWeeklyRecords(season = ACTIVE_SEASON): Promise<WeeklyRe
       record: "0G-0P",
     }));
 
-  if (!supabase) {
-    return buildEmptyWeeks();
-  }
-
   try {
-    const { data: rawGames } = await supabase
-      .from("games")
-      .select("*")
-      .eq("season", season)
-      .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
-      .in("game_type", ["R", "regular"])
-      .or("home_team_id.eq.695,away_team_id.eq.695");
-
-    const games = rawGames || [];
+    const games = await getCanonicalPlayedGames(season, { phase: "regular", teamId: 695 });
 
     return WEEKS_2026_CONFIG.map((w) => {
       const weekGames = games.filter((g) => {
@@ -656,62 +665,116 @@ export async function getWeeklyRecords(season = ACTIVE_SEASON): Promise<WeeklyRe
  * Obtiene los detalles y el MVP del último encuentro jugado.
  */
 export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGameDetail | null> {
-  if (supabase) {
-    try {
-      const { data: rawGames } = await supabase
-        .from("games")
-        .select("*")
-        .eq("season", season)
-        .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
-        .in("game_type", ["R", "regular"])
-        .or("home_team_id.eq.695,away_team_id.eq.695")
-        .order("game_date", { ascending: false })
-        .order("game_datetime", { ascending: false })
-        .limit(1);
+  try {
+    const canonicalGames = await getCanonicalPlayedGames(season, { phase: "regular", teamId: 695 });
+    const rawGames = sortGamesByDate(canonicalGames, "desc").slice(0, 1);
 
-      if (rawGames && rawGames.length > 0) {
-        const g = rawGames[0];
-        const isHomeLeones = Number(g.home_team_id) === 695;
-        const homeTeam = getTeam(Number(g.home_team_id));
-        const awayTeam = getTeam(Number(g.away_team_id));
-        const homeScore = Number(g.home_score ?? 0);
-        const awayScore = Number(g.away_score ?? 0);
-        const leonesScore = isHomeLeones ? homeScore : awayScore;
-        const oppScore = isHomeLeones ? awayScore : homeScore;
-        const leonesWon = leonesScore > oppScore;
+    if (rawGames && rawGames.length > 0) {
+      const g = rawGames[0];
+      const isHomeLeones = Number(g.home_team_id) === 695;
+      const homeTeam = getTeam(Number(g.home_team_id));
+      const awayTeam = getTeam(Number(g.away_team_id));
+      const homeScore = Number(g.home_score ?? 0);
+      const awayScore = Number(g.away_score ?? 0);
+      const leonesScore = isHomeLeones ? homeScore : awayScore;
+      const oppScore = isHomeLeones ? awayScore : homeScore;
+      const leonesWon = leonesScore > oppScore;
 
-        const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
-        let gameDateFormatted = effDate || g.game_date || "";
-        if (effDate && effDate.length >= 10) {
-          const parts = effDate.slice(0, 10).split("-");
-          const months = [
-            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-          ];
-          const mIndex = parseInt(parts[1], 10) - 1;
-          gameDateFormatted = `${parseInt(parts[2], 10)} de ${months[mIndex]}, ${parts[0]}`;
+      const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
+      let gameDateFormatted = effDate || g.game_date || "";
+      if (effDate && effDate.length >= 10) {
+        const parts = effDate.slice(0, 10).split("-");
+        const months = [
+          "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+          "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ];
+        const mIndex = parseInt(parts[1], 10) - 1;
+        gameDateFormatted = `${parseInt(parts[2], 10)} de ${months[mIndex]}, ${parts[0]}`;
+      }
+
+      let mvp: GameMVP | null = season === 2025 ? BASELINE_2025_LAST_GAME.mvp : null;
+      let topBatter: GameMVP | null = null;
+      let topPitcher: GameMVP | null = null;
+
+      try {
+        const { processGameWpa } = await import("./wpa-engine");
+        const targetGamePk = Number(g.game_pk || g.id);
+        const gameWpa = await processGameWpa(targetGamePk);
+
+        const gameIdList = Array.from(new Set([g.id, g.game_pk].filter(Boolean).map(Number)));
+
+        // 1. Obtener estadísticas canónicas de caja de bateo y pitcheo de Leones (team 695)
+        let { battingRows: batRows, pitchingRows: pitRows } = await getCanonicalGameBoxscoreRows(
+          season,
+          gameIdList,
+          695
+        );
+
+        // Fallback directo al feed/live de MLB si el boxscore aún no estuviera disponible
+        if (!batRows || batRows.length === 0 || !pitRows || pitRows.length === 0) {
+          const feed = await fetchGameLiveFeed(targetGamePk);
+          const leoBox = feed?.liveData?.boxscore?.teams?.[isHomeLeones ? "home" : "away"];
+          if (leoBox?.players) {
+            if (!batRows || batRows.length === 0) {
+              const batters: number[] = Array.isArray(leoBox.batters) ? leoBox.batters : [];
+              batRows = batters
+                .map((pId: number) => {
+                  const pData = leoBox.players[`ID${pId}`];
+                  const b = pData?.stats?.batting;
+                  if (!b) return null;
+                  return {
+                    game_id: targetGamePk,
+                    player_id: pId,
+                    team_id: 695,
+                    player_name: pData?.person?.fullName || "Bateador",
+                    ab: Number(b.atBats ?? 0),
+                    r: Number(b.runs ?? 0),
+                    h: Number(b.hits ?? 0),
+                    doubles: Number(b.doubles ?? 0),
+                    triples: Number(b.triples ?? 0),
+                    hr: Number(b.homeRuns ?? 0),
+                    rbi: Number(b.rbi ?? 0),
+                    bb: Number(b.baseOnBalls ?? 0),
+                    so: Number(b.strikeOuts ?? 0),
+                    sb: Number(b.stolenBases ?? 0),
+                    cs: Number(b.caughtStealing ?? 0),
+                    hbp: Number(b.hitByPitch ?? 0),
+                    sf: Number(b.sacFlies ?? 0),
+                    sh: Number(b.sacBunts ?? 0),
+                  };
+                })
+                .filter(Boolean);
+            }
+            if (!pitRows || pitRows.length === 0) {
+              const pitchers: number[] = Array.isArray(leoBox.pitchers) ? leoBox.pitchers : [];
+              pitRows = pitchers
+                .map((pId: number) => {
+                  const pData = leoBox.players[`ID${pId}`];
+                  const p = pData?.stats?.pitching;
+                  if (!p) return null;
+                  const ipStr = String(p.inningsPitched || "0.0");
+                  const [wholeStr, fracStr] = ipStr.split(".");
+                  const ipDec =
+                    (parseInt(wholeStr || "0", 10) || 0) + (parseInt(fracStr || "0", 10) || 0) / 3;
+                  return {
+                    game_id: targetGamePk,
+                    player_id: pId,
+                    team_id: 695,
+                    player_name: pData?.person?.fullName || "Lanzador",
+                    ip_string: ipStr,
+                    ip_decimal: ipDec,
+                    h: Number(p.hits ?? 0),
+                    r: Number(p.runs ?? 0),
+                    er: Number(p.earnedRuns ?? 0),
+                    bb: Number(p.baseOnBalls ?? 0),
+                    so: Number(p.strikeOuts ?? 0),
+                    hr: Number(p.homeRuns ?? 0),
+                  };
+                })
+                .filter(Boolean);
+            }
+          }
         }
-
-        let mvp: GameMVP | null = season === 2025 ? BASELINE_2025_LAST_GAME.mvp : null;
-        let topBatter: GameMVP | null = null;
-        let topPitcher: GameMVP | null = null;
-
-        try {
-          const { processGameWpa } = await import("./wpa-engine");
-          const targetGamePk = Number(g.game_pk || g.id);
-          const gameWpa = await processGameWpa(targetGamePk);
-
-          const gameIdList = [g.id, g.game_pk].filter(Boolean).map(Number);
-
-          // 1. Obtener estadísticas de caja de bateo y pitcheo de Leones (team 695)
-          const [{ data: batRows }, { data: pitRows }] = await Promise.all([
-            supabase
-              ? supabase.from("batting_stats").select("*").in("game_id", gameIdList).eq("team_id", 695)
-              : Promise.resolve({ data: null }),
-            supabase
-              ? supabase.from("pitching_stats").select("*").in("game_id", gameIdList).eq("team_id", 695)
-              : Promise.resolve({ data: null }),
-          ]);
 
           const batterMap: Record<number, any> = {};
           if (batRows) {
@@ -911,7 +974,7 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
           gamePk: Number(g.game_pk ?? g.id),
           gameDate: g.game_date || "",
           gameDateFormatted,
-          venue: g.venue || (isHomeLeones ? "Estadio Monumental Simón Bolívar" : "Estadio Rival"),
+          venue: (g as { venue?: string }).venue || (isHomeLeones ? "Estadio Monumental Simón Bolívar" : "Estadio Rival"),
           homeTeamName: homeTeam.name,
           homeTeamAbbr: homeTeam.abbreviation,
           homeTeamLogo: homeTeam.logoUrl,
@@ -930,7 +993,6 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
     } catch (err) {
       console.warn("Error consultando último juego de Leones:", err);
     }
-  }
   return BASELINE_2025_LAST_GAME;
 }
 
@@ -938,50 +1000,41 @@ export async function getLastGameDetail(season = ACTIVE_SEASON): Promise<LastGam
  * Obtiene los últimos 10 encuentros jugados por Leones.
  */
 export async function getRecentTrends(limit = 10, season = ACTIVE_SEASON): Promise<TrendGameItem[]> {
-  if (supabase) {
-    try {
-      const { data: rawGames } = await supabase
-        .from("games")
-        .select("*")
-        .eq("season", season)
-        .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
-        .in("game_type", ["R", "regular"])
-        .or("home_team_id.eq.695,away_team_id.eq.695")
-        .order("game_date", { ascending: false })
-        .limit(limit);
+  try {
+    const canonicalGames = await getCanonicalPlayedGames(season, { phase: "regular", teamId: 695 });
+    const rawGames = sortGamesByDate(canonicalGames, "desc").slice(0, limit);
 
-      if (rawGames && rawGames.length > 0) {
-        return rawGames.map((g) => {
-          const isHome = Number(g.home_team_id) === 695;
-          const rivalId = isHome ? Number(g.away_team_id) : Number(g.home_team_id);
-          const rivalTeam = getTeam(rivalId);
-          const caracasScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
-          const rivalScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
-          const won = caracasScore > rivalScore;
+    if (rawGames && rawGames.length > 0) {
+      return rawGames.map((g) => {
+        const isHome = Number(g.home_team_id) === 695;
+        const rivalId = isHome ? Number(g.away_team_id) : Number(g.home_team_id);
+        const rivalTeam = getTeam(rivalId);
+        const caracasScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
+        const rivalScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
+        const won = caracasScore > rivalScore;
 
-          const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
-          let fecha = effDate?.slice(5) || "";
-          if (effDate && effDate.length >= 10) {
-            const parts = effDate.slice(0, 10).split("-");
-            fecha = `${parts[2]}/${parts[1]}`;
-          }
+        const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
+        let fecha = effDate?.slice(5) || "";
+        if (effDate && effDate.length >= 10) {
+          const parts = effDate.slice(0, 10).split("-");
+          fecha = `${parts[2]}/${parts[1]}`;
+        }
 
-          return {
-            id: Number(g.id),
-            fecha,
-            rivalId,
-            rivalName: rivalTeam.name,
-            rivalAbbr: rivalTeam.abbreviation,
-            rivalLogo: rivalTeam.logoUrl,
-            isHome,
-            score: `${caracasScore}-${rivalScore}`,
-            won,
-          };
-        });
-      }
-    } catch (err) {
-      console.warn("Error consultando tendencias de Leones:", err);
+        return {
+          id: Number(g.id),
+          fecha,
+          rivalId,
+          rivalName: rivalTeam.name,
+          rivalAbbr: rivalTeam.abbreviation,
+          rivalLogo: rivalTeam.logoUrl,
+          isHome,
+          score: `${caracasScore}-${rivalScore}`,
+          won,
+        };
+      });
     }
+  } catch (err) {
+    console.warn("Error consultando tendencias de Leones:", err);
   }
   return BASELINE_2025_TRENDS.slice(0, limit);
 }
@@ -1117,48 +1170,41 @@ export async function getBroadcastChannelRecords(season = 2026): Promise<Broadca
     });
   });
 
-  // Si existen resultados jugados cruzados con Supabase, acumular wins y losses
-  if (supabase) {
-    try {
-      const { data: rawGames } = await supabase
-        .from("games")
-        .select("game_date, home_score, away_score, home_team_id")
-        .eq("season", season)
-        .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
-        .in("game_type", ["R", "regular"])
-        .or("home_team_id.eq.695,away_team_id.eq.695");
+  // Cruzar resultados jugados canónicos (Supabase + MLB Stats API) para acumular wins y losses
+  try {
+    const rawGames = await getCanonicalPlayedGames(season, { phase: "regular", teamId: 695 });
 
-      if (rawGames && rawGames.length > 0) {
-        rawGames.forEach((g) => {
-          const matchedEvent = events.find((ev) => ev.date === g.game_date?.slice(0, 10));
-          if (!matchedEvent) return;
+    if (rawGames && rawGames.length > 0) {
+      rawGames.forEach((g) => {
+        const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
+        const matchedEvent = events.find((ev) => ev.date === effDate);
+        if (!matchedEvent) return;
 
-          const isHome = Number(g.home_team_id) === 695;
-          const leonesScore = isHome ? Number(g.home_score) : Number(g.away_score);
-          const oppScore = isHome ? Number(g.away_score) : Number(g.home_score);
-          const won = leonesScore > oppScore;
+        const isHome = Number(g.home_team_id) === 695;
+        const leonesScore = isHome ? Number(g.home_score ?? 0) : Number(g.away_score ?? 0);
+        const oppScore = isHome ? Number(g.away_score ?? 0) : Number(g.home_score ?? 0);
+        const won = leonesScore > oppScore;
 
-          const rawTrans = (matchedEvent.transmission || "").toLowerCase();
-          const parts = rawTrans.split(",").map((p) => p.trim());
+        const rawTrans = (matchedEvent.transmission || "").toLowerCase();
+        const parts = rawTrans.split(",").map((p) => p.trim());
 
-          parts.forEach((part) => {
-            if (part.includes("beisbolplay")) return;
-            for (const [pattern, cfg] of Object.entries(LINEAR_CHANNELS)) {
-              if (part === pattern || part.includes(pattern)) {
-                if (channelMap[cfg.key]) {
-                  channelMap[cfg.key].played += 1;
-                  if (won) channelMap[cfg.key].wins += 1;
-                  else channelMap[cfg.key].losses += 1;
-                }
-                break;
+        parts.forEach((part) => {
+          if (part.includes("beisbolplay")) return;
+          for (const [pattern, cfg] of Object.entries(LINEAR_CHANNELS)) {
+            if (part === pattern || part.includes(pattern)) {
+              if (channelMap[cfg.key]) {
+                channelMap[cfg.key].played += 1;
+                if (won) channelMap[cfg.key].wins += 1;
+                else channelMap[cfg.key].losses += 1;
               }
+              break;
             }
-          });
+          }
         });
-      }
-    } catch {
-      // Silencioso: mantendrá scheduled y played=0
+      });
     }
+  } catch {
+    // Silencioso: mantendrá scheduled y played=0
   }
 
   // Filtrar solo los canales que tienen al menos 1 juego programado o jugado
@@ -1214,18 +1260,8 @@ export async function getHeadToHeadRecords(season = ACTIVE_SEASON): Promise<Head
     };
   });
 
-  if (!supabase) {
-    return defaultRecords;
-  }
-
   try {
-    const { data: rawGames } = await supabase
-      .from("games")
-      .select("*")
-      .eq("season", season)
-      .in("status", ["Final", "Completed", "Completed Early", "Game Over"])
-      .in("game_type", ["R", "regular"])
-      .or("home_team_id.eq.695,away_team_id.eq.695");
+    const rawGames = await getCanonicalPlayedGames(season, { phase: "regular", teamId: 695 });
 
     if (!rawGames || rawGames.length === 0) {
       return defaultRecords;
@@ -1343,7 +1379,7 @@ export async function getDashboardTabsData(season = ACTIVE_SEASON): Promise<Dash
       getLastGameDetail(season),
       getRecentTrends(10, season),
       getCaracasTeamLeaders(season),
-      getBroadcastChannelRecords(2026),
+      getBroadcastChannelRecords(season),
       getHeadToHeadRecords(season),
       getStreaksData(season).catch((err) => {
         console.error("Error al cargar rachas en dashboard:", err);
