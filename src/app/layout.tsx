@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Jura, Righteous } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -19,6 +19,17 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+const righteous = Righteous({
+  weight: "400",
+  variable: "--font-righteous",
+  subsets: ["latin"],
+});
+
+const jura = Jura({
+  variable: "--font-jura",
   subsets: ["latin"],
 });
 
@@ -69,7 +80,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} h-full dark`}>
+    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} ${righteous.variable} ${jura.variable} h-full dark`}>
       <body className="h-full bg-[#070B19] text-[#F8FAFC] flex flex-col lg:flex-row overflow-hidden antialiased">
         <SeasonProvider>
           <RadioProvider>

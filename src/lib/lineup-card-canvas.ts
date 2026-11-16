@@ -31,6 +31,34 @@ const PILL_FILL_COLOR = "rgba(116, 101, 61, 0.84)";
 const HEADER_GOLD_COLOR = "#C59D4D";
 const TEXT_WHITE = "#FFFFFF";
 
+const DISPLAY_FONT_FALLBACK = '"Righteous", "Arial Black", sans-serif';
+const BODY_FONT_FALLBACK = '"Jura", "Montserrat", "Inter", sans-serif';
+
+function resolveFontFamily(cssVarName: string, fallback: string): string {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return fallback;
+  }
+  const value = window
+    .getComputedStyle(document.documentElement)
+    .getPropertyValue(cssVarName)
+    .trim();
+  return value ? `${value}, ${fallback}` : fallback;
+}
+
+async function ensureLineupFontsLoaded(displayFont: string, bodyFont: string): Promise<void> {
+  if (typeof document === "undefined" || !("fonts" in document)) return;
+  try {
+    await Promise.all([
+      document.fonts.load(`400 ${42 * SCALE}px ${displayFont}`),
+      document.fonts.load(`600 ${25 * SCALE}px ${bodyFont}`),
+      document.fonts.load(`700 ${25 * SCALE}px ${bodyFont}`),
+    ]);
+    await document.fonts.ready;
+  } catch {
+    // Fallback silencioso si el entorno de navegador no soporta Font Loading API
+  }
+}
+
 // Caché en memoria de imágenes ya cargadas para evitar parpadeos al editar en vivo
 const imageCache = new Map<string, HTMLImageElement>();
 const inFlightImageLoads = new Map<string, Promise<HTMLImageElement | null>>();
@@ -181,6 +209,10 @@ export async function renderLineupCardOnCanvas(
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
+  const displayFont = resolveFontFamily("--font-righteous", DISPLAY_FONT_FALLBACK);
+  const bodyFont = resolveFontFamily("--font-jura", BODY_FONT_FALLBACK);
+  await ensureLineupFontsLoaded(displayFont, bodyFont);
+
   // ── 0. Fondo de Plantilla o Gradiente Fallback ──
   ctx.save();
   if (bgImg) {
@@ -194,11 +226,11 @@ export async function renderLineupCardOnCanvas(
   }
   ctx.restore();
 
-  // ── 1. Cabecera: "LINE UP VS" + Nombre Corto del Rival ──
+  // ── 1. Cabecera: "LINE UP VS" + Nombre Corto del Rival (Righteous) ──
   const headerCx = 413 * SCALE;
 
   ctx.save();
-  ctx.font = `900 ${42 * SCALE}px "Arial Black", "Montserrat", "Inter", sans-serif`;
+  ctx.font = `400 ${42 * SCALE}px ${displayFont}`;
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
   const lineUpLabel = "LINE UP ";
@@ -223,17 +255,17 @@ export async function renderLineupCardOnCanvas(
   ctx.fillStyle = TEXT_WHITE;
 
   while (opponentFontSize > minOpponentFontSize) {
-    ctx.font = `900 ${opponentFontSize}px "Arial Black", "Montserrat", "Inter", sans-serif`;
+    ctx.font = `400 ${opponentFontSize}px ${displayFont}`;
     if (ctx.measureText(opponentText).width <= maxOpponentWidth) {
       break;
     }
     opponentFontSize -= 1 * SCALE;
   }
-  ctx.font = `900 ${opponentFontSize}px "Arial Black", "Montserrat", "Inter", sans-serif`;
+  ctx.font = `400 ${opponentFontSize}px ${displayFont}`;
   ctx.fillText(opponentText, headerCx, 189 * SCALE, maxOpponentWidth);
   ctx.restore();
 
-  // ── 2. Filas de los 9 Bateadores ──
+  // ── 2. Filas de los 9 Bateadores (Cápsulas Righteous + Nombres Jura) ──
   for (let i = 0; i < ROW_CYS.length; i++) {
     const cy = ROW_CYS[i] * SCALE;
     const slot = data.slots[i];
@@ -247,20 +279,20 @@ export async function renderLineupCardOnCanvas(
     ctx.fill();
     ctx.restore();
 
-    // Texto de posición centrado en la píldora
+    // Texto de posición centrado en la píldora (Righteous)
     ctx.save();
     ctx.fillStyle = TEXT_WHITE;
-    ctx.font = `700 ${25 * SCALE}px "Montserrat", "Inter", sans-serif`;
+    ctx.font = `400 ${25 * SCALE}px ${displayFont}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(posText, 82 * SCALE, cy, 56 * SCALE);
     ctx.restore();
 
-    // Nombre del bateador
+    // Nombre del bateador (Jura)
     if (playerText) {
       ctx.save();
       ctx.fillStyle = TEXT_WHITE;
-      ctx.font = `600 ${25 * SCALE}px "Montserrat", "Inter", sans-serif`;
+      ctx.font = `700 ${25 * SCALE}px ${bodyFont}`;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
@@ -272,9 +304,9 @@ export async function renderLineupCardOnCanvas(
     }
   }
 
-  // ── 3. Píldora del Pitcher Abridor ──
+  // ── 3. Píldora del Pitcher Abridor (Righteous) ──
   const pitcherText = `PITCHER: ${(data.pitcherName?.trim() || "POR ANUNCIAR").toUpperCase()}`;
-  const pitcherFont = `800 ${24 * SCALE}px "Montserrat", "Inter", sans-serif`;
+  const pitcherFont = `400 ${24 * SCALE}px ${displayFont}`;
 
   ctx.save();
   ctx.font = pitcherFont;
@@ -299,10 +331,10 @@ export async function renderLineupCardOnCanvas(
   );
   ctx.restore();
 
-  // ── 4. Pie de Página: Transmisión (Izquierda) y Fecha/Hora (Derecha) ──
+  // ── 4. Pie de Página: Transmisión (Jura) y Fecha/Hora (Righteous) ──
   ctx.save();
   ctx.fillStyle = TEXT_WHITE;
-  ctx.font = `500 ${25 * SCALE}px "Montserrat", "Inter", sans-serif`;
+  ctx.font = `600 ${25 * SCALE}px ${bodyFont}`;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
@@ -315,7 +347,7 @@ export async function renderLineupCardOnCanvas(
 
   ctx.save();
   ctx.fillStyle = TEXT_WHITE;
-  ctx.font = `800 ${30 * SCALE}px "Arial Black", "Montserrat", "Inter", sans-serif`;
+  ctx.font = `400 ${30 * SCALE}px ${displayFont}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
@@ -326,14 +358,14 @@ export async function renderLineupCardOnCanvas(
   ctx.fillText((data.timeCompact || "").trim().toUpperCase(), 485 * SCALE, 914 * SCALE, 170 * SCALE);
   ctx.restore();
 
-  // ── 5. Banner del Estadio ──
+  // ── 5. Banner del Estadio (Righteous) ──
   ctx.save();
   ctx.fillStyle = PILL_FILL_COLOR;
   drawRoundedRect(ctx, 39 * SCALE, 954 * SCALE, 498 * SCALE, 38 * SCALE, 14 * SCALE);
   ctx.fill();
 
   ctx.fillStyle = TEXT_WHITE;
-  ctx.font = `800 ${21 * SCALE}px "Montserrat", "Inter", sans-serif`;
+  ctx.font = `400 ${21 * SCALE}px ${displayFont}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText((data.stadiumName || "").trim().toUpperCase(), 288 * SCALE, 973 * SCALE, 476 * SCALE);
