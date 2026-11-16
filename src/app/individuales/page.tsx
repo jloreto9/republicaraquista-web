@@ -13,9 +13,13 @@ export const metadata = {
 
 export default async function IndividualesPage() {
   const activeSeason = await getActiveSeason();
-  const [initialBattingStats, initialPitchingStats, { teamGamesMap, maxGames }] = await Promise.all([
-    getBattingStats(activeSeason, "R", "all", 250, 0),
-    getPitchingStats(activeSeason, "R", "all", 250, 0.0),
+  const [
+    initialBattingStats,
+    initialPitchingStats,
+    { teamGamesMap, teamWinPctMap, maxGames },
+  ] = await Promise.all([
+    getBattingStats(activeSeason, "R", "all", 500, 0),
+    getPitchingStats(activeSeason, "R", "all", 500, 0.0),
     getTeamGamesMap(activeSeason, "R"),
   ]);
 
@@ -23,7 +27,7 @@ export default async function IndividualesPage() {
     <div className="flex-1 flex flex-col min-h-screen">
       <Header
         title="Líderes Individuales"
-        subtitle="Líderes de Bateo, Pitcheo y Fildeo • LVBP"
+        subtitle="Líderes de Bateo, Pitcheo, Premios y Fildeo • LVBP"
         season={activeSeason}
       />
 
@@ -40,6 +44,7 @@ export default async function IndividualesPage() {
             initialPitchingStats={initialPitchingStats}
             initialSeason={activeSeason}
             initialTeamGamesMap={teamGamesMap}
+            initialTeamWinPctMap={teamWinPctMap}
             initialMaxGames={maxGames}
           />
         </Suspense>

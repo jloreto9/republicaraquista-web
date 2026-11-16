@@ -14,12 +14,12 @@ export async function GET(request: NextRequest) {
     const teamId = searchParams.get("team_id") || "all";
     const limit = searchParams.get("limit")
       ? parseInt(searchParams.get("limit")!, 10)
-      : 250;
+      : 500;
     const minAb = searchParams.get("min_ab")
       ? parseInt(searchParams.get("min_ab")!, 10)
       : 0;
 
-    const [stats, { teamGamesMap, maxGames }] = await Promise.all([
+    const [stats, { teamGamesMap, teamWinPctMap, maxGames }] = await Promise.all([
       getBattingStats(season, phase, teamId, limit, minAb),
       getTeamGamesMap(season, phase),
     ]);
@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
         count: stats.length,
         maxGames,
         teamGamesMap,
+        teamWinPctMap,
         data: stats,
       },
       {

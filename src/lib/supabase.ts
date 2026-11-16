@@ -1420,12 +1420,21 @@ export async function getSeasonKPIs(season = ACTIVE_SEASON): Promise<SeasonKPIs>
   };
 }
 
-async function fetchMlbSeasonGidpMap(
+interface MlbSeasonPitchingMeta {
+  gidp: number;
+  wins: number;
+  losses: number;
+  saves: number;
+  gamesStarted: number;
+  hbp: number;
+}
+
+async function fetchMlbSeasonStatsSplits(
   season: number,
   phase: string,
   group: "hitting" | "pitching"
-): Promise<Map<number, number>> {
-  const map = new Map<number, number>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any[]> {
   try {
     const normalizedPhase = normalizePhase(phase);
     const mlbGameType =
@@ -1441,17 +1450,49 @@ async function fetchMlbSeasonGidpMap(
     });
     if (res.ok) {
       const data = await res.json();
-      const splits = data.stats?.[0]?.splits || [];
-      for (const s of splits) {
-        const pId = Number(s.player?.id);
-        const gidp = Number(s.stat?.groundIntoDoublePlay ?? 0);
-        if (pId) {
-          map.set(pId, gidp);
-        }
-      }
+      return Array.isArray(data?.stats?.[0]?.splits) ? data.stats[0].splits : [];
     }
   } catch (err) {
-    console.warn(`Error fetching MLB season GIDP map (${group}):`, err);
+    console.warn(`Error fetching MLB season stats (${group}):`, err);
+  }
+  return [];
+}
+
+async function fetchMlbSeasonGidpMap(
+  season: number,
+  phase: string,
+  group: "hitting" | "pitching"
+): Promise<Map<number, number>> {
+  const map = new Map<number, number>();
+  const splits = await fetchMlbSeasonStatsSplits(season, phase, group);
+  for (const s of splits) {
+    const pId = Number(s?.player?.id);
+    const gidp = Number(s?.stat?.groundIntoDoublePlay ?? 0);
+    if (pId) {
+      map.set(pId, gidp);
+    }
+  }
+  return map;
+}
+
+async function fetchMlbSeasonPitchingMetaMap(
+  season: number,
+  phase: string
+): Promise<Map<number, MlbSeasonPitchingMeta>> {
+  const map = new Map<number, MlbSeasonPitchingMeta>();
+  const splits = await fetchMlbSeasonStatsSplits(season, phase, "pitching");
+  for (const s of splits) {
+    const pId = Number(s?.player?.id);
+    if (!pId) continue;
+    const st = s?.stat || {};
+    map.set(pId, {
+      gidp: Number(st.groundIntoDoublePlay ?? 0),
+      wins: Number(st.wins ?? 0),
+      losses: Number(st.losses ?? 0),
+      saves: Number(st.saves ?? 0),
+      gamesStarted: Number(st.gamesStarted ?? 0),
+      hbp: Number(st.hitBatsmen ?? 0),
+    });
   }
   return map;
 }
@@ -1730,10 +1771,10 @@ export async function getPitchingStats(
     dbPromise = Promise.resolve(query).catch((err) => ({ data: null, error: err }));
   }
 
-  const [canonicalPlayedGames, dbResult, gidpMap] = await Promise.all([
+  const [canonicalPlayedGames, dbResult, pitchingMetaMap] = await Promise.all([
     getCanonicalPlayedGames(season, { phase }),
     dbPromise,
-    fetchMlbSeasonGidpMap(season, phase, "pitching"),
+    fetchMlbSeasonPitchingMetaMap(season, phase),
   ]);
 
   if (dbResult.error) {
@@ -1776,6 +1817,7 @@ export async function getPitchingStats(
       runs: number;
       earnedRuns: number;
       walks: number;
+      hbp: number;
       strikeouts: number;
       homeRuns: number;
     }
@@ -1808,6 +1850,7 @@ export async function getPitchingStats(
         runs: 0,
         earnedRuns: 0,
         walks: 0,
+        hbp: 0,
         strikeouts: 0,
         homeRuns: 0,
       };
@@ -1821,6 +1864,7 @@ export async function getPitchingStats(
     p.runs += Number(row.r || 0);
     p.earnedRuns += Number(row.er || 0);
     p.walks += Number(row.bb || 0);
+    p.hbp += Number(row.hbp || 0);
     p.strikeouts += Number(row.so || 0);
     p.homeRuns += Number(row.hr || 0);
   });
@@ -1847,6 +1891,7 @@ export async function getPitchingStats(
     const kPer9 = ip > 0 ? Number(((p.strikeouts * 9) / ip).toFixed(2)) : 0.0;
     const bbPer9 = ip > 0 ? Number(((p.walks * 9) / ip).toFixed(2)) : 0.0;
     const kToBb = p.walks > 0 ? Number((p.strikeouts / p.walks).toFixed(2)) : p.strikeouts;
+    const pitchMeta = pitchingMetaMap.get(p.playerId);
 
     return {
       playerId: p.playerId,
@@ -1857,7 +1902,7 @@ export async function getPitchingStats(
       teamAbbr: team.abbreviation,
       teamLogo: team.logoUrl,
       games: p.appearances,
-      gamesStarted: 0,
+      gamesStarted: pitchMeta?.gamesStarted ?? 0,
       inningsPitched: ip,
       inningsDisplay,
       hits: p.hits,
@@ -1866,7 +1911,11 @@ export async function getPitchingStats(
       walks: p.walks,
       strikeouts: p.strikeouts,
       homeRuns: p.homeRuns,
-      gidp: gidpMap.get(p.playerId) ?? 0,
+      gidp: pitchMeta?.gidp ?? 0,
+      hbp: p.hbp > 0 ? p.hbp : (pitchMeta?.hbp ?? 0),
+      wins: pitchMeta?.wins ?? 0,
+      losses: pitchMeta?.losses ?? 0,
+      saves: pitchMeta?.saves ?? 0,
       era,
       whip,
       kPer9,
@@ -1882,19 +1931,25 @@ export async function getPitchingStats(
 }
 
 /**
- * Obtiene los juegos disputados por franquicia y el máximo de juegos en la fase.
+ * Obtiene los juegos disputados y porcentaje de victorias por franquicia, más el máximo de juegos en la fase.
  */
 export async function getTeamGamesMap(
   season = ACTIVE_SEASON,
   phase = "R"
-): Promise<{ teamGamesMap: Record<number, number>; maxGames: number }> {
+): Promise<{
+  teamGamesMap: Record<number, number>;
+  teamWinPctMap: Record<number, number>;
+  maxGames: number;
+}> {
   const phaseKey =
     phase === "L" ? "round_robin" : phase === "F" ? "final" : phase === "all" ? "all" : "regular";
   const standings = await getStandings(season, phaseKey);
   const teamGamesMap: Record<number, number> = {};
+  const teamWinPctMap: Record<number, number> = {};
   standings.forEach((s) => {
     teamGamesMap[s.teamId] = s.gamesPlayed;
+    teamWinPctMap[s.teamId] = s.pct;
   });
   const maxGames = Math.max(...standings.map((s) => s.gamesPlayed), 0);
-  return { teamGamesMap, maxGames };
+  return { teamGamesMap, teamWinPctMap, maxGames };
 }

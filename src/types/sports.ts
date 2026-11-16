@@ -120,6 +120,7 @@ export interface PitchingStats {
   strikeouts: number;
   homeRuns: number;
   gidp?: number;
+  hbp?: number;
   era: number;
   whip: number;
   kPer9: number;

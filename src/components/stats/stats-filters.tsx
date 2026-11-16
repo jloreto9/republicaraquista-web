@@ -10,7 +10,7 @@ interface StatsFiltersProps {
   onSelectPhase: (phase: string) => void;
   qualifyingOnly?: boolean;
   onToggleQualifying?: (value: boolean) => void;
-  activeTab?: "batting" | "pitching" | "splits" | "fielding";
+  activeTab?: "batting" | "pitching" | "splits" | "fielding" | "awards";
   thresholdLabel?: string;
 }
 

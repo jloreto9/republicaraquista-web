@@ -6,8 +6,9 @@ import { BattingStats, PitchingStats } from "@/types/sports";
 import { StatsFilters } from "@/components/stats/stats-filters";
 import { BattingTable } from "@/components/stats/batting-table";
 import { PitchingTable } from "@/components/stats/pitching-table";
+import { AwardsView } from "@/components/stats/awards-view";
 import { PlayerSplitsView } from "@/components/stats/splits/player-splits-view";
-import { Flame, Target, Shield, Loader2, Sparkles, Zap } from "lucide-react";
+import { Flame, Target, Shield, Loader2, Sparkles, Zap, Trophy } from "lucide-react";
 import { useSeason } from "@/context/season-context";
 
 interface IndividualesViewProps {
@@ -15,7 +16,31 @@ interface IndividualesViewProps {
   initialPitchingStats: PitchingStats[];
   initialSeason?: number;
   initialTeamGamesMap?: Record<number, number>;
+  initialTeamWinPctMap?: Record<number, number>;
   initialMaxGames?: number;
+}
+
+type IndividualesTab = "batting" | "pitching" | "awards" | "splits" | "fielding";
+
+function resolveTabFromParams(params: ReturnType<typeof useSearchParams>): IndividualesTab {
+  const tabParam = params?.get("tab");
+  if (tabParam === "splits") return "splits";
+  if (tabParam === "pitching") return "pitching";
+  if (tabParam === "awards" || tabParam === "premios") return "awards";
+  if (tabParam === "fielding") return "fielding";
+  return "batting";
+}
+
+function resolveSplitPlayerFromParams(
+  params: ReturnType<typeof useSearchParams>
+): { id: number; type: "batter" | "pitcher" } | null {
+  if (params?.get("tab") !== "splits") return null;
+  const playerParam = params.get("player");
+  if (!playerParam) return null;
+  return {
+    id: Number(playerParam),
+    type: params.get("type") === "pitcher" ? "pitcher" : "batter",
+  };
 }
 
 export function IndividualesView({
@@ -23,19 +48,28 @@ export function IndividualesView({
   initialPitchingStats,
   initialSeason = 2026,
   initialTeamGamesMap = {},
+  initialTeamWinPctMap = {},
   initialMaxGames = 56,
 }: IndividualesViewProps) {
   const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
-  const [season, setSeason] = useState<number>(globalSeason || initialSeason);
-  const isFirstMount = useRef(true);
-  const [activeTab, setActiveTab] = useState<"batting" | "pitching" | "splits" | "fielding">(
-    "batting"
+  const season = globalSeason || initialSeason;
+  const loadedScopeRef = useRef<{ season: number; phase: string }>({
+    season: initialSeason,
+    phase: "R",
+  });
+  const searchParams = useSearchParams();
+  const searchParamsKey = searchParams?.toString() ?? "";
+  const [prevSearchParamsKey, setPrevSearchParamsKey] = useState(searchParamsKey);
+  const [activeTab, setActiveTab] = useState<IndividualesTab>(() =>
+    resolveTabFromParams(searchParams)
   );
   const [selectedPhase, setSelectedPhase] = useState<string>("R");
   const [selectedTeam, setSelectedTeam] = useState<string | number>("all");
   const [qualifyingOnly, setQualifyingOnly] = useState<boolean>(true); // Activado por defecto
 
   const [teamGamesMap, setTeamGamesMap] = useState<Record<number, number>>(initialTeamGamesMap);
+  const [teamWinPctMap, setTeamWinPctMap] =
+    useState<Record<number, number>>(initialTeamWinPctMap);
   const [maxGames, setMaxGames] = useState<number>(initialMaxGames);
 
   const [battingStats, setBattingStats] = useState<BattingStats[]>(initialBattingStats);
@@ -46,77 +80,69 @@ export function IndividualesView({
   const [targetSplitPlayer, setTargetSplitPlayer] = useState<{
     id: number;
     type: "batter" | "pitcher";
-  } | null>(null);
+  } | null>(() => resolveSplitPlayerFromParams(searchParams));
 
-  const searchParams = useSearchParams();
-
-  // Escuchar parámetros de URL para deep-linking (ej: ?tab=splits&player=682949&type=pitcher)
-  useEffect(() => {
-    if (!searchParams) return;
-    const tabParam = searchParams.get("tab");
-    const playerParam = searchParams.get("player");
-    const typeParam = searchParams.get("type");
-
-    if (tabParam === "splits") {
-      setActiveTab("splits");
-      if (playerParam) {
-        setTargetSplitPlayer({
-          id: Number(playerParam),
-          type: typeParam === "pitcher" ? "pitcher" : "batter",
-        });
-      }
-    } else if (tabParam === "pitching") {
-      setActiveTab("pitching");
-    } else if (tabParam === "fielding") {
-      setActiveTab("fielding");
-    } else if (tabParam === "batting") {
-      setActiveTab("batting");
+  if (searchParamsKey !== prevSearchParamsKey) {
+    setPrevSearchParamsKey(searchParamsKey);
+    if (searchParams?.get("tab")) {
+      setActiveTab(resolveTabFromParams(searchParams));
     }
-  }, [searchParams]);
-
-  // Sincronizar si la temporada global cambia desde el Header u otra vista
-  useEffect(() => {
-    if (globalSeason && globalSeason !== season) {
-      setSeason(globalSeason);
+    const nextSplit = resolveSplitPlayerFromParams(searchParams);
+    if (nextSplit) {
+      setTargetSplitPlayer(nextSplit);
     }
-  }, [globalSeason]);
+  }
 
-  // Carga reactiva de estadísticas al cambiar filtros o temporada
+  // Carga reactiva del pool completo de liga al cambiar temporada o fase
   useEffect(() => {
+    if (
+      loadedScopeRef.current.season === season &&
+      loadedScopeRef.current.phase === selectedPhase
+    ) {
+      return;
+    }
+
     let isMounted = true;
-    async function fetchStats() {
-      if (activeTab === "splits") return;
+    async function fetchLeagueStats() {
       setLoading(true);
       try {
-        const teamParam = selectedTeam === "all" ? "all" : selectedTeam;
-        if (activeTab === "batting") {
-          const res = await fetch(
-            `/api/stats/batting?season=${season}&phase=${selectedPhase}&team_id=${teamParam}&limit=250`
-          );
-          if (res.ok) {
-            const json = await res.json();
-            if (isMounted) {
-              setBattingStats(json.data || json.stats || []);
-              if (json.teamGamesMap) setTeamGamesMap(json.teamGamesMap);
-              if (typeof json.maxGames === "number" && json.maxGames > 0) {
-                setMaxGames(json.maxGames);
-              }
+        const [batRes, pitRes] = await Promise.all([
+          fetch(
+            `/api/stats/batting?season=${season}&phase=${selectedPhase}&team_id=all&limit=500`
+          ),
+          fetch(
+            `/api/stats/pitching?season=${season}&phase=${selectedPhase}&team_id=all&limit=500`
+          ),
+        ]);
+
+        if (!isMounted) return;
+
+        if (batRes.ok) {
+          const batJson = await batRes.json();
+          if (isMounted) {
+            setBattingStats(batJson.data || batJson.stats || []);
+            if (batJson.teamGamesMap) setTeamGamesMap(batJson.teamGamesMap);
+            if (batJson.teamWinPctMap) setTeamWinPctMap(batJson.teamWinPctMap);
+            if (typeof batJson.maxGames === "number" && batJson.maxGames > 0) {
+              setMaxGames(batJson.maxGames);
             }
           }
-        } else if (activeTab === "pitching") {
-          const res = await fetch(
-            `/api/stats/pitching?season=${season}&phase=${selectedPhase}&team_id=${teamParam}&limit=250`
-          );
-          if (res.ok) {
-            const json = await res.json();
-            if (isMounted) {
-              setPitchingStats(json.data || json.stats || []);
-              if (json.teamGamesMap) setTeamGamesMap(json.teamGamesMap);
-              if (typeof json.maxGames === "number" && json.maxGames > 0) {
-                setMaxGames(json.maxGames);
-              }
+        }
+
+        if (pitRes.ok) {
+          const pitJson = await pitRes.json();
+          if (isMounted) {
+            setPitchingStats(pitJson.data || pitJson.stats || []);
+            if (pitJson.teamGamesMap) setTeamGamesMap(pitJson.teamGamesMap);
+            if (pitJson.teamWinPctMap) setTeamWinPctMap(pitJson.teamWinPctMap);
+            if (typeof pitJson.maxGames === "number" && pitJson.maxGames > 0) {
+              setMaxGames(pitJson.maxGames);
             }
           }
+        }
+
+        if (batRes.ok || pitRes.ok) {
+          loadedScopeRef.current = { season, phase: selectedPhase };
         }
       } catch (err) {
         console.error("Error al cargar estadísticas individuales:", err);
@@ -125,23 +151,11 @@ export function IndividualesView({
       }
     }
 
-    if (isFirstMount.current) {
-      isFirstMount.current = false;
-      if (
-        selectedPhase !== "R" ||
-        selectedTeam !== "all" ||
-        (activeTab === "pitching" && pitchingStats.length === 0)
-      ) {
-        fetchStats();
-      }
-      return;
-    }
-
-    fetchStats();
+    fetchLeagueStats();
     return () => {
       isMounted = false;
     };
-  }, [activeTab, selectedPhase, selectedTeam, season]);
+  }, [selectedPhase, season]);
 
   // Juegos de referencia del equipo seleccionado o el máximo de la liga
   const currentTeamGames = useMemo(() => {
@@ -164,10 +178,22 @@ export function IndividualesView({
       ? `≥ ${minIpThreshold.toFixed(1)} IP`
       : undefined;
 
+  const teamBattingStats = useMemo(() => {
+    if (selectedTeam === "all") return battingStats;
+    const targetId = Number(selectedTeam);
+    return battingStats.filter((b) => b.teamId === targetId);
+  }, [battingStats, selectedTeam]);
+
+  const teamPitchingStats = useMemo(() => {
+    if (selectedTeam === "all") return pitchingStats;
+    const targetId = Number(selectedTeam);
+    return pitchingStats.filter((p) => p.teamId === targetId);
+  }, [pitchingStats, selectedTeam]);
+
   // Filtrado de bateadores
   const displayedBattingStats = useMemo(() => {
-    if (!qualifyingOnly) return battingStats;
-    return battingStats.filter((b) => {
+    if (!qualifyingOnly) return teamBattingStats;
+    return teamBattingStats.filter((b) => {
       const tGames = teamGamesMap[b.teamId];
       const teamGames =
         selectedTeam !== "all"
@@ -178,12 +204,12 @@ export function IndividualesView({
         b.plateAppearances ?? b.pa ?? ((b.atBats || 0) + (b.walks || 0));
       return playerPa >= reqPa;
     });
-  }, [battingStats, qualifyingOnly, selectedTeam, teamGamesMap, maxGames, currentTeamGames]);
+  }, [teamBattingStats, qualifyingOnly, selectedTeam, teamGamesMap, maxGames, currentTeamGames]);
 
   // Filtrado de lanzadores
   const displayedPitchingStats = useMemo(() => {
-    if (!qualifyingOnly) return pitchingStats;
-    return pitchingStats.filter((p) => {
+    if (!qualifyingOnly) return teamPitchingStats;
+    return teamPitchingStats.filter((p) => {
       const tGames = teamGamesMap[p.teamId];
       const teamGames =
         selectedTeam !== "all"
@@ -192,7 +218,7 @@ export function IndividualesView({
       const reqIp = Math.max(0, teamGames * 1.0);
       return (p.inningsPitched || 0) >= (reqIp > 0 ? reqIp - 0.05 : 0);
     });
-  }, [pitchingStats, qualifyingOnly, selectedTeam, teamGamesMap, maxGames, currentTeamGames]);
+  }, [teamPitchingStats, qualifyingOnly, selectedTeam, teamGamesMap, maxGames, currentTeamGames]);
 
   const handleSelectBatterForSplits = (playerId: number) => {
     setTargetSplitPlayer({ id: playerId, type: "batter" });
@@ -208,10 +234,10 @@ export function IndividualesView({
     <div className="space-y-6">
       {/* Selector de Pestañas Principales */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-[#1E2B4D] pb-3 sm:pb-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 sm:flex items-center gap-1.5 sm:space-x-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
           <button
             onClick={() => setActiveTab("batting")}
-            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
               activeTab === "batting"
                 ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)] font-bold"
                 : "bg-[#0D152B] text-slate-300 hover:text-slate-100 hover:bg-[#131E3D] border border-[#1E2B4D]"
@@ -223,7 +249,7 @@ export function IndividualesView({
 
           <button
             onClick={() => setActiveTab("pitching")}
-            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
               activeTab === "pitching"
                 ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)] font-bold"
                 : "bg-[#0D152B] text-slate-300 hover:text-slate-100 hover:bg-[#131E3D] border border-[#1E2B4D]"
@@ -234,20 +260,40 @@ export function IndividualesView({
           </button>
 
           <button
+            onClick={() => setActiveTab("awards")}
+            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              activeTab === "awards"
+                ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)] font-bold"
+                : "bg-[#0D152B] text-slate-300 hover:text-slate-100 hover:bg-[#131E3D] border border-[#1E2B4D]"
+            }`}
+          >
+            <Trophy
+              className={`w-3.5 h-3.5 shrink-0 ${
+                activeTab === "awards" ? "text-[#070B19]" : "text-[#FDB827]"
+              }`}
+            />
+            <span>Premios</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab("splits")}
-            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
               activeTab === "splits"
                 ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)] font-bold"
                 : "bg-[#0D152B] text-slate-300 hover:text-slate-100 hover:bg-[#131E3D] border border-[#1E2B4D]"
             }`}
           >
-            <Zap className="w-3.5 h-3.5 shrink-0 text-[#FDB827]" />
+            <Zap
+              className={`w-3.5 h-3.5 shrink-0 ${
+                activeTab === "splits" ? "text-[#070B19]" : "text-[#FDB827]"
+              }`}
+            />
             <span>Splits</span>
           </button>
 
           <button
             onClick={() => setActiveTab("fielding")}
-            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center justify-center sm:justify-start space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-semibold transition-all ${
               activeTab === "fielding"
                 ? "bg-[#FDB827] text-[#070B19] shadow-[0_0_15px_rgba(253,184,39,0.25)] font-bold"
                 : "bg-[#0D152B] text-slate-300 hover:text-slate-100 hover:bg-[#131E3D] border border-[#1E2B4D]"
@@ -265,9 +311,7 @@ export function IndividualesView({
           <select
             value={season}
             onChange={(e) => {
-              const s = Number(e.target.value);
-              setSeason(s);
-              setGlobalSeason(s);
+              setGlobalSeason(Number(e.target.value));
             }}
             className="bg-transparent text-[#FDB827] text-xs font-bold font-mono focus:outline-none cursor-pointer"
           >
@@ -277,7 +321,7 @@ export function IndividualesView({
         </div>
       </div>
 
-      {/* Barra de Filtros General (para Bateo y Pitcheo) */}
+      {/* Barra de Filtros General (para Bateo, Pitcheo, Premios y Fildeo) */}
       {activeTab !== "splits" && (
         <StatsFilters
           selectedPhase={selectedPhase}
@@ -304,7 +348,7 @@ export function IndividualesView({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono text-slate-400 px-1">
             <div className="flex flex-wrap items-center gap-2">
               <span>
-                Mostrando {displayedBattingStats.length} de {battingStats.length} bateadores{" "}
+                Mostrando {displayedBattingStats.length} de {teamBattingStats.length} bateadores{" "}
                 {qualifyingOnly ? "(solo calificados)" : "(todos)"}
               </span>
               {qualifyingOnly && (
@@ -340,7 +384,7 @@ export function IndividualesView({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono text-slate-400 px-1">
             <div className="flex flex-wrap items-center gap-2">
               <span>
-                Mostrando {displayedPitchingStats.length} de {pitchingStats.length} lanzadores{" "}
+                Mostrando {displayedPitchingStats.length} de {teamPitchingStats.length} lanzadores{" "}
                 {qualifyingOnly ? "(solo calificados)" : "(todos)"}
               </span>
               {qualifyingOnly && (
@@ -371,6 +415,17 @@ export function IndividualesView({
             />
           )}
         </div>
+      ) : activeTab === "awards" ? (
+        <AwardsView
+          battingStats={battingStats}
+          pitchingStats={pitchingStats}
+          teamGamesMap={teamGamesMap}
+          teamWinPctMap={teamWinPctMap}
+          maxGames={maxGames}
+          selectedTeam={selectedTeam}
+          onSelectBatterForSplits={handleSelectBatterForSplits}
+          onSelectPitcherForSplits={handleSelectPitcherForSplits}
+        />
       ) : activeTab === "splits" ? (
         <PlayerSplitsView
           initialPlayerId={targetSplitPlayer?.id}

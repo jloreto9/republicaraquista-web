@@ -14,12 +14,12 @@ export async function GET(request: NextRequest) {
     const teamId = searchParams.get("team_id") || "all";
     const limit = searchParams.get("limit")
       ? parseInt(searchParams.get("limit")!, 10)
-      : 250;
+      : 500;
     const minIp = searchParams.get("min_ip")
       ? parseFloat(searchParams.get("min_ip")!)
       : 0.0;
 
-    const [stats, { teamGamesMap, maxGames }] = await Promise.all([
+    const [stats, { teamGamesMap, teamWinPctMap, maxGames }] = await Promise.all([
       getPitchingStats(season, phase, teamId, limit, minIp),
       getTeamGamesMap(season, phase),
     ]);
@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
         count: stats.length,
         maxGames,
         teamGamesMap,
+        teamWinPctMap,
         data: stats,
       },
       {
