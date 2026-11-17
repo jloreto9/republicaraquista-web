@@ -198,7 +198,7 @@ export function FreeSimulatorModal({ isOpen, onClose, oddsFormat }: FreeSimulato
                 />
               </div>
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Local (Home - Ventaja +35 ELO)
+                Local (Home - Ventaja de Localía)
               </span>
             </div>
 

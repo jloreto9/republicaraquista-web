@@ -7,8 +7,8 @@ import { getActiveSeason } from "@/lib/constants";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Posiciones & ELO | REPUBLICARAQUISTAPP",
-  description: "Tabla de posiciones oficial, simulador de clasificación y Power Rankings ELO.",
+  title: "Posiciones | REPUBLICARAQUISTAPP",
+  description: "Tabla de posiciones oficial y simulador de clasificación de la LVBP.",
 };
 
 export default async function StandingsPage() {
@@ -27,8 +27,8 @@ export default async function StandingsPage() {
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <Header
-        title="Posiciones & ELO"
-        subtitle="Expectativa Pitagórica • Simulador de Clasificación • Power Rankings"
+        title="Posiciones"
+        subtitle="Tabla Oficial • Expectativa Pitagórica • Simulador de Clasificación"
         season={activeSeason}
       />
 

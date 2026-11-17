@@ -13,6 +13,7 @@ import {
   Newspaper,
   UserCheck,
   Tv,
+  Landmark,
   LucideIcon,
 } from "lucide-react";
 
@@ -41,14 +42,14 @@ export const navigationGroups: NavGroup[] = [
   {
     category: "Temporada & Equipo",
     items: [
-      { name: "Posiciones & ELO", href: "/standings", icon: Trophy },
+      { name: "Posiciones", href: "/standings", icon: Trophy },
       { name: "Calendario Oficial", href: "/calendario", icon: Calendar },
       { name: "Roster Oficial & Staff", href: "/roster", icon: UserCheck, badge: "34" },
       { name: "Bullpen & Lineups", href: "/bullpen", icon: Shield },
     ],
   },
   {
-    category: "Laboratorio Sabermétrico",
+    category: "Analítica Avanzada",
     items: [
       { name: "Líderes Individuales", href: "/individuales", icon: Users },
       { name: "Pitching Summary", href: "/pitching", icon: Radio },
@@ -57,6 +58,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Win Expectancy & WPA", href: "/wpa", icon: Activity },
       { name: "Splits Situacionales", href: "/situacional", icon: PieChart },
       { name: "Spray Charts", href: "/spray-charts", icon: Target },
+      { name: "Factores de Parque", href: "/park-factors", icon: Landmark },
     ],
   },
 ];

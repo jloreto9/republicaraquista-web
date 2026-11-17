@@ -111,7 +111,7 @@ export default function TermsPage() {
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-[70ch]">
-              Los indicadores estadísticos avanzados, calificaciones ELO, métricas de expectativa de
+              Los indicadores estadísticos avanzados, métricas de expectativa de
               victoria (WPA / RE24), proyecciones y probabilidades mostradas en la plataforma tienen
               carácter estrictamente informativo, estadístico y educativo. No constituyen asesoría
               financiera, recomendación de inversión ni incitación a apuestas deportivas.

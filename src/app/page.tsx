@@ -102,7 +102,7 @@ export default async function DashboardPage() {
               href="/standings"
               className="text-xs text-[#FDB827] hover:text-[#FDB827]/80 flex items-center space-x-1 font-mono transition-colors"
             >
-              <span>Ver tabla completa y ELO</span>
+              <span>Ver tabla completa</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>

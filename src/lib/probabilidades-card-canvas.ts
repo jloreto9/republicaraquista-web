@@ -122,7 +122,7 @@ export async function generateProbabilidadesCardBlob(
   ctx.fillStyle = "#94A3B8";
   ctx.font = `${isSquare ? 28 : 16}px 'Inter', sans-serif`;
   ctx.fillText(
-    `LVBP • Jornada ${dateStr} • Modelos ELO + FIP + Parques • Cuotas de Mercado`,
+    `LVBP • Jornada ${dateStr} • Modelos FIP + Parques • Cuotas de Mercado`,
     textStartX,
     headerY + (isSquare ? 122 : 70)
   );
