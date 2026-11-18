@@ -37,9 +37,11 @@ import {
   BestAvailableLineupResult,
 } from "@/types/tango-lineup";
 import {
+  DEFAULT_TANGO_PRIOR_PA,
   resolvePlayerStats,
   optimizeTangoLineup,
   buildBestAvailableLineup,
+  stabilizeTangoPlayer,
   LVBP_REGULAR_SEASON_GAMES,
 } from "@/lib/tango-lineup-engine";
 import { cn } from "@/lib/utils";
@@ -51,6 +53,8 @@ const MIN_PA_OPTIONS = [
   { value: 0, label: "Todos (0 PA)" },
   { value: 20, label: "Mín. 20 PA" },
   { value: 35, label: "Mín. 35 PA" },
+  { value: 50, label: "Mín. 50 PA" },
+  { value: 75, label: "Mín. 75 PA" },
 ] as const;
 
 interface TangoLineupOptimizerTabProps {
@@ -188,6 +192,8 @@ export function TangoLineupOptimizerTab({
   const [minPlateAppearances, setMinPlateAppearances] = useState<number>(10);
   const [excludedPlayerIds, setExcludedPlayerIds] = useState<number[]>([]);
   const [showRosterPanel, setShowRosterPanel] = useState<boolean>(true);
+  const [useBayesianStabilization, setUseBayesianStabilization] = useState<boolean>(true);
+  const activePriorPa = useBayesianStabilization ? DEFAULT_TANGO_PRIOR_PA : 0;
 
   // Sincronizar clave si cambian los datos o el gamePk solicitado
   useEffect(() => {
@@ -315,8 +321,8 @@ export function TangoLineupOptimizerTab({
         deltaRunsPerSeason: 0,
       };
     }
-    return optimizeTangoLineup(activePlayers);
-  }, [activePlayers]);
+    return optimizeTangoLineup(activePlayers, { stabilizationPriorPa: activePriorPa });
+  }, [activePlayers, activePriorPa]);
 
   // Derivados para modo Mejor Posible (Roster Activo)
   const rosterByPlayerId = useMemo(
@@ -352,6 +358,7 @@ export function TangoLineupOptimizerTab({
       minPlateAppearances,
       excludedPlayerIds: effectiveExcludedIds,
       referenceLineup,
+      stabilizationPriorPa: activePriorPa,
     });
   }, [
     activeRosterPool,
@@ -359,6 +366,7 @@ export function TangoLineupOptimizerTab({
     minPlateAppearances,
     effectiveExcludedIds,
     referenceLineup,
+    activePriorPa,
   ]);
 
   const benchDisplayPlayers = useMemo(() => {
@@ -619,7 +627,41 @@ export function TangoLineupOptimizerTab({
               </select>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Toggle Estabilización Bayesiana por PA */}
+              <div
+                role="group"
+                aria-label="Ajuste por muestra de apariciones al plato"
+                className="inline-flex items-center p-1 rounded-xl bg-[#070B19] border border-[#1E2B4D]"
+              >
+                <button
+                  type="button"
+                  onClick={() => setUseBayesianStabilization(true)}
+                  title={`Aplica regresión bayesiana (k=${DEFAULT_TANGO_PRIOR_PA} PA) hacia la media LVBP para evitar que muestras cortas de 15-35 PA desplacen a titulares de 120+ PA`}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors",
+                    useBayesianStabilization
+                      ? "bg-[#FDB827] text-slate-950 font-bold"
+                      : "text-slate-300 hover:text-slate-100"
+                  )}
+                >
+                  Estabilizado (k={DEFAULT_TANGO_PRIOR_PA} PA)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUseBayesianStabilization(false)}
+                  title="Ordena usando exclusivamente los números crudos de la temporada sin regresión por muestra"
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors",
+                    !useBayesianStabilization
+                      ? "bg-[#FDB827] text-slate-950 font-bold"
+                      : "text-slate-300 hover:text-slate-100"
+                  )}
+                >
+                  Crudo
+                </button>
+              </div>
+
               <div className="text-right hidden sm:block">
                 <span className="text-xs font-bold text-[#FDB827] block">
                   {contextTitle}
@@ -754,6 +796,7 @@ export function TangoLineupOptimizerTab({
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {activeRosterPool.map((player) => {
                     const isExcluded = excludedIdSet.has(player.playerId);
+                    const effWoba = stabilizeTangoPlayer(player, activePriorPa).woba;
                     return (
                       <button
                         key={`pool-chip-${player.playerId}`}
@@ -763,7 +806,7 @@ export function TangoLineupOptimizerTab({
                         title={
                           isExcluded
                             ? `Reactivar a ${player.playerName}`
-                            : `Excluir temporalmente a ${player.playerName}`
+                            : `Excluir temporalmente a ${player.playerName} (wOBA crudo ${formatRate(player.woba)} · Est. ${formatRate(effWoba)})`
                         }
                         className={cn(
                           "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border transition-colors font-medium",
@@ -785,7 +828,7 @@ export function TangoLineupOptimizerTab({
                             isExcluded ? "text-rose-300" : "text-[#FDB827]"
                           )}
                         >
-                          {formatRate(player.woba)}
+                          {formatRate(useBayesianStabilization ? effWoba : player.woba)}
                         </span>
                       </button>
                     );
@@ -1035,66 +1078,90 @@ export function TangoLineupOptimizerTab({
               </div>
 
               <div className="space-y-2">
-                {result.currentLineup.map((slotItem, idx) => (
-                  <div
-                    key={`curr-${slotItem.slot}-${slotItem.player.playerName}`}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#070B19]/70 border border-[#1E2B4D] hover:border-slate-700 transition-all text-xs"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-[#1E2B4D] font-mono font-bold text-slate-200 text-xs shrink-0">
-                        {slotItem.slot}
-                      </span>
-
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-100">
-                            {slotItem.player.playerName}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {slotItem.player.position}
-                          </span>
-                          {getBatsBadge(slotItem.player.bats)}
-                        </div>
-                        <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
-                          <span>AVG: {formatRate(slotItem.player.avg)}</span>
-                          <span>OBP: {formatRate(slotItem.player.obp)}</span>
-                          <span>SLG: {formatRate(slotItem.player.slg)}</span>
-                          <span className="text-[#FDB827] font-bold">
-                            wOBA: {formatRate(slotItem.player.woba)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="text-right font-mono pr-2 hidden sm:block">
-                        <span className="text-xs font-bold text-slate-200">
-                          {slotItem.runsContributedSeason} R
+                {result.currentLineup.map((slotItem, idx) => {
+                  const sourceMeta = formatStatsSourceBadge(slotItem.player.statsSource);
+                  const eff = stabilizeTangoPlayer(slotItem.player, activePriorPa);
+                  const showEst =
+                    useBayesianStabilization &&
+                    typeof slotItem.player.plateAppearances === "number" &&
+                    Math.abs(eff.woba - slotItem.player.woba) >= 0.002;
+                  return (
+                    <div
+                      key={`curr-${slotItem.slot}-${slotItem.player.playerName}`}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-[#070B19]/70 border border-[#1E2B4D] hover:border-slate-700 transition-all text-xs gap-2"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-[#1E2B4D] font-mono font-bold text-slate-200 text-xs shrink-0">
+                          {slotItem.slot}
                         </span>
-                        <span className="text-[10px] text-slate-500 block">56 JJ</span>
+
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-slate-100">
+                              {slotItem.player.playerName}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {slotItem.player.position}
+                            </span>
+                            {getBatsBadge(slotItem.player.bats)}
+                            <span
+                              className={cn(
+                                "text-[9px] font-semibold px-1.5 py-0.2 rounded border",
+                                sourceMeta.className
+                              )}
+                            >
+                              {sourceMeta.label}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-[10px] text-slate-400 font-mono tabular-nums flex-wrap">
+                            <span>AVG: {formatRate(slotItem.player.avg)}</span>
+                            <span>OBP: {formatRate(slotItem.player.obp)}</span>
+                            <span>SLG: {formatRate(slotItem.player.slg)}</span>
+                            {typeof slotItem.player.plateAppearances === "number" && (
+                              <span>{slotItem.player.plateAppearances} PA</span>
+                            )}
+                            <span className="text-[#FDB827] font-bold">
+                              wOBA: {formatRate(slotItem.player.woba)}
+                              {showEst && (
+                                <span className="text-slate-300 font-normal ml-1">
+                                  (Est. {formatRate(eff.woba)})
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="flex flex-col gap-0.5">
-                        <button
-                          onClick={() => handleSwap(idx, idx - 1)}
-                          disabled={idx === 0}
-                          className="p-1 rounded bg-[#131E3D] hover:bg-[#1E2B4D] disabled:opacity-30 text-slate-300"
-                          title="Subir turno"
-                        >
-                          <ChevronUp className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => handleSwap(idx, idx + 1)}
-                          disabled={idx === 8}
-                          className="p-1 rounded bg-[#131E3D] hover:bg-[#1E2B4D] disabled:opacity-30 text-slate-300"
-                          title="Bajar turno"
-                        >
-                          <ChevronDown className="w-3 h-3" />
-                        </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-right font-mono pr-2 hidden sm:block">
+                          <span className="text-xs font-bold text-slate-200">
+                            {slotItem.runsContributedSeason} R
+                          </span>
+                          <span className="text-[10px] text-slate-500 block">56 JJ</span>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            onClick={() => handleSwap(idx, idx - 1)}
+                            disabled={idx === 0}
+                            className="p-1 rounded bg-[#131E3D] hover:bg-[#1E2B4D] disabled:opacity-30 text-slate-300"
+                            title="Subir turno"
+                          >
+                            <ChevronUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleSwap(idx, idx + 1)}
+                            disabled={idx === 8}
+                            className="p-1 rounded bg-[#131E3D] hover:bg-[#1E2B4D] disabled:opacity-30 text-slate-300"
+                            title="Bajar turno"
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -1107,7 +1174,9 @@ export function TangoLineupOptimizerTab({
                     <span>Alineación Optimizada (The Book)</span>
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Reasignación matemática para maximizar carreras esperadas
+                    {useBayesianStabilization
+                      ? `Reasignación matemática con estabilización bayesiana (k=${DEFAULT_TANGO_PRIOR_PA} PA)`
+                      : "Reasignación matemática con métricas crudas sin ajuste por muestra"}
                   </p>
                 </div>
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-[#FDB827]/20 text-[#FDB827] border border-[#FDB827]/30">
@@ -1122,19 +1191,25 @@ export function TangoLineupOptimizerTab({
                   );
                   const originalSlot = prevIndex >= 0 ? prevIndex + 1 : slotItem.slot;
                   const slotDiff = originalSlot - slotItem.slot; // > 0 subió de turno, < 0 bajó
+                  const sourceMeta = formatStatsSourceBadge(slotItem.player.statsSource);
+                  const eff = stabilizeTangoPlayer(slotItem.player, activePriorPa);
+                  const showEst =
+                    useBayesianStabilization &&
+                    typeof slotItem.player.plateAppearances === "number" &&
+                    Math.abs(eff.woba - slotItem.player.woba) >= 0.002;
 
                   return (
                     <div
                       key={`opt-${slotItem.slot}-${slotItem.player.playerName}`}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-[#070B19]/80 border border-[#FDB827]/30 hover:border-[#FDB827] transition-all text-xs"
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-[#070B19]/80 border border-[#FDB827]/30 hover:border-[#FDB827] transition-all text-xs gap-2"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-[#FDB827] font-mono font-black text-slate-950 text-xs shrink-0 shadow-sm">
                           {slotItem.slot}
                         </span>
 
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-slate-100">
                               {slotItem.player.playerName}
                             </span>
@@ -1145,17 +1220,35 @@ export function TangoLineupOptimizerTab({
                             <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-[#1E2B4D] text-[#FDB827]">
                               {slotItem.role}
                             </span>
+                            <span
+                              className={cn(
+                                "text-[9px] font-semibold px-1.5 py-0.2 rounded border",
+                                sourceMeta.className
+                              )}
+                            >
+                              {sourceMeta.label}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
-                            <span>wOBA: {formatRate(slotItem.player.woba)}</span>
+                          <div className="flex items-center gap-2.5 text-[10px] text-slate-400 font-mono tabular-nums flex-wrap">
+                            <span className="text-[#FDB827] font-bold">
+                              wOBA: {formatRate(slotItem.player.woba)}
+                              {showEst && (
+                                <span className="text-slate-300 font-normal ml-1">
+                                  (Est. {formatRate(eff.woba)})
+                                </span>
+                              )}
+                            </span>
                             <span>OBP: {formatRate(slotItem.player.obp)}</span>
                             <span>SLG: {formatRate(slotItem.player.slg)}</span>
                             <span>ISO: {formatRate(slotItem.player.iso)}</span>
+                            {typeof slotItem.player.plateAppearances === "number" && (
+                              <span>{slotItem.player.plateAppearances} PA</span>
+                            )}
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
                         <div className="text-right font-mono">
                           <span className="text-xs font-bold text-[#FDB827]">
                             {slotItem.runsContributedSeason} R
@@ -1330,6 +1423,11 @@ export function TangoLineupOptimizerTab({
                         const sourceMeta = formatStatsSourceBadge(
                           slotItem.player.statsSource
                         );
+                        const eff = stabilizeTangoPlayer(slotItem.player, activePriorPa);
+                        const showEst =
+                          useBayesianStabilization &&
+                          typeof slotItem.player.plateAppearances === "number" &&
+                          Math.abs(eff.woba - slotItem.player.woba) >= 0.002;
                         return (
                           <div
                             key={`ref-${slotItem.slot}-${slotItem.player.playerId}-${slotItem.player.playerName}`}
@@ -1358,12 +1456,20 @@ export function TangoLineupOptimizerTab({
                                     {sourceMeta.label}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono tabular-nums">
+                                <div className="flex items-center gap-2.5 text-[10px] text-slate-400 font-mono tabular-nums flex-wrap">
                                   <span>AVG: {formatRate(slotItem.player.avg)}</span>
                                   <span>OBP: {formatRate(slotItem.player.obp)}</span>
                                   <span>SLG: {formatRate(slotItem.player.slg)}</span>
+                                  {typeof slotItem.player.plateAppearances === "number" && (
+                                    <span>{slotItem.player.plateAppearances} PA</span>
+                                  )}
                                   <span className="text-[#FDB827] font-bold">
                                     wOBA: {formatRate(slotItem.player.woba)}
+                                    {showEst && (
+                                      <span className="text-slate-300 font-normal ml-1">
+                                        (Est. {formatRate(eff.woba)})
+                                      </span>
+                                    )}
                                   </span>
                                 </div>
                               </div>
@@ -1437,6 +1543,11 @@ export function TangoLineupOptimizerTab({
                         slotItem.player.statsSource
                       );
                       const rosterMeta = rosterByPlayerId.get(slotItem.player.playerId);
+                      const eff = stabilizeTangoPlayer(slotItem.player, activePriorPa);
+                      const showEst =
+                        useBayesianStabilization &&
+                        typeof slotItem.player.plateAppearances === "number" &&
+                        Math.abs(eff.woba - slotItem.player.woba) >= 0.002;
 
                       return (
                         <div
@@ -1471,9 +1582,14 @@ export function TangoLineupOptimizerTab({
                                   {sourceMeta.label}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono tabular-nums flex-wrap">
+                              <div className="flex items-center gap-2.5 text-[10px] text-slate-400 font-mono tabular-nums flex-wrap">
                                 <span className="text-[#FDB827] font-bold">
                                   wOBA: {formatRate(slotItem.player.woba)}
+                                  {showEst && (
+                                    <span className="text-slate-300 font-normal ml-1">
+                                      (Est. {formatRate(eff.woba)})
+                                    </span>
+                                  )}
                                 </span>
                                 <span>OBP: {formatRate(slotItem.player.obp)}</span>
                                 <span>SLG: {formatRate(slotItem.player.slg)}</span>
@@ -1599,7 +1715,13 @@ export function TangoLineupOptimizerTab({
                             {formatRate(player.slg)}
                           </td>
                           <td className="py-2.5 px-2 text-center font-mono tabular-nums font-bold text-[#FDB827]">
-                            {formatRate(player.woba)}
+                            <span>{formatRate(player.woba)}</span>
+                            {useBayesianStabilization &&
+                              Math.abs(stabilizeTangoPlayer(player, activePriorPa).woba - player.woba) >= 0.002 && (
+                                <span className="block text-[10px] font-normal text-slate-400">
+                                  Est. {formatRate(stabilizeTangoPlayer(player, activePriorPa).woba)}
+                                </span>
+                              )}
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             <span
@@ -1706,7 +1828,14 @@ export function TangoLineupOptimizerTab({
                       </td>
                       <td className="py-3 px-2 text-center">{getBatsBadge(item.player.bats)}</td>
                       <td className="py-3 px-2 text-center font-mono font-bold text-[#FDB827]">
-                        {formatRate(item.player.woba)}
+                        <span>{formatRate(item.player.woba)}</span>
+                        {useBayesianStabilization &&
+                          typeof item.player.plateAppearances === "number" &&
+                          Math.abs(stabilizeTangoPlayer(item.player, activePriorPa).woba - item.player.woba) >= 0.002 && (
+                            <span className="block text-[10px] font-normal text-slate-400">
+                              Est. {formatRate(stabilizeTangoPlayer(item.player, activePriorPa).woba)}
+                            </span>
+                          )}
                       </td>
                       <td className="py-3 px-2 text-center font-mono text-slate-300">
                         {formatRate(item.player.obp)}

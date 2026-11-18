@@ -3,6 +3,7 @@ import {
   BestAvailableLineupResult,
   BestLineupConstraintMode,
   BuildBestAvailableLineupParams,
+  TangoOptimizationOptions,
   TangoPlayer,
   TangoSlotContribution,
   TangoLineupMetrics,
@@ -13,6 +14,73 @@ import { computeWoba, computeWrcPlus } from "./matchup-engine";
 import { getPlayerHeadshotUrl } from "./constants";
 
 export const LVBP_REGULAR_SEASON_GAMES = 56;
+
+// Peso previo en apariciones al plato (PA) para regresión bayesiana (Empirical Bayes)
+// Protege el ordenamiento frente a muestras cortas infladas (ej. 15-35 PA vs titulares de 120+ PA).
+export const DEFAULT_TANGO_PRIOR_PA = 80;
+
+export const LVBP_LEAGUE_BATTING_MEANS = {
+  avg: 0.270,
+  obp: 0.340,
+  slg: 0.395,
+  woba: 0.330,
+  iso: 0.125,
+} as const;
+
+export interface StabilizedTangoRates {
+  avg: number;
+  obp: number;
+  slg: number;
+  woba: number;
+  iso: number;
+}
+
+function shrinkRate(observed: number, pa: number, leagueMean: number, priorPa: number): number {
+  const safeObs = Number.isFinite(observed) ? observed : leagueMean;
+  return Number(((pa * safeObs + priorPa * leagueMean) / (pa + priorPa)).toFixed(3));
+}
+
+/**
+ * Aplica regresión bayesiana hacia la media LVBP ponderada por apariciones al plato (PA).
+ * Si `priorPa <= 0` o el jugador no registra `plateAppearances`, retorna sus tasas observadas intactas.
+ */
+export function stabilizeTangoPlayer(
+  player: Pick<TangoPlayer, "avg" | "obp" | "slg" | "woba" | "iso" | "plateAppearances">,
+  priorPa = DEFAULT_TANGO_PRIOR_PA
+): StabilizedTangoRates {
+  const pa = player.plateAppearances;
+  if (priorPa <= 0 || typeof pa !== "number" || !Number.isFinite(pa) || pa < 0) {
+    return {
+      avg: player.avg,
+      obp: player.obp,
+      slg: player.slg,
+      woba: player.woba,
+      iso: player.iso,
+    };
+  }
+
+  const avg = shrinkRate(player.avg, pa, LVBP_LEAGUE_BATTING_MEANS.avg, priorPa);
+  const obp = shrinkRate(player.obp, pa, LVBP_LEAGUE_BATTING_MEANS.obp, priorPa);
+  const slg = shrinkRate(player.slg, pa, LVBP_LEAGUE_BATTING_MEANS.slg, priorPa);
+  const woba = shrinkRate(player.woba, pa, LVBP_LEAGUE_BATTING_MEANS.woba, priorPa);
+  const iso = Number(Math.max(0, slg - avg).toFixed(3));
+
+  return { avg, obp, slg, woba, iso };
+}
+
+function attachStabilizedFields(player: TangoPlayer, priorPa = DEFAULT_TANGO_PRIOR_PA): TangoPlayer {
+  if (typeof player.plateAppearances !== "number" || !Number.isFinite(player.plateAppearances)) {
+    return player;
+  }
+  const adj = stabilizeTangoPlayer(player, priorPa);
+  return {
+    ...player,
+    adjustedWoba: adj.woba,
+    adjustedObp: adj.obp,
+    adjustedSlg: adj.slg,
+    adjustedIso: adj.iso,
+  };
+}
 
 // Ponderación de apariciones al plato (PA) por slot en el orden (Tom Tango - The Book)
 export const SLOT_PA_WEIGHTS: Record<number, number> = {
@@ -515,8 +583,13 @@ export function buildTangoPlayerFromBattingStats(
   const obp = Number(stats.obp ?? 0);
   const slg = Number(stats.slg ?? 0);
   const iso = Number(Math.max(0, slg - avg).toFixed(3));
+  const plateAppearances = Number(
+    stats.plateAppearances ??
+      stats.pa ??
+      stats.atBats + stats.walks + (stats.hbp ?? 0) + (stats.sf ?? 0) + (stats.sh ?? 0)
+  );
 
-  return {
+  return attachStabilizedFields({
     playerId: stats.playerId,
     playerName: stats.playerName,
     position: resolveValidPosition(position, canonical?.position || "UTIL"),
@@ -527,9 +600,10 @@ export function buildTangoPlayerFromBattingStats(
     woba,
     wrcPlus,
     iso,
+    plateAppearances,
     headshot: stats.playerAvatar || getPlayerHeadshotUrl(stats.playerId),
     statsSource: "supabase",
-  };
+  });
 }
 
 /**
@@ -610,7 +684,7 @@ export function buildTangoPlayerFromMlbSeasonStats(params: {
   const wrcPlus = computeWrcPlus(woba);
   const canonical = findCanonicalPlayer(params.playerId, params.playerName);
 
-  return {
+  return attachStabilizedFields({
     playerId: params.playerId,
     playerName: params.playerName,
     position: resolveValidPosition(params.position, canonical?.position || "UTIL"),
@@ -621,9 +695,10 @@ export function buildTangoPlayerFromMlbSeasonStats(params: {
     woba,
     wrcPlus,
     iso,
+    plateAppearances: tempBatting.plateAppearances,
     headshot: getPlayerHeadshotUrl(params.playerId),
     statsSource: "mlb",
-  };
+  });
 }
 
 /**
@@ -640,12 +715,12 @@ export function resolvePlayerStats(
   if (playerId && realStatsLookup?.[playerId] && realStatsLookup[playerId].statsSource !== "synthetic") {
     const real = realStatsLookup[playerId];
     const canonical = findCanonicalPlayer(playerId, name);
-    return {
+    return attachStabilizedFields({
       ...real,
       playerName: real.playerName || name,
       position: resolveValidPosition(position, real.position),
       bats: real.bats || canonical?.bats || "R",
-    };
+    });
   }
 
   // 2. Búsqueda en mapa canónico auditado (por nombre normalizado o playerId)
@@ -688,7 +763,11 @@ export function resolvePlayerStats(
 /**
  * Calcula las carreras proyectadas y métricas de un lineup de 9 bateadores
  */
-export function calculateLineupMetrics(players: TangoPlayer[]): TangoLineupMetrics {
+export function calculateLineupMetrics(
+  players: TangoPlayer[],
+  options?: TangoOptimizationOptions
+): TangoLineupMetrics {
+  const priorPa = options?.stabilizationPriorPa ?? DEFAULT_TANGO_PRIOR_PA;
   const nine = players.slice(0, 9);
   let totalRunsGame = 0;
   let weightedWobaSum = 0;
@@ -698,19 +777,20 @@ export function calculateLineupMetrics(players: TangoPlayer[]): TangoLineupMetri
     const slot = idx + 1;
     const paWeight = SLOT_PA_WEIGHTS[slot] || 4.0;
     const cfg = TANGO_SLOT_LEVERAGE[slot];
+    const eff = stabilizeTangoPlayer(player, priorPa);
 
-    // Formulación BaseRuns ponderada para LVBP
+    // Formulación BaseRuns ponderada para LVBP (usando tasas estabilizadas por PA cuando aplica)
     const slotRcPerPa =
-      (player.obp * cfg.obpWeight * 0.48 +
-        player.slg * cfg.slgWeight * 0.32 +
-        player.iso * 0.15) *
+      (eff.obp * cfg.obpWeight * 0.48 +
+        eff.slg * cfg.slgWeight * 0.32 +
+        eff.iso * 0.15) *
       cfg.wobaMult;
 
     const runsGame = slotRcPerPa * (paWeight / 4.0);
     const runsSeason = runsGame * LVBP_REGULAR_SEASON_GAMES;
 
     totalRunsGame += runsGame;
-    weightedWobaSum += player.woba * paWeight;
+    weightedWobaSum += eff.woba * paWeight;
     totalPaWeights += paWeight;
 
     return {
@@ -753,40 +833,53 @@ export function calculateLineupMetrics(players: TangoPlayer[]): TangoLineupMetri
 /**
  * Optimiza un conjunto de 9 bateadores siguiendo el algoritmo de Tom Tango (The Book)
  */
-export function optimizeTangoLineup(currentNine: TangoPlayer[]): TangoOptimizationResult {
+export function optimizeTangoLineup(
+  currentNine: TangoPlayer[],
+  options?: TangoOptimizationOptions
+): TangoOptimizationResult {
   if (currentNine.length < 9) {
     throw new Error("Se requieren al menos 9 bateadores para optimizar el lineup.");
   }
 
+  const priorPa = options?.stabilizationPriorPa ?? DEFAULT_TANGO_PRIOR_PA;
+  const effRates = (p: TangoPlayer) => stabilizeTangoPlayer(p, priorPa);
+  const paTieBreak = (a: TangoPlayer, b: TangoPlayer) =>
+    (b.plateAppearances ?? 0) - (a.plateAppearances ?? 0);
+
   const pool = [...currentNine.slice(0, 9)];
   const optimalSlots: Record<number, TangoPlayer> = {};
 
-  // 1. Slot #2: El mejor bateador integral del equipo (Mayor wOBA)
-  pool.sort((a, b) => b.woba - a.woba);
+  // 1. Slot #2: El mejor bateador integral del equipo (Mayor wOBA estabilizado)
+  pool.sort((a, b) => effRates(b).woba - effRates(a).woba || paTieBreak(a, b));
   optimalSlots[2] = pool.splice(0, 1)[0];
 
-  // 2. Slot #1: El mejor OBP entre los 8 restantes
-  pool.sort((a, b) => b.obp - a.obp);
+  // 2. Slot #1: El mejor OBP estabilizado entre los 8 restantes
+  pool.sort((a, b) => effRates(b).obp - effRates(a).obp || paTieBreak(a, b));
   optimalSlots[1] = pool.splice(0, 1)[0];
 
-  // 3. Slot #4: El bateador de mayor poder aislado (ISO / SLG) entre los 7 restantes
-  pool.sort((a, b) => b.iso - a.iso || b.slg - a.slg);
+  // 3. Slot #4: El bateador de mayor poder aislado (ISO / SLG estabilizado) entre los 7 restantes
+  pool.sort(
+    (a, b) =>
+      effRates(b).iso - effRates(a).iso ||
+      effRates(b).slg - effRates(a).slg ||
+      paTieBreak(a, b)
+  );
   optimalSlots[4] = pool.splice(0, 1)[0];
 
-  // 4. Slot #5: Segundo bateador de mayor poder restante (Mayor SLG)
-  pool.sort((a, b) => b.slg - a.slg);
+  // 4. Slot #5: Segundo bateador de mayor poder restante (Mayor SLG estabilizado)
+  pool.sort((a, b) => effRates(b).slg - effRates(a).slg || paTieBreak(a, b));
   optimalSlots[5] = pool.splice(0, 1)[0];
 
-  // 5. Slot #3: El mejor bateador restante en wOBA/contacto (5to en la jerarquía)
-  pool.sort((a, b) => b.woba - a.woba);
+  // 5. Slot #3: El mejor bateador restante en wOBA estabilizado (5to en la jerarquía)
+  pool.sort((a, b) => effRates(b).woba - effRates(a).woba || paTieBreak(a, b));
   optimalSlots[3] = pool.splice(0, 1)[0];
 
-  // 6. Slot #9: Segundo Leadoff (Mejor OBP de los 4 restantes)
-  pool.sort((a, b) => b.obp - a.obp);
+  // 6. Slot #9: Segundo Leadoff (Mejor OBP estabilizado de los 4 restantes)
+  pool.sort((a, b) => effRates(b).obp - effRates(a).obp || paTieBreak(a, b));
   optimalSlots[9] = pool.splice(0, 1)[0];
 
-  // 7. Slots #6, #7, #8: Orden descendente por wOBA entre los 3 restantes
-  pool.sort((a, b) => b.woba - a.woba);
+  // 7. Slots #6, #7, #8: Orden descendente por wOBA estabilizado entre los 3 restantes
+  pool.sort((a, b) => effRates(b).woba - effRates(a).woba || paTieBreak(a, b));
   optimalSlots[6] = pool.splice(0, 1)[0];
   optimalSlots[7] = pool.splice(0, 1)[0];
   optimalSlots[8] = pool.splice(0, 1)[0];
@@ -797,8 +890,8 @@ export function optimizeTangoLineup(currentNine: TangoPlayer[]): TangoOptimizati
     optimizedNine.push(optimalSlots[s]);
   }
 
-  const currentMetrics = calculateLineupMetrics(currentNine);
-  const optimizedMetrics = calculateLineupMetrics(optimizedNine);
+  const currentMetrics = calculateLineupMetrics(currentNine, { stabilizationPriorPa: priorPa });
+  const optimizedMetrics = calculateLineupMetrics(optimizedNine, { stabilizationPriorPa: priorPa });
 
   const deltaRunsPerGame = Number(
     (optimizedMetrics.runsPerGame - currentMetrics.runsPerGame).toFixed(2)
@@ -943,7 +1036,8 @@ interface CandidateProfile {
   strictSet: Set<string>;
   secondarySet: Set<string>;
   primarySet: Set<string>;
-  ops: number;
+  effWoba: number;
+  effOps: number;
 }
 
 function runDefensiveSearch(
@@ -976,12 +1070,12 @@ function runDefensiveSearch(
         const bSec = candidates[b].secondarySet.has(slot) ? 1 : 0;
         if (aSec !== bSec) return bSec - aSec;
       }
-      const wobaDiff = candidates[b].batter.woba - candidates[a].batter.woba;
+      const wobaDiff = candidates[b].effWoba - candidates[a].effWoba;
       if (Math.abs(wobaDiff) > 1e-9) return wobaDiff;
       const aPrimary = candidates[a].primarySet.has(slot) ? 1 : 0;
       const bPrimary = candidates[b].primarySet.has(slot) ? 1 : 0;
       if (aPrimary !== bPrimary) return bPrimary - aPrimary;
-      return candidates[b].ops - candidates[a].ops;
+      return candidates[b].effOps - candidates[a].effOps;
     });
 
     return { slot, slotIdx, eligibleIndices };
@@ -1010,8 +1104,8 @@ function runDefensiveSearch(
     let taken = 0;
     for (let i = 0; i < n && taken < remainingCount; i++) {
       if (!used[i]) {
-        maxWoba += candidates[i].batter.woba;
-        maxOps += candidates[i].ops;
+        maxWoba += candidates[i].effWoba;
+        maxOps += candidates[i].effOps;
         taken++;
       }
     }
@@ -1100,8 +1194,8 @@ function runDefensiveSearch(
 
       dfs(
         depth + 1,
-        wobaSum + cand.batter.woba,
-        opsSum + cand.ops,
+        wobaSum + cand.effWoba,
+        opsSum + cand.effOps,
         nonStrictCount + (isStrict ? 0 : 1),
         emergencyCount + (isSecondary ? 0 : 1),
         primaryMatches + (isPrimary ? 1 : 0)
@@ -1133,7 +1227,10 @@ function runDefensiveSearch(
  * Selecciona los 9 bateadores que maximizan la suma ofensiva (`wOBA`) cubriendo las
  * 9 posiciones reglamentarias (`C, 1B, 2B, 3B, SS, LF, CF, RF, DH`) sin repetir jugador.
  */
-export function selectBestDefensiveNine(pool: ActiveRosterBatter[]): {
+export function selectBestDefensiveNine(
+  pool: ActiveRosterBatter[],
+  options?: TangoOptimizationOptions
+): {
   selected: ActiveRosterBatter[];
   assignedPositions: Record<number, string>;
   relaxedNote?: string;
@@ -1146,14 +1243,22 @@ export function selectBestDefensiveNine(pool: ActiveRosterBatter[]): {
     };
   }
 
-  const sortedPool = [...pool].sort(
-    (a, b) =>
-      b.woba - a.woba ||
-      b.obp + b.slg - (a.obp + a.slg) ||
+  const priorPa = options?.stabilizationPriorPa ?? DEFAULT_TANGO_PRIOR_PA;
+  const effMap = new Map(
+    pool.map((b) => [b.playerId, stabilizeTangoPlayer(b, priorPa)] as const)
+  );
+
+  const sortedPool = [...pool].sort((a, b) => {
+    const ea = effMap.get(a.playerId)!;
+    const eb = effMap.get(b.playerId)!;
+    return (
+      eb.woba - ea.woba ||
+      eb.obp + eb.slg - (ea.obp + ea.slg) ||
       b.wrcPlus - a.wrcPlus ||
       b.plateAppearances - a.plateAppearances ||
       a.playerId - b.playerId
-  );
+    );
+  });
 
   const candidates: CandidateProfile[] = sortedPool.map((batter) => {
     const rawList =
@@ -1163,12 +1268,14 @@ export function selectBestDefensiveNine(pool: ActiveRosterBatter[]): {
     const strictSet = normalizeEligiblePositions(rawList);
     strictSet.add("DH");
     const primarySet = new Set(expandPositionToken(batter.position).positions);
+    const eff = effMap.get(batter.playerId)!;
     return {
       batter,
       strictSet,
       secondarySet: buildSecondaryPositions(strictSet),
       primarySet,
-      ops: batter.obp + batter.slg,
+      effWoba: eff.woba,
+      effOps: eff.obp + eff.slg,
     };
   });
 
@@ -1252,13 +1359,15 @@ export function buildBestAvailableLineup(
 ): BestAvailableLineupResult {
   const modeUsed: BestLineupConstraintMode = params.mode ?? "defensive_valid";
   const requestedMinPa = Math.max(0, params.minPlateAppearances ?? 10);
+  const priorPa = params.stabilizationPriorPa ?? DEFAULT_TANGO_PRIOR_PA;
+  const optOptions: TangoOptimizationOptions = { stabilizationPriorPa: priorPa };
   const excludedSet = new Set(params.excludedPlayerIds ?? []);
 
   const availablePool = params.pool.filter((p) => !excludedSet.has(p.playerId));
 
-  // Cascada progresiva de PA: [requestedMinPa, 5, 0] deduplicada y descendente
+  // Cascada progresiva de PA: [requestedMinPa, 35, 20, 10, 5, 0] deduplicada y descendente
   const thresholds = Array.from(
-    new Set([requestedMinPa, 5, 0].filter((v) => v <= requestedMinPa))
+    new Set([requestedMinPa, 35, 20, 10, 5, 0].filter((v) => v <= requestedMinPa))
   ).sort((a, b) => b - a);
 
   let effectiveMinPa = thresholds[thresholds.length - 1] ?? 0;
@@ -1280,17 +1389,19 @@ export function buildBestAvailableLineup(
     );
   }
 
+  const effWobaOf = (p: ActiveRosterBatter) => stabilizeTangoPlayer(p, priorPa).woba;
+
   if (qualifiedPool.length < 9) {
     const refMetrics =
       params.referenceLineup && params.referenceLineup.length >= 9
-        ? calculateLineupMetrics(params.referenceLineup.slice(0, 9))
+        ? calculateLineupMetrics(params.referenceLineup.slice(0, 9), optOptions)
         : createEmptyMetrics();
     const emptyOpt = createEmptyMetrics();
     notes.push(
       `Solo hay ${qualifiedPool.length} bateadores disponibles tras filtros (se requieren 9 para armar el lineup).`
     );
     const benchPlayers = [...params.pool].sort(
-      (a, b) => b.woba - a.woba || b.plateAppearances - a.plateAppearances
+      (a, b) => effWobaOf(b) - effWobaOf(a) || b.plateAppearances - a.plateAppearances
     );
 
     return {
@@ -1315,19 +1426,22 @@ export function buildBestAvailableLineup(
 
   if (modeUsed === "pure_bats") {
     selectedNine = [...qualifiedPool]
-      .sort(
-        (a, b) =>
-          b.woba - a.woba ||
+      .sort((a, b) => {
+        const ea = stabilizeTangoPlayer(a, priorPa);
+        const eb = stabilizeTangoPlayer(b, priorPa);
+        return (
+          eb.woba - ea.woba ||
           b.wrcPlus - a.wrcPlus ||
-          b.obp - a.obp ||
+          eb.obp - ea.obp ||
           b.plateAppearances - a.plateAppearances
-      )
+        );
+      })
       .slice(0, 9);
     for (const batter of selectedNine) {
       assignedPositions[batter.playerId] = batter.position || "DH";
     }
   } else {
-    const defensiveResult = selectBestDefensiveNine(qualifiedPool);
+    const defensiveResult = selectBestDefensiveNine(qualifiedPool, optOptions);
     selectedNine = defensiveResult.selected;
     assignedPositions = defensiveResult.assignedPositions;
     if (defensiveResult.relaxedNote) {
@@ -1340,12 +1454,12 @@ export function buildBestAvailableLineup(
     position: assignedPositions[player.playerId] || player.position,
   }));
 
-  const baseOpt = optimizeTangoLineup(selectedWithAssignedPos);
+  const baseOpt = optimizeTangoLineup(selectedWithAssignedPos, optOptions);
   let optimization: TangoOptimizationResult = baseOpt;
 
   if (params.referenceLineup && params.referenceLineup.length >= 9) {
     const refNine = params.referenceLineup.slice(0, 9);
-    const currentMetrics = calculateLineupMetrics(refNine);
+    const currentMetrics = calculateLineupMetrics(refNine, optOptions);
     const optimizedMetrics = baseOpt.optimizedMetrics;
     optimization = {
       currentLineup: currentMetrics.contributions,
@@ -1364,7 +1478,7 @@ export function buildBestAvailableLineup(
   const selectedIds = new Set(selectedNine.map((p) => p.playerId));
   const benchPlayers = params.pool
     .filter((p) => !selectedIds.has(p.playerId))
-    .sort((a, b) => b.woba - a.woba || b.plateAppearances - a.plateAppearances);
+    .sort((a, b) => effWobaOf(b) - effWobaOf(a) || b.plateAppearances - a.plateAppearances);
 
   return {
     optimization,

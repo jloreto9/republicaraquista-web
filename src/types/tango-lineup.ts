@@ -11,8 +11,18 @@ export interface TangoPlayer {
   woba: number;
   wrcPlus: number;
   iso: number;
+  plateAppearances?: number;
+  adjustedWoba?: number;
+  adjustedObp?: number;
+  adjustedSlg?: number;
+  adjustedIso?: number;
   headshot?: string;
   statsSource?: TangoStatsSource;
+}
+
+export interface TangoOptimizationOptions {
+  /** Peso previo en PA para regresión bayesiana (0 desactiva el ajuste y usa métricas crudas). */
+  stabilizationPriorPa?: number;
 }
 
 export interface TangoSlotContribution {
@@ -72,6 +82,7 @@ export interface BuildBestAvailableLineupParams {
   minPlateAppearances?: number;
   excludedPlayerIds?: number[];
   referenceLineup?: TangoPlayer[];
+  stabilizationPriorPa?: number;
 }
 
 export interface BestAvailableLineupResult {

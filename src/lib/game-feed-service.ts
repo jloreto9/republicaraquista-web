@@ -34,6 +34,7 @@ import {
   buildTangoPlayerFromBattingStats,
   buildTangoPlayerFromMlbSeasonStats,
   resolvePlayerStats,
+  stabilizeTangoPlayer,
 } from "./tango-lineup-engine";
 
 const LEONES_TEAM_ID = 695;
@@ -737,6 +738,11 @@ export function buildActiveRosterPool(params: {
         ? entry.primaryPosition.toUpperCase()
         : eligiblePositions[0] || resolved.position;
 
+    const adj = stabilizeTangoPlayer({
+      ...resolved,
+      plateAppearances,
+    });
+
     pool.push({
       ...resolved,
       position: displayPosition,
@@ -744,6 +750,10 @@ export function buildActiveRosterPool(params: {
       plateAppearances,
       atBats,
       gamesPlayed,
+      adjustedWoba: adj.woba,
+      adjustedObp: adj.obp,
+      adjustedSlg: adj.slg,
+      adjustedIso: adj.iso,
       eligiblePositions,
       rosterStatus: entry.rosterStatus,
     });
@@ -751,6 +761,7 @@ export function buildActiveRosterPool(params: {
 
   pool.sort(
     (a, b) =>
+      (b.adjustedWoba ?? b.woba) - (a.adjustedWoba ?? a.woba) ||
       b.woba - a.woba ||
       b.plateAppearances - a.plateAppearances ||
       a.playerId - b.playerId
@@ -922,6 +933,18 @@ async function resolveTodayAndRequestedLineups(
     requestedLineup,
     allFeeds: Array.from(feedByGamePk.values()),
   };
+}
+
+/**
+ * Resuelve únicamente el mapa de estadísticas de temporada desde Supabase para temporadas históricas.
+ */
+export async function getHistoricalPlayerStatsMap(
+  season: number
+): Promise<Record<number, TangoPlayer>> {
+  const supabaseStats = await getBattingStats(season, "R", "all", 400, 0).catch(
+    () => [] as BattingStats[]
+  );
+  return buildPlayerStatsMapFromSources(supabaseStats, [], []);
 }
 
 /**

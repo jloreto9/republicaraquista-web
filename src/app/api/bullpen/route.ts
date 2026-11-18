@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBullpenAndLineups } from "@/lib/bullpen";
 import {
   getDynamicBullpenAndLineups,
+  getHistoricalPlayerStatsMap,
   getRequestedGameLineupAndStats,
 } from "@/lib/game-feed-service";
 import { getBullpenBudget } from "@/lib/bullpen-budget";
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     Number.isFinite(parsedGamePk) && parsedGamePk > 0 ? parsedGamePk : undefined;
 
   try {
-    const [baseData, bullpenBudget, fallbackRequested] = await Promise.all([
+    const [baseData, bullpenBudget, fallbackRequested, historicalStatsMap] = await Promise.all([
       season >= activeSeason
         ? getDynamicBullpenAndLineups(season, { targetGamePk, teamId })
         : Promise.resolve(getBullpenAndLineups(season, teamId)),
@@ -34,6 +35,9 @@ export async function GET(request: NextRequest) {
       season < activeSeason && targetGamePk
         ? getRequestedGameLineupAndStats(targetGamePk, season, teamId)
         : Promise.resolve(null),
+      season < activeSeason && !targetGamePk
+        ? getHistoricalPlayerStatsMap(season)
+        : Promise.resolve(undefined),
     ]);
 
     const enrichedLineups = fallbackRequested
@@ -41,6 +45,11 @@ export async function GET(request: NextRequest) {
           ...baseData.lineups,
           requestedLineup: fallbackRequested.requestedLineup,
           playerStatsMap: fallbackRequested.playerStatsMap,
+        }
+      : historicalStatsMap
+      ? {
+          ...baseData.lineups,
+          playerStatsMap: historicalStatsMap,
         }
       : baseData.lineups;
 

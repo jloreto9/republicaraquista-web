@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/header";
 import { getBullpenAndLineups } from "@/lib/bullpen";
 import {
   getDynamicBullpenAndLineups,
+  getHistoricalPlayerStatsMap,
   getRequestedGameLineupAndStats,
 } from "@/lib/game-feed-service";
 import { getBullpenBudget } from "@/lib/bullpen-budget";
@@ -66,7 +67,7 @@ export default async function BullpenPage({ searchParams }: BullpenPageProps) {
   const activeSeason = await getActiveSeason();
   const season = activeSeason;
   const isDynamicSeason = season >= activeSeason;
-  const [baseData, bullpenBudget, fallbackRequested] = await Promise.all([
+  const [baseData, bullpenBudget, fallbackRequested, historicalStatsMap] = await Promise.all([
     isDynamicSeason
       ? getDynamicBullpenAndLineups(season, {
           targetGamePk: initialGamePk,
@@ -77,6 +78,9 @@ export default async function BullpenPage({ searchParams }: BullpenPageProps) {
     !isDynamicSeason && initialGamePk
       ? getRequestedGameLineupAndStats(initialGamePk, season, resolvedTeamId)
       : Promise.resolve(null),
+    !isDynamicSeason && !initialGamePk
+      ? getHistoricalPlayerStatsMap(season)
+      : Promise.resolve(undefined),
   ]);
 
   const data = {
@@ -86,6 +90,11 @@ export default async function BullpenPage({ searchParams }: BullpenPageProps) {
           ...baseData.lineups,
           requestedLineup: fallbackRequested.requestedLineup,
           playerStatsMap: fallbackRequested.playerStatsMap,
+        }
+      : historicalStatsMap
+      ? {
+          ...baseData.lineups,
+          playerStatsMap: historicalStatsMap,
         }
       : baseData.lineups,
     bullpenBudget,

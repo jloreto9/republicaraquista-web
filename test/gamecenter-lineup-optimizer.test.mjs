@@ -387,7 +387,9 @@ async function runTests() {
     assert.equal(player.bats, "L");
     assert.equal(player.position, "RF");
     assert.equal(player.iso, 0.228);
+    assert.equal(player.plateAppearances, 82);
     assert.ok(player.woba > 0.38);
+    assert.ok(typeof player.adjustedWoba === "number" && player.adjustedWoba < player.woba);
     assert.ok(player.wrcPlus > 120);
   });
 
@@ -423,7 +425,9 @@ async function runTests() {
     assert.equal(mlbPlayer.statsSource, "mlb");
     assert.equal(mlbPlayer.bats, "S");
     assert.equal(mlbPlayer.iso, 0.267);
+    assert.equal(mlbPlayer.plateAppearances, 34);
     assert.ok(mlbPlayer.woba > 0.4);
+    assert.ok(typeof mlbPlayer.adjustedWoba === "number" && mlbPlayer.adjustedWoba < mlbPlayer.woba);
   });
 
   check("3c. resolvePlayerStats respeta precedencia realStatsLookup -> LEONES_REAL_STATS_MAP -> synthetic", () => {

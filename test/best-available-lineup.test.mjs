@@ -73,9 +73,12 @@ function loadLocalModule(absPath) {
 
 const {
   DEFENSIVE_LINEUP_SLOTS,
+  DEFAULT_TANGO_PRIOR_PA,
   normalizeEligiblePositions,
   selectBestDefensiveNine,
   buildBestAvailableLineup,
+  optimizeTangoLineup,
+  stabilizeTangoPlayer,
 } = loadLocalModule(path.join(repoRoot, "src/lib/tango-lineup-engine.ts"));
 
 const { fetchTeamActiveRosterBatters } = loadLocalModule(
@@ -773,6 +776,44 @@ async function runTests() {
   } finally {
     globalThis.fetch = originalFetch;
   }
+
+  check("9a. Estabilización bayesiana por PA evita sesgo de muestras cortas infladas frente a titulares consolidados", () => {
+    const biasedNine = [
+      makeBatter({ playerId: 9101, playerName: "Victor Bericoto", position: "RF", woba: 0.476, obp: 0.496, slg: 0.619, avg: 0.361, plateAppearances: 119, atBats: 97 }),
+      makeBatter({ playerId: 9102, playerName: "Leandro Cedeño", position: "DH", woba: 0.433, obp: 0.425, slg: 0.600, avg: 0.305, plateAppearances: 120, atBats: 105 }),
+      makeBatter({ playerId: 9103, playerName: "Lenyn Sosa", position: "2B", woba: 0.386, obp: 0.367, slg: 0.522, avg: 0.310, plateAppearances: 128, atBats: 113 }),
+      makeBatter({ playerId: 9104, playerName: "Aldrem Corredor", position: "1B", woba: 0.382, obp: 0.412, slg: 0.443, avg: 0.283, plateAppearances: 131, atBats: 106 }),
+      makeBatter({ playerId: 9105, playerName: "Jhonny Pereda", position: "C", woba: 0.553, obp: 0.548, slg: 0.792, avg: 0.417, plateAppearances: 31, atBats: 24 }),
+      makeBatter({ playerId: 9106, playerName: "Liván Soto", position: "SS", woba: 0.521, obp: 0.553, slg: 0.667, avg: 0.367, plateAppearances: 38, atBats: 30, bats: "L" }),
+      makeBatter({ playerId: 9107, playerName: "Marvin Alcántara", position: "3B", woba: 0.467, obp: 0.469, slg: 0.615, avg: 0.346, plateAppearances: 32, atBats: 26 }),
+      makeBatter({ playerId: 9108, playerName: "Kenedy Corona", position: "CF", woba: 0.401, obp: 0.368, slg: 0.533, avg: 0.333, plateAppearances: 19, atBats: 15 }),
+      makeBatter({ playerId: 9109, playerName: "Yonathan Daza", position: "LF", woba: 0.328, obp: 0.324, slg: 0.427, avg: 0.291, plateAppearances: 112, atBats: 103 }),
+    ];
+
+    const bericotoAdj = stabilizeTangoPlayer(biasedNine[0], DEFAULT_TANGO_PRIOR_PA);
+    const coronaAdj = stabilizeTangoPlayer(biasedNine[7], DEFAULT_TANGO_PRIOR_PA);
+    const sosaAdj = stabilizeTangoPlayer(biasedNine[2], DEFAULT_TANGO_PRIOR_PA);
+    assert.ok(bericotoAdj.woba > coronaAdj.woba, "Bericoto 119 PA debe superar a Corona 19 PA");
+    assert.ok(sosaAdj.woba > coronaAdj.woba, "Sosa 128 PA (.386) debe superar a Corona 19 PA (.401) tras regresión");
+
+    // Modo estabilizado por defecto (k = 80 PA)
+    const stabilizedOpt = optimizeTangoLineup(biasedNine);
+    const slot2Stabilized = stabilizedOpt.optimizedLineup.find((s) => s.slot === 2);
+    const slot4Stabilized = stabilizedOpt.optimizedLineup.find((s) => s.slot === 4);
+    const coronaSlotStabilized = stabilizedOpt.optimizedLineup.find((s) => s.player.playerId === 9108);
+    const sosaSlotStabilized = stabilizedOpt.optimizedLineup.find((s) => s.player.playerId === 9103);
+    assert.equal(slot2Stabilized?.player.playerName, "Victor Bericoto", "Bericoto (119 PA) debe ocupar #2 en modo estabilizado");
+    assert.equal(slot4Stabilized?.player.playerName, "Leandro Cedeño", "Cedeño (120 PA) debe ocupar #4 en modo estabilizado");
+    assert.ok(
+      (coronaSlotStabilized?.slot ?? 0) > (sosaSlotStabilized?.slot ?? 9),
+      "Kenedy Corona (19 PA) no debe quedar por encima de Lenyn Sosa (128 PA)"
+    );
+
+    // Modo crudo (priorPa = 0) preserva comportamiento sin regresión
+    const rawOpt = optimizeTangoLineup(biasedNine, { stabilizationPriorPa: 0 });
+    const slot2Raw = rawOpt.optimizedLineup.find((s) => s.slot === 2);
+    assert.equal(slot2Raw?.player.playerName, "Jhonny Pereda", "Sin ajuste (k=0), Pereda .553 toma #2");
+  });
 
   console.log(`🎉 ${passed} pruebas completadas exitosamente.`);
 }
