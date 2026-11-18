@@ -796,7 +796,8 @@ async function runTests() {
     assert.ok(bericotoAdj.woba > coronaAdj.woba, "Bericoto 119 PA debe superar a Corona 19 PA");
     assert.ok(sosaAdj.woba > coronaAdj.woba, "Sosa 128 PA (.386) debe superar a Corona 19 PA (.401) tras regresión");
 
-    // Modo estabilizado por defecto (k = 80 PA)
+    // Modo estabilizado por defecto (k = 100 PA)
+    assert.equal(DEFAULT_TANGO_PRIOR_PA, 100);
     const stabilizedOpt = optimizeTangoLineup(biasedNine);
     const slot2Stabilized = stabilizedOpt.optimizedLineup.find((s) => s.slot === 2);
     const slot4Stabilized = stabilizedOpt.optimizedLineup.find((s) => s.slot === 4);

@@ -34,7 +34,7 @@ Durante la evaluación del **Optimizador de Lineups (Tom Tango - The Book)** en 
 - Agregar `TangoOptimizationOptions` (`{ stabilizationPriorPa?: number }`) y `stabilizationPriorPa?: number` en `BuildBestAvailableLineupParams`.
 
 ### RF-02: Estabilización Bayesiana Empírica en el Motor (`src/lib/tango-lineup-engine.ts`)
-- Exportar `DEFAULT_TANGO_PRIOR_PA = 80` y `LVBP_LEAGUE_BATTING_MEANS` (`avg: 0.270`, `obp: 0.340`, `slg: 0.395`, `woba: 0.330`, `iso: 0.125`).
+- Exportar `DEFAULT_TANGO_PRIOR_PA = 100` y `LVBP_LEAGUE_BATTING_MEANS` (`avg: 0.270`, `obp: 0.340`, `slg: 0.395`, `woba: 0.330`, `iso: 0.125`).
 - Exportar función pura `stabilizeTangoPlayer(player: TangoPlayer, priorPa = DEFAULT_TANGO_PRIOR_PA)`:
   - Cuando `priorPa > 0` y `typeof player.plateAppearances === "number"` con `player.plateAppearances >= 0`, aplica regresión bayesiana hacia la media de liga:
     $$\text{métrica}_{\text{est}} = \frac{\text{PA} \cdot \text{métrica}_{\text{cruda}} + k \cdot \mu_{\text{liga}}}{\text{PA} + k}$$
@@ -47,7 +47,7 @@ Durante la evaluación del **Optimizador de Lineups (Tom Tango - The Book)** en 
 - En `/api/bullpen` y `/bullpen`, hidratar `playerStatsMap` con `getHistoricalPlayerStatsMap(season)` cuando `season < activeSeason` y no exista `fallbackRequested`.
 
 ### RF-04: Transparencia y Toggle de Estabilización en UI (`src/components/bullpen/tango-lineup-optimizer-tab.tsx`)
-- Agregar control segmentado **`Estabilizado (Bayes k=80)`** *(activo por defecto)* vs **`Crudo (Sin ajuste PA)`** aplicable tanto al modo *"Del Juego / Orden del Día"* como a *"Mejor Posible (Roster Activo)"*.
+- Agregar control segmentado **`Estabilizado (Bayes k=100)`** *(activo por defecto)* vs **`Crudo (Sin ajuste PA)`** aplicable tanto al modo *"Del Juego / Orden del Día"* como a *"Mejor Posible (Roster Activo)"*.
 - En modo *"Del Juego"*, mostrar `PA` (cuando esté disponible), el badge de fuente (`Temporada BD`, `MLB API`, `Base Club`, `Estimado`) y el `wOBA Est.` junto al `wOBA` crudo cuando difieran.
 - En modo *"Mejor Posible"*, añadir opciones `Mín. 50 PA` y `Mín. 75 PA` al selector de muestra mínima y mostrar `Est.` junto al `wOBA` observado en el lineup, chips y banca.
 
@@ -55,7 +55,7 @@ Durante la evaluación del **Optimizador de Lineups (Tom Tango - The Book)** en 
 
 ## 3. Criterios de Aceptación
 
-1. **CA-01 (Anti-Sesgo de Muestra Pequeña):** Con `priorPa = 80`, un bateador de 19–32 PA con `wOBA` crudo inflado (`.401`–`.467`) no desplaza a titulares consolidados de 115–130+ PA con sólido rendimiento (`Bericoto .476`, `Cedeño .433`, `Sosa .386`).
+1. **CA-01 (Anti-Sesgo de Muestra Pequeña):** Con `priorPa = 100`, un bateador de 19–32 PA con `wOBA` crudo inflado (`.401`–`.467`) no desplaza a titulares consolidados de 115–130+ PA con sólido rendimiento (`Bericoto .476`, `Cedeño .433`, `Sosa .386`).
 2. **CA-02 (Modo Crudo Opcional):** Al pasar `stabilizationPriorPa: 0` (o alternar el toggle en UI a *Crudo*), el motor ordena por métricas sin regresión.
 3. **CA-03 (Transparencia Histórica):** En temporadas `< activeSeason`, `/api/bullpen` entrega `playerStatsMap` con datos reales de `Supabase` (`statsSource: "supabase"`) en lugar de caer a dummies.
 4. **CA-04 (Calidad y No Regresión):** Pruebas unitarias en `test/` pasando al 100%, `npx tsc --noEmit` sin errores y `npm run build` exitoso.
