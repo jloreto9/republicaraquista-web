@@ -17,7 +17,7 @@ export const LVBP_REGULAR_SEASON_GAMES = 56;
 
 // Peso previo en apariciones al plato (PA) para regresión bayesiana (Empirical Bayes)
 // Protege el ordenamiento frente a muestras cortas infladas (ej. 15-35 PA vs titulares de 120+ PA).
-export const DEFAULT_TANGO_PRIOR_PA = 100;
+export const DEFAULT_TANGO_PRIOR_PA = 80;
 
 export const LVBP_LEAGUE_BATTING_MEANS = {
   avg: 0.270,

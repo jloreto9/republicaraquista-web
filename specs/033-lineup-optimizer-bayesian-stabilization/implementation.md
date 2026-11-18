@@ -14,7 +14,7 @@
    - Añadidos `TangoOptimizationOptions` y `stabilizationPriorPa?` en `BuildBestAvailableLineupParams`.
 
 2. **Motor de Optimización (`src/lib/tango-lineup-engine.ts`):**
-   - Exportados `DEFAULT_TANGO_PRIOR_PA = 100`, `LVBP_LEAGUE_BATTING_MEANS` (`avg: 0.270`, `obp: 0.340`, `slg: 0.395`, `woba: 0.330`, `iso: 0.125`) y `stabilizeTangoPlayer(player, priorPa)`.
+   - Exportados `DEFAULT_TANGO_PRIOR_PA = 80`, `LVBP_LEAGUE_BATTING_MEANS` (`avg: 0.270`, `obp: 0.340`, `slg: 0.395`, `woba: 0.330`, `iso: 0.125`) y `stabilizeTangoPlayer(player, priorPa)`.
    - Propagados `plateAppearances` y `adjusted*` en `buildTangoPlayerFromBattingStats`, `buildTangoPlayerFromMlbSeasonStats` y `resolvePlayerStats`.
    - Aplicadas las tasas estabilizadas en `calculateLineupMetrics`, `optimizeTangoLineup`, `selectBestDefensiveNine` y `buildBestAvailableLineup` (conservando intactas las tasas observadas en `player` para transparencia visual).
    - Extendida la cascada progresiva de PA a `[requestedMinPa, 35, 20, 10, 5, 0]`.
@@ -24,7 +24,7 @@
    - Hidratado `playerStatsMap` desde `Supabase` (`getBattingStats`) también en temporadas `< activeSeason` cuando no hay `gamePk`.
 
 4. **Interfaz de Usuario (`src/components/bullpen/tango-lineup-optimizer-tab.tsx`):**
-   - Añadido toggle segmentado **`Estabilizado (k=100 PA)`** *(por defecto)* vs **`Crudo`**.
+   - Añadido toggle segmentado **`Estabilizado (k=80 PA)`** *(por defecto)* vs **`Crudo`**.
    - Añadidos badge de fuente (`Temporada BD`, `MLB API`, `Base Club`, `Estimado`), conteo `PA` y valor `Est. .XXX` junto al `wOBA` observado en el modo *"Del Juego / Orden del Día"* y en *"Mejor Posible (Roster Activo)"*.
    - Añadidas opciones `Mín. 50 PA` y `Mín. 75 PA` al selector de muestra mínima.
 
