@@ -85,6 +85,7 @@ const {
   resolvePlayerStats,
 } = loadLocalModule(path.join(repoRoot, "src/lib/tango-lineup-engine.ts"));
 const {
+  extractStartingNineFromBoxTeam,
   extractTeamGameLineupFromFeed,
   getDynamicBullpenAndLineups,
 } = loadLocalModule(path.join(repoRoot, "src/lib/game-feed-service.ts"));
@@ -345,6 +346,45 @@ async function runTests() {
     assert.ok(luSched);
     assert.equal(luSched.starters.length, 9);
     assert.equal(luSched.starters[0].playerId, 9901);
+  });
+
+  check("2e. extractStartingNineFromBoxTeam prioriza abridores (bo % 100 === 0) sobre sustitutos en boxTeam.battingOrder", () => {
+    const feedWithSubs = makeFeed({
+      gamePk: 869974,
+      officialDate: "2026-11-17",
+      detailedState: "Final",
+      abstractGameState: "Final",
+      withBatters: true,
+      withBattingOrder: true,
+    });
+    const homeBox = feedWithSubs.liveData.boxscore.teams.home;
+    const starter3Id = homeBox.battingOrder[2]; // bo: 300
+    const subId = 670869; // Liván Soto bo: 303
+    // Simular sobrescritura de MLB API en teamBox.battingOrder con sustituto
+    homeBox.battingOrder[2] = subId;
+    homeBox.players[`ID${subId}`] = {
+      person: { id: subId, fullName: "Liván Soto" },
+      position: { abbreviation: "2B" },
+      allPositions: [{ abbreviation: "2B" }],
+      battingOrder: "303",
+    };
+    // Simular cambio defensivo posterior en slot 5 (3B inicial -> 1B final)
+    const starter5Id = homeBox.battingOrder[4];
+    homeBox.players[`ID${starter5Id}`].position = { abbreviation: "1B" };
+    homeBox.players[`ID${starter5Id}`].allPositions = [
+      { abbreviation: "3B" },
+      { abbreviation: "1B" },
+    ];
+
+    const starters = extractStartingNineFromBoxTeam(homeBox, feedWithSubs.gameData.players);
+    assert.equal(starters.length, 9);
+    assert.equal(starters[2].playerId, starter3Id, "Slot #3 debe conservar al abridor (300) y no al sustituto (303)");
+    assert.equal(starters[4].position, "3B", "Slot #5 debe conservar la posición defensiva inicial (allPositions[0])");
+
+    const extracted = extractTeamGameLineupFromFeed(feedWithSubs, 695, "2026-11-17");
+    assert.ok(extracted);
+    assert.equal(extracted.starters[2].playerId, starter3Id);
+    assert.equal(extracted.starters.some((s) => s.playerId === subId), false);
   });
 
   // 3. resolvePlayerStats precedence and real-stats conversion

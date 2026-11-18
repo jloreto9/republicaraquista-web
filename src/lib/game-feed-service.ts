@@ -251,6 +251,133 @@ function mapFeedGameStatus(feed: any): {
 }
 
 /**
+ * Extrae los 9 titulares reales (orden 1..9) desde `boxTeam`, priorizando los códigos
+ * `battingOrder` terminados en `00` (`100..900`) sobre `teamBox.battingOrder` (que MLB API
+ * sobrescribe con los sustitutos del final del juego como PH/PR/defensa).
+ */
+export function extractStartingNineFromBoxTeam(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  teamBox: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  gamePlayersDict: Record<string, any> = {}
+): StarterSlot[] {
+  const playersDict = teamBox?.players || {};
+
+  const resolveInitialPos = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pData: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gpData: any
+  ): string => {
+    const allPos: string[] = Array.isArray(pData?.allPositions)
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pData.allPositions.map((x: any) => String(x?.abbreviation || "")).filter(Boolean)
+      : [];
+    const firstValidAllPos = allPos.find(
+      (abbr) => abbr !== "PH" && abbr !== "PR" && abbr !== "P"
+    );
+    return (
+      firstValidAllPos ||
+      pData?.position?.abbreviation ||
+      gpData?.primaryPosition?.abbreviation ||
+      "DH"
+    );
+  };
+
+  const hasBoxLineupEntries =
+    (Array.isArray(teamBox?.batters) && teamBox.batters.length > 0) ||
+    (Array.isArray(teamBox?.battingOrder) && teamBox.battingOrder.length > 0);
+  if (!hasBoxLineupEntries) {
+    return [];
+  }
+
+  // 1. Primaria: jugadores con `battingOrder` exacto de abridor (`100, 200, ..., 900`)
+  const slotMap = new Map<number, StarterSlot>();
+  for (const [key, rawPlayer] of Object.entries(playersDict)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pData = rawPlayer as any;
+    const rawBo = pData?.battingOrder;
+    const bo = rawBo !== undefined && rawBo !== null ? parseInt(String(rawBo), 10) : NaN;
+    if (!Number.isFinite(bo) || bo < 100 || bo > 900 || bo % 100 !== 0) continue;
+
+    const slot = Math.floor(bo / 100);
+    if (slot < 1 || slot > 9 || slotMap.has(slot)) continue;
+
+    const pId = Number(pData?.person?.id || String(key).replace(/^ID/, "") || 0);
+    if (!pId) continue;
+
+    const gpData = gamePlayersDict[`ID${pId}`] || {};
+    const name = pData?.person?.fullName || gpData?.fullName || "Bateador";
+    const pos = resolveInitialPos(pData, gpData);
+    slotMap.set(slot, buildStarterSlot(slot, pId, name, pos));
+  }
+
+  if (slotMap.size === 9) {
+    return Array.from({ length: 9 }, (_, i) => slotMap.get(i + 1)!);
+  }
+
+  // 2. Respaldo 1: `boxTeam.battingOrder` (útil en Pre-Juego antes de poblar `players[].battingOrder`)
+  const rawOrder: number[] = Array.isArray(teamBox?.battingOrder)
+    ? teamBox.battingOrder
+    : [];
+  if (rawOrder.length >= 9) {
+    return rawOrder.slice(0, 9).map((pId: number, idx: number) => {
+      const pData = playersDict[`ID${pId}`] || {};
+      const gpData = gamePlayersDict[`ID${pId}`] || {};
+      const name = pData?.person?.fullName || gpData?.fullName || "Bateador";
+      const pos = resolveInitialPos(pData, gpData);
+      return buildStarterSlot(idx + 1, Number(pId), name, pos);
+    });
+  }
+
+  // 3. Respaldo 2: `boxTeam.batters` filtrando lanzadores puros y sustitutos (`bo % 100 !== 0`)
+  if (Array.isArray(teamBox?.batters) && teamBox.batters.length > 0) {
+    const candidateIds: number[] = (teamBox.batters as number[]).filter((pId) => {
+      const p = playersDict[`ID${pId}`];
+      if (!p) return false;
+      const pos = p.position?.abbreviation;
+      const isPitcher =
+        pos === "P" ||
+        p.position?.type === "Pitcher" ||
+        p.position?.code === "1";
+      if (!isPitcher) return true;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
+      return allPos.includes("DH") || allPos.includes("PH") || Boolean(p.battingOrder);
+    });
+
+    candidateIds.sort((a, b) => {
+      const boA = playersDict[`ID${a}`]?.battingOrder
+        ? parseInt(playersDict[`ID${a}`].battingOrder, 10)
+        : 9999;
+      const boB = playersDict[`ID${b}`]?.battingOrder
+        ? parseInt(playersDict[`ID${b}`].battingOrder, 10)
+        : 9999;
+      return boA - boB;
+    });
+
+    const primaryStarters = candidateIds.filter((pId) => {
+      const bo = playersDict[`ID${pId}`]?.battingOrder
+        ? parseInt(playersDict[`ID${pId}`].battingOrder, 10)
+        : null;
+      return bo === null || bo % 100 === 0;
+    });
+
+    if (primaryStarters.length >= 9) {
+      return primaryStarters.slice(0, 9).map((pId, idx) => {
+        const pData = playersDict[`ID${pId}`] || {};
+        const gpData = gamePlayersDict[`ID${pId}`] || {};
+        const name = pData?.person?.fullName || gpData?.fullName || "Bateador";
+        const pos = resolveInitialPos(pData, gpData);
+        return buildStarterSlot(idx + 1, Number(pId), name, pos);
+      });
+    }
+  }
+
+  return [];
+}
+
+/**
  * Extrae una alineación titular 1-9 desde un `feed/live` (y respaldo de `schedule?hydrate=lineups`).
  */
 export function extractTeamGameLineupFromFeed(
@@ -285,71 +412,7 @@ export function extractTeamGameLineupFromFeed(
   const playersDict = teamBox?.players || {};
   const gamePlayersDict = feed?.gameData?.players || {};
 
-  let starters: StarterSlot[] = [];
-
-  // 1. Primaria: `boxTeam.battingOrder` (slots 1..9)
-  const rawOrder: number[] = Array.isArray(teamBox?.battingOrder)
-    ? teamBox.battingOrder
-    : [];
-  if (rawOrder.length >= 9) {
-    starters = rawOrder.slice(0, 9).map((pId: number, idx: number) => {
-      const pData = playersDict[`ID${pId}`] || {};
-      const gpData = gamePlayersDict[`ID${pId}`] || {};
-      const name = pData?.person?.fullName || gpData?.fullName || "Bateador";
-      const pos =
-        pData?.position?.abbreviation ||
-        gpData?.primaryPosition?.abbreviation ||
-        "DH";
-      return buildStarterSlot(idx + 1, Number(pId), name, pos);
-    });
-  }
-
-  // 2. Respaldo 1: `boxTeam.batters` con `battingOrder` por jugador
-  if (starters.length < 9 && Array.isArray(teamBox?.batters) && teamBox.batters.length > 0) {
-    const candidateIds: number[] = (teamBox.batters as number[]).filter((pId) => {
-      const p = playersDict[`ID${pId}`];
-      if (!p) return false;
-      const pos = p.position?.abbreviation;
-      const isPitcher =
-        pos === "P" ||
-        p.position?.type === "Pitcher" ||
-        p.position?.code === "1";
-      if (!isPitcher) return true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const allPos = (p.allPositions || []).map((x: any) => x.abbreviation);
-      return allPos.includes("DH") || allPos.includes("PH") || Boolean(p.battingOrder);
-    });
-
-    candidateIds.sort((a, b) => {
-      const boA = playersDict[`ID${a}`]?.battingOrder
-        ? parseInt(playersDict[`ID${a}`].battingOrder, 10)
-        : 9999;
-      const boB = playersDict[`ID${b}`]?.battingOrder
-        ? parseInt(playersDict[`ID${b}`].battingOrder, 10)
-        : 9999;
-      return boA - boB;
-    });
-
-    const primaryStarters = candidateIds.filter((pId) => {
-      const bo = playersDict[`ID${pId}`]?.battingOrder
-        ? parseInt(playersDict[`ID${pId}`].battingOrder, 10)
-        : null;
-      return bo === null || bo % 100 === 0;
-    });
-
-    if (primaryStarters.length >= 9) {
-      starters = primaryStarters.slice(0, 9).map((pId, idx) => {
-        const pData = playersDict[`ID${pId}`] || {};
-        const gpData = gamePlayersDict[`ID${pId}`] || {};
-        const name = pData?.person?.fullName || gpData?.fullName || "Bateador";
-        const pos =
-          pData?.position?.abbreviation ||
-          gpData?.primaryPosition?.abbreviation ||
-          "DH";
-        return buildStarterSlot(idx + 1, Number(pId), name, pos);
-      });
-    }
-  }
+  let starters: StarterSlot[] = extractStartingNineFromBoxTeam(teamBox, gamePlayersDict);
 
   // 3. Respaldo 2: `schedule?hydrate=lineups`
   if (
@@ -1090,18 +1153,18 @@ export async function getDynamicBullpenAndLineups(
       }
     });
 
-    // 2. Extraer Lineup Titular (Orden 1-9)
-    const battingOrder = teamBox?.battingOrder || [];
-    if (battingOrder.length >= 9) {
-      const starters = battingOrder.slice(0, 9).map((pId: number, idx: number) => {
-        const pData = playersDict[`ID${pId}`];
-        return {
-          order: idx + 1,
-          player_id: pId,
-          player_name: pData?.person?.fullName || "Bateador",
-          position: pData?.position?.abbreviation || "DH",
-        };
-      });
+    // 2. Extraer Lineup Titular real (Orden 1-9, preservando abridores `bo % 100 === 0` frente a sustitutos)
+    const startingSlots = extractStartingNineFromBoxTeam(
+      teamBox,
+      feed?.gameData?.players || {}
+    );
+    if (startingSlots.length >= 9) {
+      const starters = startingSlots.map((slot) => ({
+        order: slot.order,
+        player_id: slot.playerId,
+        player_name: slot.playerName,
+        position: slot.position,
+      }));
 
       luRecords.push({
         team_id: targetTeamId,

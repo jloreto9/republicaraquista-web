@@ -28,6 +28,10 @@
    - Añadidos badge de fuente (`Temporada BD`, `MLB API`, `Base Club`, `Estimado`), conteo `PA` y valor `Est. .XXX` junto al `wOBA` observado en el modo *"Del Juego / Orden del Día"* y en *"Mejor Posible (Roster Activo)"*.
    - Añadidas opciones `Mín. 50 PA` y `Mín. 75 PA` al selector de muestra mínima.
 
+5. **Extracción exacta de abridores 1–9 (`src/lib/game-feed-service.ts`):**
+   - Extraído el helper compartido `extractStartingNineFromBoxTeam(teamBox, gamePlayersDict)` usado tanto por `extractTeamGameLineupFromFeed` como por `getDynamicBullpenAndLineups`.
+   - Prioriza los códigos `battingOrder % 100 === 0` (`100..900`) y la posición inicial (`allPositions[0]`) por encima de `teamBox.battingOrder` (donde MLB Stats API sobrescribe con los sustitutos del final del partido, p. ej. `303` en lugar de `300`).
+
 ---
 
 ## 2. Verificación Ejecutada
@@ -35,7 +39,7 @@
 | Chequeo | Resultado | Detalle |
 |---|---|---|
 | `node test/best-available-lineup.test.mjs` | ✅ `13/13` pasando | Incluye nuevo test `9a` de estabilización bayesiana (`19-38 PA` vs `119-131 PA`) y modo `k=0`. |
-| `node test/gamecenter-lineup-optimizer.test.mjs` | ✅ `13/13` pasando | Valida `plateAppearances` y `adjustedWoba` en `supabase` y `mlb`. |
+| `node test/gamecenter-lineup-optimizer.test.mjs` | ✅ `14/14` pasando | Valida `plateAppearances` y `adjustedWoba`, y test `2e` de abridores `bo % 100 === 0` frente a sustitutos en `boxTeam.battingOrder`. |
 | `node test/bullpen-ir-irs.test.mjs` | ✅ `7/7` pasando | Sin regresiones en módulo de bullpen. |
 | `node test/calendar-today.test.mjs` | ✅ `5/5` pasando | Sin regresiones en utilidades de fecha VET. |
 | `npm run build` | ✅ Exitoso | Compilado con Next.js 16.3.6 (Turbopack) y 19/19 páginas estáticas generadas. |
