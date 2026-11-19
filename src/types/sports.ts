@@ -99,6 +99,13 @@ export interface BattingStats {
   ops: number;
   iso: number;
   babip: number;
+  woba?: number;
+  avgPlus?: number;
+  obpPlus?: number;
+  slgPlus?: number;
+  opsPlus?: number;
+  wobaPlus?: number;
+  wrcPlus?: number;
 }
 
 export interface PitchingStats {
@@ -129,6 +136,10 @@ export interface PitchingStats {
   saves?: number;
   wins?: number;
   losses?: number;
+  fip?: number;
+  eraPlus?: number;
+  whipPlus?: number;
+  fipPlus?: number;
 }
 
 export interface FieldingStats {

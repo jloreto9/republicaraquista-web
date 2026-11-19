@@ -36,6 +36,72 @@ export interface StatheadIndividualSearchProps {
 type IndividualGroup = "batting" | "pitching" | "fielding";
 type DatePreset = "7d" | "14d" | "oct" | "nov" | "dic" | "all" | "custom";
 type MinPreset = "qualified" | "all" | "mid" | "high";
+type ColumnView = "all" | "traditional" | "advanced";
+
+const COLUMN_VIEW_OPTIONS: Array<{ id: ColumnView; label: string }> = [
+  { id: "all", label: "Todas" },
+  { id: "traditional", label: "Tradicionales" },
+  { id: "advanced", label: "Avanzadas & Stats+" },
+];
+
+const BATTING_PLUS_COLUMNS: Array<{
+  key: "avgPlus" | "obpPlus" | "slgPlus" | "opsPlus" | "wobaPlus" | "wrcPlus";
+  label: string;
+  title: string;
+}> = [
+  {
+    key: "avgPlus",
+    label: "AVG+",
+    title: "Índice ajustado de Promedio de Bateo (100 = Promedio LVBP)",
+  },
+  {
+    key: "obpPlus",
+    label: "OBP+",
+    title: "Índice ajustado de Embasado (100 = Promedio LVBP)",
+  },
+  {
+    key: "slgPlus",
+    label: "SLG+",
+    title: "Índice ajustado de Slugging (100 = Promedio LVBP)",
+  },
+  {
+    key: "opsPlus",
+    label: "OPS+",
+    title: "Índice ajustado de OPS (100 = Promedio LVBP)",
+  },
+  {
+    key: "wobaPlus",
+    label: "wOBA+",
+    title: "Índice ajustado de wOBA (100 = Promedio LVBP)",
+  },
+  {
+    key: "wrcPlus",
+    label: "wRC+",
+    title: "Carreras Creadas Ponderadas Ajustadas (100 = Promedio LVBP)",
+  },
+];
+
+const PITCHING_PLUS_COLUMNS: Array<{
+  key: "eraPlus" | "whipPlus" | "fipPlus";
+  label: string;
+  title: string;
+}> = [
+  {
+    key: "eraPlus",
+    label: "ERA+",
+    title: "Índice ajustado de Efectividad (>100 es mejor, 100 = Promedio LVBP)",
+  },
+  {
+    key: "whipPlus",
+    label: "WHIP+",
+    title: "Índice ajustado de WHIP (>100 es mejor, 100 = Promedio LVBP)",
+  },
+  {
+    key: "fipPlus",
+    label: "FIP+",
+    title: "Índice ajustado de FIP (>100 es mejor, 100 = Promedio LVBP)",
+  },
+];
 
 interface IndividualStatsApiResponse<T> {
   success: boolean;
@@ -105,6 +171,7 @@ const FIELDING_POSITION_PILLS = [
 const ASCENDING_DEFAULT_FIELDS = new Set([
   "era",
   "whip",
+  "fip",
   "bbPer9",
   "walks",
   "earnedRuns",
@@ -186,6 +253,25 @@ function normalizeSearchText(text: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function compareSortableRows(
+  valA: unknown,
+  valB: unknown,
+  tieBreaker: number,
+  sortAsc: boolean
+): number {
+  if (typeof valA === "string" || typeof valB === "string") {
+    return sortAsc
+      ? String(valA ?? "").localeCompare(String(valB ?? ""))
+      : String(valB ?? "").localeCompare(String(valA ?? ""));
+  }
+  const nA = Number(valA ?? 0);
+  const nB = Number(valB ?? 0);
+  const safeA = Number.isFinite(nA) ? nA : 0;
+  const safeB = Number.isFinite(nB) ? nB : 0;
+  if (safeA !== safeB) return sortAsc ? safeA - safeB : safeB - safeA;
+  return tieBreaker;
 }
 
 function computeDelta(
@@ -386,6 +472,37 @@ function SortableHeader({
   );
 }
 
+function getPlusBadgeClass(value: number): string {
+  if (value >= 130) {
+    return "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold";
+  }
+  if (value >= 110) {
+    return "bg-[#FDB827]/15 text-[#FDB827] border-[#FDB827]/35 font-semibold";
+  }
+  if (value >= 91) {
+    return "bg-slate-800/80 text-slate-200 border-slate-700";
+  }
+  return "bg-rose-500/15 text-rose-300 border-rose-500/30";
+}
+
+function PlusStatBadge({ value }: { value?: number }) {
+  const rounded =
+    typeof value === "number" && Number.isFinite(value) ? Math.round(value) : 0;
+  if (rounded <= 0) {
+    return <span className="text-slate-500 font-mono">--</span>;
+  }
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center justify-center min-w-[2.25rem] px-1.5 py-0.5 rounded border text-[11px] font-mono tabular-nums",
+        getPlusBadgeClass(rounded)
+      )}
+    >
+      {rounded}
+    </span>
+  );
+}
+
 function StatValueCell({
   display,
   compareEnabled,
@@ -539,9 +656,13 @@ export function StatheadIndividualSearch({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [positionFilter, setPositionFilter] = useState<string>("ALL");
 
-  // Ordenamiento
+  // Ordenamiento y vista de columnas
   const [sortField, setSortField] = useState<string>("ops");
   const [sortAsc, setSortAsc] = useState<boolean>(false);
+  const [columnView, setColumnView] = useState<ColumnView>("all");
+
+  const showTraditionalCols = columnView === "all" || columnView === "traditional";
+  const showAdvancedCols = columnView === "all" || columnView === "advanced";
 
   // Datos y estado de red
   const [groupData, setGroupData] = useState<GroupDataState>({
@@ -1019,73 +1140,58 @@ export function StatheadIndividualSearch({
   // Ordenamiento de filas
   const sortedBatting = useMemo(() => {
     return [...filteredBatting].sort((a, b) => {
-      let valA: unknown = a[sortField as keyof BattingStats];
-      let valB: unknown = b[sortField as keyof BattingStats];
-      if (sortField === "plateAppearances") {
-        valA = getBatterPa(a);
-        valB = getBatterPa(b);
-      }
-      if (typeof valA === "number" && typeof valB === "number") {
-        if (valA !== valB) return sortAsc ? valA - valB : valB - valA;
-        return getBatterPa(b) - getBatterPa(a);
-      }
-      if (valA === undefined || valB === undefined) {
-        const nA = Number(valA ?? 0);
-        const nB = Number(valB ?? 0);
-        if (nA !== nB) return sortAsc ? nA - nB : nB - nA;
-        return getBatterPa(b) - getBatterPa(a);
-      }
-      return sortAsc
-        ? String(valA).localeCompare(String(valB))
-        : String(valB).localeCompare(String(valA));
+      const valA =
+        sortField === "plateAppearances"
+          ? getBatterPa(a)
+          : a[sortField as keyof BattingStats];
+      const valB =
+        sortField === "plateAppearances"
+          ? getBatterPa(b)
+          : b[sortField as keyof BattingStats];
+      return compareSortableRows(
+        valA,
+        valB,
+        getBatterPa(b) - getBatterPa(a),
+        sortAsc
+      );
     });
   }, [filteredBatting, sortField, sortAsc]);
 
   const sortedPitching = useMemo(() => {
     return [...filteredPitching].sort((a, b) => {
-      let valA: unknown = a[sortField as keyof PitchingStats];
-      let valB: unknown = b[sortField as keyof PitchingStats];
-      if (sortField === "inningsDisplay") {
-        valA = a.inningsPitched;
-        valB = b.inningsPitched;
-      }
-      if (typeof valA === "number" && typeof valB === "number") {
-        if (valA !== valB) return sortAsc ? valA - valB : valB - valA;
-        return b.inningsPitched - a.inningsPitched;
-      }
-      if (valA === undefined || valB === undefined) {
-        const nA = Number(valA ?? 0);
-        const nB = Number(valB ?? 0);
-        if (nA !== nB) return sortAsc ? nA - nB : nB - nA;
-        return b.inningsPitched - a.inningsPitched;
-      }
-      return sortAsc
-        ? String(valA).localeCompare(String(valB))
-        : String(valB).localeCompare(String(valA));
+      const valA =
+        sortField === "inningsDisplay"
+          ? a.inningsPitched
+          : a[sortField as keyof PitchingStats];
+      const valB =
+        sortField === "inningsDisplay"
+          ? b.inningsPitched
+          : b[sortField as keyof PitchingStats];
+      return compareSortableRows(
+        valA,
+        valB,
+        b.inningsPitched - a.inningsPitched,
+        sortAsc
+      );
     });
   }, [filteredPitching, sortField, sortAsc]);
 
   const sortedFielding = useMemo(() => {
     return [...filteredFielding].sort((a, b) => {
-      let valA: unknown = a[sortField as keyof FieldingStats];
-      let valB: unknown = b[sortField as keyof FieldingStats];
-      if (sortField === "innings") {
-        valA = a.inningsDecimal ?? 0;
-        valB = b.inningsDecimal ?? 0;
-      }
-      if (typeof valA === "number" && typeof valB === "number") {
-        if (valA !== valB) return sortAsc ? valA - valB : valB - valA;
-        return b.totalChances - a.totalChances;
-      }
-      if (valA === undefined || valB === undefined) {
-        const nA = Number(valA ?? 0);
-        const nB = Number(valB ?? 0);
-        if (nA !== nB) return sortAsc ? nA - nB : nB - nA;
-        return b.totalChances - a.totalChances;
-      }
-      return sortAsc
-        ? String(valA).localeCompare(String(valB))
-        : String(valB).localeCompare(String(valA));
+      const valA =
+        sortField === "innings"
+          ? a.inningsDecimal ?? 0
+          : a[sortField as keyof FieldingStats];
+      const valB =
+        sortField === "innings"
+          ? b.inningsDecimal ?? 0
+          : b[sortField as keyof FieldingStats];
+      return compareSortableRows(
+        valA,
+        valB,
+        b.totalChances - a.totalChances,
+        sortAsc
+      );
     });
   }, [filteredFielding, sortField, sortAsc]);
 
@@ -1850,35 +1956,90 @@ export function StatheadIndividualSearch({
         </div>
       ) : (
         <div className="bg-[#0B132B] border border-[#1E2B4D] rounded-2xl shadow-xl overflow-hidden">
-          <div className="px-4 py-3 bg-[#070B19] border-b border-[#1E2B4D] flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-slate-100">
-                {group === "batting"
-                  ? "Bateo Individual"
-                  : group === "pitching"
-                  ? "Pitcheo Individual"
-                  : "Fildeo Individual"}
-              </span>
-              <span className="text-[11px] text-slate-300 font-mono">
-                ({startDate} → {endDate})
-              </span>
-              <span className="text-[11px] font-mono text-slate-300">
-                • Mostrando {activeFilteredCount} de {activePreMinCount}
-              </span>
-              {compareEnabled && (
-                <span className="text-[10px] text-[#FDB827] bg-[#FDB827]/10 px-2 py-0.5 rounded font-mono border border-[#FDB827]/30">
-                  vs {compareSeason} ({prevStartDate} → {prevEndDate})
+          <div className="px-4 py-3 bg-[#070B19] border-b border-[#1E2B4D] space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-100">
+                  {group === "batting"
+                    ? "Bateo Individual"
+                    : group === "pitching"
+                    ? "Pitcheo Individual"
+                    : "Fildeo Individual"}
                 </span>
-              )}
+                <span className="text-[11px] text-slate-300 font-mono">
+                  ({startDate} → {endDate})
+                </span>
+                <span className="text-[11px] font-mono text-slate-300">
+                  • Mostrando {activeFilteredCount} de {activePreMinCount}
+                </span>
+                {compareEnabled && (
+                  <span className="text-[10px] text-[#FDB827] bg-[#FDB827]/10 px-2 py-0.5 rounded font-mono border border-[#FDB827]/30">
+                    vs {compareSeason} ({prevStartDate} → {prevEndDate})
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] text-slate-300">
+                Haz clic en un encabezado para ordenar o en un nombre para ver splits
+              </span>
             </div>
-            <span className="text-[11px] text-slate-300">
-              Haz clic en un encabezado para ordenar o en un nombre para ver splits
-            </span>
+
+            {(group === "batting" || group === "pitching") && (
+              <div className="pt-2 border-t border-[#1E2B4D]/70 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+                <div
+                  role="group"
+                  aria-label="Vista de columnas del buscador"
+                  className="inline-flex flex-wrap items-center gap-1 bg-[#0B132B] p-1 rounded-lg border border-[#1E2B4D] self-start"
+                >
+                  {COLUMN_VIEW_OPTIONS.map((option) => {
+                    const active = columnView === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setColumnView(option.id)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FDB827]",
+                          active
+                            ? "bg-[#FDB827] text-slate-950 font-bold"
+                            : "text-slate-300 hover:text-slate-100 hover:bg-[#131E3D]"
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                  <span className="text-slate-300 font-semibold mr-1">
+                    100 = Promedio LVBP
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded border bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold">
+                    ≥130 Élite
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded border bg-[#FDB827]/15 text-[#FDB827] border-[#FDB827]/35 font-semibold">
+                    110–129 Sobre prom.
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded border bg-slate-800/80 text-slate-200 border-slate-700">
+                    91–109 Promedio
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded border bg-rose-500/15 text-rose-300 border-rose-500/30">
+                    1–90 Bajo prom.
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="overflow-x-auto">
             {groupData.group === "batting" ? (
-              <table className="w-full text-left text-xs border-collapse min-w-[960px]">
+              <table
+                className={cn(
+                  "w-full text-left text-xs border-collapse",
+                  columnView === "all" ? "min-w-[1260px]" : "min-w-[820px]"
+                )}
+              >
                 <thead>
                   <tr className="bg-[#0D152B] border-b border-[#1E2B4D]">
                     <th className="py-3 px-3 text-center w-10 font-mono text-[11px] text-slate-300">
@@ -1898,23 +2059,50 @@ export function StatheadIndividualSearch({
                     </th>
                     <SortableHeader label="JJ" field="games" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
                     <SortableHeader label="AP" field="plateAppearances" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} title="Apariciones al Plato" />
-                    <SortableHeader label="VB" field="atBats" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="CA" field="runs" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="H" field="hits" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="2B" field="doubles" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="3B" field="triples" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="HR" field="homeRuns" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="CI" field="rbi" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="BB" field="walks" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="SO" field="strikeouts" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="GIDP" field="gidp" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="BR" field="stolenBases" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                    {showTraditionalCols && (
+                      <>
+                        <SortableHeader label="VB" field="atBats" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="CA" field="runs" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="H" field="hits" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="2B" field="doubles" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="3B" field="triples" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="HR" field="homeRuns" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="CI" field="rbi" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="BB" field="walks" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="SO" field="strikeouts" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="GIDP" field="gidp" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="BR" field="stolenBases" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                      </>
+                    )}
                     <SortableHeader label="AVG" field="avg" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
                     <SortableHeader label="OBP" field="obp" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
                     <SortableHeader label="SLG" field="slg" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
                     <SortableHeader label="OPS" field="ops" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} highlight />
-                    <SortableHeader label="ISO" field="iso" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="BABIP" field="babip" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                    {showAdvancedCols && (
+                      <>
+                        <SortableHeader label="ISO" field="iso" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="BABIP" field="babip" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader
+                          label="wOBA"
+                          field="woba"
+                          sortField={sortField}
+                          sortAsc={sortAsc}
+                          onSort={handleSort}
+                          title="Promedio Ponderado en Base (wOBA, constantes LVBP 2025-2026)"
+                        />
+                        {BATTING_PLUS_COLUMNS.map((col) => (
+                          <SortableHeader
+                            key={col.key}
+                            label={col.label}
+                            field={col.key}
+                            sortField={sortField}
+                            sortAsc={sortAsc}
+                            onSort={handleSort}
+                            title={col.title}
+                          />
+                        ))}
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#152042]">
@@ -1989,58 +2177,62 @@ export function StatheadIndividualSearch({
                           delta={hasPrev ? computeDelta(currPa, prevPa, true, 0) : undefined}
                           className="font-semibold text-slate-100"
                         />
-                        <td className="py-2.5 px-2 text-center font-mono tabular-nums">{player.atBats}</td>
-                        <StatValueCell
-                          display={player.runs}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(player.runs, prev.runs, true, 0) : undefined}
-                        />
-                        <StatValueCell
-                          display={player.hits}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(player.hits, prev.hits, true, 0) : undefined}
-                          className="font-bold text-slate-100"
-                        />
-                        <td className="py-2.5 px-2 text-center font-mono tabular-nums">{player.doubles}</td>
-                        <td className="py-2.5 px-2 text-center font-mono tabular-nums">{player.triples}</td>
-                        <StatValueCell
-                          display={player.homeRuns}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(player.homeRuns, prev.homeRuns, true, 0) : undefined}
-                          className="font-bold text-[#FDB827]"
-                        />
-                        <StatValueCell
-                          display={player.rbi}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(player.rbi, prev.rbi, true, 0) : undefined}
-                        />
-                        <StatValueCell
-                          display={player.walks}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(player.walks, prev.walks, true, 0) : undefined}
-                        />
-                        <StatValueCell
-                          display={player.strikeouts}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(player.strikeouts, prev.strikeouts, false, 0) : undefined}
-                          className="text-slate-300"
-                        />
-                        <td className="py-2.5 px-2 text-center font-mono tabular-nums text-slate-300">
-                          {player.gidp ?? 0}
-                        </td>
-                        <StatValueCell
-                          display={player.stolenBases}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(player.stolenBases, prev.stolenBases, true, 0) : undefined}
-                          className="text-emerald-300"
-                        />
+                        {showTraditionalCols && (
+                          <>
+                            <td className="py-2.5 px-2 text-center font-mono tabular-nums">{player.atBats}</td>
+                            <StatValueCell
+                              display={player.runs}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(player.runs, prev.runs, true, 0) : undefined}
+                            />
+                            <StatValueCell
+                              display={player.hits}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(player.hits, prev.hits, true, 0) : undefined}
+                              className="font-bold text-slate-100"
+                            />
+                            <td className="py-2.5 px-2 text-center font-mono tabular-nums">{player.doubles}</td>
+                            <td className="py-2.5 px-2 text-center font-mono tabular-nums">{player.triples}</td>
+                            <StatValueCell
+                              display={player.homeRuns}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(player.homeRuns, prev.homeRuns, true, 0) : undefined}
+                              className="font-bold text-[#FDB827]"
+                            />
+                            <StatValueCell
+                              display={player.rbi}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(player.rbi, prev.rbi, true, 0) : undefined}
+                            />
+                            <StatValueCell
+                              display={player.walks}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(player.walks, prev.walks, true, 0) : undefined}
+                            />
+                            <StatValueCell
+                              display={player.strikeouts}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(player.strikeouts, prev.strikeouts, false, 0) : undefined}
+                              className="text-slate-300"
+                            />
+                            <td className="py-2.5 px-2 text-center font-mono tabular-nums text-slate-300">
+                              {player.gidp ?? 0}
+                            </td>
+                            <StatValueCell
+                              display={player.stolenBases}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(player.stolenBases, prev.stolenBases, true, 0) : undefined}
+                              className="text-emerald-300"
+                            />
+                          </>
+                        )}
                         <StatValueCell
                           display={formatRate3(player.avg)}
                           compareEnabled={compareEnabled}
@@ -2069,27 +2261,93 @@ export function StatheadIndividualSearch({
                           delta={hasPrev ? computeDelta(player.ops, prev.ops, true, 3) : undefined}
                           className="font-black text-[#FDB827] bg-[#FDB827]/5 px-2.5"
                         />
-                        <StatValueCell
-                          display={formatRate3(player.iso)}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(player.iso, prev.iso, true, 3) : undefined}
-                          className="text-slate-300"
-                        />
-                        <StatValueCell
-                          display={formatRate3(player.babip)}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(player.babip, prev.babip, true, 3) : undefined}
-                          className="text-slate-300"
-                        />
+                        {showAdvancedCols && (
+                          <>
+                            <StatValueCell
+                              display={formatRate3(player.iso)}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(player.iso, prev.iso, true, 3) : undefined}
+                              className="text-slate-300"
+                            />
+                            <StatValueCell
+                              display={formatRate3(player.babip)}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(player.babip, prev.babip, true, 3) : undefined}
+                              className="text-slate-300"
+                            />
+                            <StatValueCell
+                              display={
+                                typeof player.woba === "number" &&
+                                Number.isFinite(player.woba) ? (
+                                  formatRate3(player.woba)
+                                ) : (
+                                  <span className="text-slate-500">--</span>
+                                )
+                              }
+                              compareEnabled={compareEnabled}
+                              hasPrev={
+                                prev !== null &&
+                                typeof player.woba === "number" &&
+                                Number.isFinite(player.woba) &&
+                                typeof prev.woba === "number" &&
+                                Number.isFinite(prev.woba)
+                              }
+                              delta={
+                                prev !== null &&
+                                typeof player.woba === "number" &&
+                                Number.isFinite(player.woba) &&
+                                typeof prev.woba === "number" &&
+                                Number.isFinite(prev.woba)
+                                  ? computeDelta(player.woba, prev.woba, true, 3)
+                                  : undefined
+                              }
+                              className="text-sky-300 font-semibold px-2.5"
+                            />
+                            {BATTING_PLUS_COLUMNS.map((col) => {
+                              const currVal = player[col.key];
+                              const prevVal = prev !== null ? prev[col.key] : undefined;
+                              const hasValidPair =
+                                typeof currVal === "number" &&
+                                Number.isFinite(currVal) &&
+                                Math.round(currVal) > 0 &&
+                                typeof prevVal === "number" &&
+                                Number.isFinite(prevVal) &&
+                                Math.round(prevVal) > 0;
+                              return (
+                                <StatValueCell
+                                  key={col.key}
+                                  display={<PlusStatBadge value={currVal} />}
+                                  compareEnabled={compareEnabled}
+                                  hasPrev={hasValidPair}
+                                  delta={
+                                    hasValidPair
+                                      ? computeDelta(
+                                          Math.round(currVal),
+                                          Math.round(prevVal),
+                                          true,
+                                          0
+                                        )
+                                      : undefined
+                                  }
+                                />
+                              );
+                            })}
+                          </>
+                        )}
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             ) : groupData.group === "pitching" ? (
-              <table className="w-full text-left text-xs border-collapse min-w-[960px]">
+              <table
+                className={cn(
+                  "w-full text-left text-xs border-collapse",
+                  columnView === "all" ? "min-w-[1140px]" : "min-w-[820px]"
+                )}
+              >
                 <thead>
                   <tr className="bg-[#0D152B] border-b border-[#1E2B4D]">
                     <th className="py-3 px-3 text-center w-10 font-mono text-[11px] text-slate-300">
@@ -2113,18 +2371,45 @@ export function StatheadIndividualSearch({
                     <SortableHeader label="P" field="losses" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} title="Juegos Perdidos" />
                     <SortableHeader label="SV" field="saves" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} title="Juegos Salvados" />
                     <SortableHeader label="IP" field="inningsPitched" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="H" field="hits" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="C" field="runs" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} title="Carreras Permitidas" />
-                    <SortableHeader label="CL" field="earnedRuns" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} title="Carreras Limpias" />
-                    <SortableHeader label="BB" field="walks" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="SO" field="strikeouts" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="HR" field="homeRuns" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
-                    <SortableHeader label="GIDP" field="gidp" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} title="Doble Plays Inducidos" />
+                    {showTraditionalCols && (
+                      <>
+                        <SortableHeader label="H" field="hits" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="C" field="runs" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} title="Carreras Permitidas" />
+                        <SortableHeader label="CL" field="earnedRuns" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} title="Carreras Limpias" />
+                        <SortableHeader label="BB" field="walks" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="SO" field="strikeouts" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="HR" field="homeRuns" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader label="GIDP" field="gidp" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} title="Doble Plays Inducidos" />
+                      </>
+                    )}
                     <SortableHeader label="ERA" field="era" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} highlight />
                     <SortableHeader label="WHIP" field="whip" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
                     <SortableHeader label="K/9" field="kPer9" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
                     <SortableHeader label="BB/9" field="bbPer9" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
                     <SortableHeader label="K/BB" field="kToBb" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                    {showAdvancedCols && (
+                      <>
+                        <SortableHeader
+                          label="FIP"
+                          field="fip"
+                          sortField={sortField}
+                          sortAsc={sortAsc}
+                          onSort={handleSort}
+                          title="Pitcheo Independiente de Fildeo (FIP, ajustado a ERA de la liga)"
+                        />
+                        {PITCHING_PLUS_COLUMNS.map((col) => (
+                          <SortableHeader
+                            key={col.key}
+                            label={col.label}
+                            field={col.key}
+                            sortField={sortField}
+                            sortAsc={sortAsc}
+                            onSort={handleSort}
+                            title={col.title}
+                          />
+                        ))}
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#152042]">
@@ -2225,46 +2510,50 @@ export function StatheadIndividualSearch({
                           }
                           className="font-bold text-slate-100"
                         />
-                        <StatValueCell
-                          display={pitcher.hits}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(pitcher.hits, prev.hits, false, 0) : undefined}
-                        />
-                        <StatValueCell
-                          display={pitcher.runs}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(pitcher.runs, prev.runs, false, 0) : undefined}
-                        />
-                        <StatValueCell
-                          display={pitcher.earnedRuns}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(pitcher.earnedRuns, prev.earnedRuns, false, 0) : undefined}
-                        />
-                        <StatValueCell
-                          display={pitcher.walks}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(pitcher.walks, prev.walks, false, 0) : undefined}
-                        />
-                        <StatValueCell
-                          display={pitcher.strikeouts}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(pitcher.strikeouts, prev.strikeouts, true, 0) : undefined}
-                          className="font-bold text-[#FDB827]"
-                        />
-                        <StatValueCell
-                          display={pitcher.homeRuns}
-                          compareEnabled={compareEnabled}
-                          hasPrev={hasPrev}
-                          delta={hasPrev ? computeDelta(pitcher.homeRuns, prev.homeRuns, false, 0) : undefined}
-                        />
-                        <td className="py-2.5 px-2 text-center font-mono tabular-nums text-slate-300">
-                          {pitcher.gidp ?? 0}
-                        </td>
+                        {showTraditionalCols && (
+                          <>
+                            <StatValueCell
+                              display={pitcher.hits}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(pitcher.hits, prev.hits, false, 0) : undefined}
+                            />
+                            <StatValueCell
+                              display={pitcher.runs}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(pitcher.runs, prev.runs, false, 0) : undefined}
+                            />
+                            <StatValueCell
+                              display={pitcher.earnedRuns}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(pitcher.earnedRuns, prev.earnedRuns, false, 0) : undefined}
+                            />
+                            <StatValueCell
+                              display={pitcher.walks}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(pitcher.walks, prev.walks, false, 0) : undefined}
+                            />
+                            <StatValueCell
+                              display={pitcher.strikeouts}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(pitcher.strikeouts, prev.strikeouts, true, 0) : undefined}
+                              className="font-bold text-[#FDB827]"
+                            />
+                            <StatValueCell
+                              display={pitcher.homeRuns}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={hasPrev ? computeDelta(pitcher.homeRuns, prev.homeRuns, false, 0) : undefined}
+                            />
+                            <td className="py-2.5 px-2 text-center font-mono tabular-nums text-slate-300">
+                              {pitcher.gidp ?? 0}
+                            </td>
+                          </>
+                        )}
                         <StatValueCell
                           display={formatFixed(pitcher.era, 2)}
                           compareEnabled={compareEnabled}
@@ -2300,6 +2589,67 @@ export function StatheadIndividualSearch({
                           delta={hasPrev ? computeDelta(pitcher.kToBb, prev.kToBb, true, 1) : undefined}
                           className="text-slate-200"
                         />
+                        {showAdvancedCols && (
+                          <>
+                            <StatValueCell
+                              display={
+                                typeof pitcher.fip === "number" &&
+                                Number.isFinite(pitcher.fip) ? (
+                                  formatFixed(pitcher.fip, 2)
+                                ) : (
+                                  <span className="text-slate-500">--</span>
+                                )
+                              }
+                              compareEnabled={compareEnabled}
+                              hasPrev={
+                                prev !== null &&
+                                typeof pitcher.fip === "number" &&
+                                Number.isFinite(pitcher.fip) &&
+                                typeof prev.fip === "number" &&
+                                Number.isFinite(prev.fip)
+                              }
+                              delta={
+                                prev !== null &&
+                                typeof pitcher.fip === "number" &&
+                                Number.isFinite(pitcher.fip) &&
+                                typeof prev.fip === "number" &&
+                                Number.isFinite(prev.fip)
+                                  ? computeDelta(pitcher.fip, prev.fip, false, 2)
+                                  : undefined
+                              }
+                              className="text-sky-300 font-semibold px-2.5"
+                            />
+                            {PITCHING_PLUS_COLUMNS.map((col) => {
+                              const currVal = pitcher[col.key];
+                              const prevVal = prev !== null ? prev[col.key] : undefined;
+                              const hasValidPair =
+                                typeof currVal === "number" &&
+                                Number.isFinite(currVal) &&
+                                Math.round(currVal) > 0 &&
+                                typeof prevVal === "number" &&
+                                Number.isFinite(prevVal) &&
+                                Math.round(prevVal) > 0;
+                              return (
+                                <StatValueCell
+                                  key={col.key}
+                                  display={<PlusStatBadge value={currVal} />}
+                                  compareEnabled={compareEnabled}
+                                  hasPrev={hasValidPair}
+                                  delta={
+                                    hasValidPair
+                                      ? computeDelta(
+                                          Math.round(currVal),
+                                          Math.round(prevVal),
+                                          true,
+                                          0
+                                        )
+                                      : undefined
+                                  }
+                                />
+                              );
+                            })}
+                          </>
+                        )}
                       </tr>
                     );
                   })}

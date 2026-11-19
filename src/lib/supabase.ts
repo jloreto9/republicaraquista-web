@@ -1567,6 +1567,188 @@ function parseFiniteStatNumber(val: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Pesos lineales canónicos LVBP (temporada base 2025-2026),
+ * alineados con `src/lib/awards-engine.ts` para cálculo de wOBA y wRC+.
+ */
+const LVBP_WOBA_WEIGHTS = {
+  bb: 0.69,
+  hbp: 0.72,
+  single: 0.888,
+  double: 1.271,
+  triple: 1.616,
+  hr: 2.101,
+  scale: 1.15,
+} as const;
+
+/**
+ * Enriquece un pool completo de bateadores con wOBA e índices ajustados a la liga (AVG+, OBP+, SLG+, OPS+, wOBA+, wRC+).
+ * Debe ejecutarse sobre todo el pool antes de aplicar filtros de mínimos (`minAb`) o límite (`limit`).
+ */
+export function enrichBattingStatsWithPlus(batters: BattingStats[]): BattingStats[] {
+  if (!batters || batters.length === 0) {
+    return [];
+  }
+
+  let sumAb = 0;
+  let sumHits = 0;
+  let sumObpNum = 0;
+  let sumTotalBases = 0;
+  let sumWobaNum = 0;
+  let sumWobaDen = 0;
+  let sumRuns = 0;
+  let sumPa = 0;
+
+  const perBatter = batters.map((b) => {
+    const ab = Number(b.atBats || 0);
+    const hits = Number(b.hits || 0);
+    const doubles = Number(b.doubles || 0);
+    const triples = Number(b.triples || 0);
+    const homeRuns = Number(b.homeRuns || 0);
+    const walks = Number(b.walks || 0);
+    const hbp = Number(b.hbp ?? 0);
+    const sf = Number(b.sf ?? 0);
+    const sh = Number(b.sh ?? 0);
+    const runs = Number(b.runs || 0);
+    const pa = Number((b.plateAppearances ?? b.pa ?? ab + walks + hbp + sf + sh) || 0);
+
+    const singles = Math.max(0, hits - doubles - triples - homeRuns);
+    const wobaDen = ab + walks + hbp + sf;
+    const wobaNum =
+      LVBP_WOBA_WEIGHTS.bb * walks +
+      LVBP_WOBA_WEIGHTS.hbp * hbp +
+      LVBP_WOBA_WEIGHTS.single * singles +
+      LVBP_WOBA_WEIGHTS.double * doubles +
+      LVBP_WOBA_WEIGHTS.triple * triples +
+      LVBP_WOBA_WEIGHTS.hr * homeRuns;
+    const wobaRaw = wobaDen > 0 ? wobaNum / wobaDen : 0;
+    const woba = Number(wobaRaw.toFixed(3));
+    const totalBases = singles + 2 * doubles + 3 * triples + 4 * homeRuns;
+
+    sumAb += ab;
+    sumHits += hits;
+    sumObpNum += hits + walks + hbp;
+    sumTotalBases += totalBases;
+    sumWobaNum += wobaNum;
+    sumWobaDen += wobaDen;
+    sumRuns += runs;
+    sumPa += pa;
+
+    return { b, ab, wobaDen, wobaRaw, woba };
+  });
+
+  const lgAvg = sumAb > 0 ? sumHits / sumAb : 0.270;
+  const lgObp = sumWobaDen > 0 ? sumObpNum / sumWobaDen : 0.340;
+  const lgSlg = sumAb > 0 ? sumTotalBases / sumAb : 0.410;
+  const lgWoba = sumWobaDen > 0 ? sumWobaNum / sumWobaDen : 0.330;
+  const lgRunsPerPa = sumPa > 0 ? sumRuns / sumPa : 0.125;
+
+  return perBatter.map(({ b, ab, wobaDen, wobaRaw, woba }) => {
+    const avg = Number(b.avg || 0);
+    const obp = Number(b.obp || 0);
+    const slg = Number(b.slg || 0);
+
+    const avgPlus = ab > 0 && lgAvg > 0 ? Math.round(100 * (avg / lgAvg)) : 0;
+    const obpPlus = wobaDen > 0 && lgObp > 0 ? Math.round(100 * (obp / lgObp)) : 0;
+    const slgPlus = ab > 0 && lgSlg > 0 ? Math.round(100 * (slg / lgSlg)) : 0;
+    const opsPlus =
+      wobaDen > 0 && ab > 0 && lgObp > 0 && lgSlg > 0
+        ? Math.max(0, Math.round(100 * (obp / lgObp + slg / lgSlg - 1)))
+        : 0;
+    const wobaPlus = wobaDen > 0 && lgWoba > 0 ? Math.round(100 * (wobaRaw / lgWoba)) : 0;
+    const wrcPlus =
+      wobaDen > 0 && lgRunsPerPa > 0
+        ? Math.max(
+            0,
+            Math.round(
+              100 * (((wobaRaw - lgWoba) / LVBP_WOBA_WEIGHTS.scale + lgRunsPerPa) / lgRunsPerPa)
+            )
+          )
+        : 0;
+
+    return {
+      ...b,
+      woba,
+      avgPlus,
+      obpPlus,
+      slgPlus,
+      opsPlus,
+      wobaPlus,
+      wrcPlus,
+    };
+  });
+}
+
+/**
+ * Enriquece un pool completo de lanzadores con FIP e índices ajustados a la liga (ERA+, WHIP+, FIP+).
+ * Usa la escala estándar donde 100 equivale al promedio del circuito y valores mayores a 100 indican mejor rendimiento.
+ * Debe ejecutarse sobre todo el pool antes de aplicar filtros de mínimos (`minIp`) o límite (`limit`).
+ */
+export function enrichPitchingStatsWithPlus(pitchers: PitchingStats[]): PitchingStats[] {
+  if (!pitchers || pitchers.length === 0) {
+    return [];
+  }
+
+  let totalIp = 0;
+  let totalEr = 0;
+  let totalHits = 0;
+  let totalWalks = 0;
+  let totalHbp = 0;
+  let totalSo = 0;
+  let totalHr = 0;
+
+  for (const p of pitchers) {
+    totalIp += Number(p.inningsPitched || 0);
+    totalEr += Number(p.earnedRuns || 0);
+    totalHits += Number(p.hits || 0);
+    totalWalks += Number(p.walks || 0);
+    totalHbp += Number(p.hbp ?? 0);
+    totalSo += Number(p.strikeouts || 0);
+    totalHr += Number(p.homeRuns || 0);
+  }
+
+  const lgEra = totalIp > 0 ? (totalEr * 9) / totalIp : 4.50;
+  const lgWhip = totalIp > 0 ? (totalHits + totalWalks) / totalIp : 1.45;
+  const lgFipCore =
+    totalIp > 0 ? (13 * totalHr + 3 * (totalWalks + totalHbp) - 2 * totalSo) / totalIp : 0.70;
+  const cFip = lgEra - lgFipCore;
+
+  return pitchers.map((p) => {
+    const ip = Number(p.inningsPitched || 0);
+    if (ip <= 0) {
+      return {
+        ...p,
+        fip: 0,
+        eraPlus: 0,
+        whipPlus: 0,
+        fipPlus: 0,
+      };
+    }
+
+    const hr = Number(p.homeRuns || 0);
+    const walks = Number(p.walks || 0);
+    const hbp = Number(p.hbp ?? 0);
+    const strikeouts = Number(p.strikeouts || 0);
+    const era = Number(p.era || 0);
+    const whip = Number(p.whip || 0);
+
+    const fipRaw = Math.max(0, (13 * hr + 3 * (walks + hbp) - 2 * strikeouts) / ip + cFip);
+    const fip = Number(fipRaw.toFixed(2));
+    const eraPlus = lgEra > 0 ? Math.min(500, Math.round(100 * (lgEra / Math.max(0.15, era)))) : 0;
+    const whipPlus =
+      lgWhip > 0 ? Math.min(500, Math.round(100 * (lgWhip / Math.max(0.10, whip)))) : 0;
+    const fipPlus = lgEra > 0 ? Math.min(500, Math.round(100 * (lgEra / Math.max(0.15, fip)))) : 0;
+
+    return {
+      ...p,
+      fip,
+      eraPlus,
+      whipPlus,
+      fipPlus,
+    };
+  });
+}
+
 function aggregateBattingRows(
   mergedRows: RawBattingRow[],
   gidpMap: Map<number, number>,
@@ -1726,8 +1908,10 @@ function aggregateBattingRows(
     };
   });
 
+  const enrichedResults = enrichBattingStatsWithPlus(results);
+
   // Filtrar clasificados por minAb y ordenar por OPS descendente
-  const qualified = minAb > 0 ? results.filter((p) => p.atBats >= minAb) : results;
+  const qualified = minAb > 0 ? enrichedResults.filter((p) => p.atBats >= minAb) : enrichedResults;
   qualified.sort((a, b) => b.ops - a.ops || b.hits - a.hits);
   return limit ? qualified.slice(0, limit) : qualified;
 }
@@ -1953,7 +2137,9 @@ export async function getBattingStats(
         };
       });
 
-      const qualified = minAb > 0 ? results.filter((p) => p.atBats >= minAb) : results;
+      const enrichedResults = enrichBattingStatsWithPlus(results);
+
+      const qualified = minAb > 0 ? enrichedResults.filter((p) => p.atBats >= minAb) : enrichedResults;
       qualified.sort((a, b) => b.ops - a.ops || b.hits - a.hits);
       return limit ? qualified.slice(0, limit) : qualified;
     }
@@ -2214,8 +2400,10 @@ function aggregatePitchingRows(
     };
   });
 
+  const enrichedResults = enrichPitchingStatsWithPlus(results);
+
   // Filtrar clasificados por minIp y ordenar por ERA ascendente
-  const qualified = minIp > 0 ? results.filter((p) => p.inningsPitched >= minIp) : results;
+  const qualified = minIp > 0 ? enrichedResults.filter((p) => p.inningsPitched >= minIp) : enrichedResults;
   qualified.sort((a, b) => a.era - b.era || b.strikeouts - a.strikeouts);
   return limit ? qualified.slice(0, limit) : qualified;
 }
@@ -2444,7 +2632,9 @@ export async function getPitchingStats(
         };
       });
 
-      const qualified = minIp > 0 ? results.filter((p) => p.inningsPitched >= minIp) : results;
+      const enrichedResults = enrichPitchingStatsWithPlus(results);
+
+      const qualified = minIp > 0 ? enrichedResults.filter((p) => p.inningsPitched >= minIp) : enrichedResults;
       qualified.sort((a, b) => a.era - b.era || b.strikeouts - a.strikeouts);
       return limit ? qualified.slice(0, limit) : qualified;
     }
