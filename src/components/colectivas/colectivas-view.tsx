@@ -17,12 +17,14 @@ import {
   ChevronDown,
   Trophy,
   Search,
+  Clock,
 } from "lucide-react";
 import {
   CollectiveStatsResult,
   CollectiveBattingTeam,
   CollectivePitchingTeam,
   CollectiveFieldingTeam,
+  PitchingRoleFilter,
 } from "@/types/collective";
 import { cn } from "@/lib/utils";
 import { useSeason } from "@/context/season-context";
@@ -53,6 +55,7 @@ export function ColectivasView({
   const [activeTab, setActiveTab] = useState<
     "bateo" | "pitcheo" | "fildeo" | "stathead"
   >("bateo");
+  const [pitchingRole, setPitchingRole] = useState<PitchingRoleFilter>("all");
   const [viewMode, setViewMode] = useState<"totals" | "per_game">("totals");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -61,12 +64,19 @@ export function ColectivasView({
   const [pitchingMetric, setPitchingMetric] = useState<keyof CollectivePitchingTeam>("era");
   const [fieldingMetric, setFieldingMetric] = useState<keyof CollectiveFieldingTeam>("fpct");
 
-  const fetchData = async (newSeason: number, newPhase: string) => {
+  const fetchData = async (
+    newSeason: number,
+    newPhase: string,
+    newRole: PitchingRoleFilter = pitchingRole
+  ) => {
     setCurrentSeason(newSeason);
     setPhase(newPhase);
+    setPitchingRole(newRole);
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/stats/collective?season=${newSeason}&phase=${newPhase}`);
+      const res = await fetch(
+        `/api/stats/collective?season=${newSeason}&phase=${newPhase}&pitchingRole=${newRole}`
+      );
       const json = await res.json();
       if (json.success && json.data) {
         setData(json.data);
@@ -80,13 +90,26 @@ export function ColectivasView({
 
   useEffect(() => {
     if (globalSeason && globalSeason !== currentSeason) {
-      fetchData(globalSeason, phase);
+      fetchData(globalSeason, phase, pitchingRole);
     }
   }, [globalSeason]);
 
   const handlePhaseChange = (newPhase: string) => {
-    fetchData(currentSeason, newPhase);
+    fetchData(currentSeason, newPhase, pitchingRole);
   };
+
+  const handlePitchingRoleChange = (newRole: PitchingRoleFilter) => {
+    if (newRole === pitchingRole) return;
+    fetchData(currentSeason, phase, newRole);
+  };
+
+  const bestPitchIp = data.pitching.length
+    ? [...data.pitching].sort((a, b) => {
+        const aOuts = Math.floor(a.ip) * 3 + Math.round((a.ip - Math.floor(a.ip)) * 10);
+        const bOuts = Math.floor(b.ip) * 3 + Math.round((b.ip - Math.floor(b.ip)) * 10);
+        return bOuts - aOuts;
+      })[0]
+    : null;
 
   return (
     <div className="space-y-6">
@@ -102,7 +125,7 @@ export function ColectivasView({
               onChange={(e) => {
                 const s = Number(e.target.value);
                 setGlobalSeason(s);
-                fetchData(s, phase);
+                fetchData(s, phase, pitchingRole);
               }}
               disabled={isLoading}
               className="bg-transparent text-xs font-bold font-mono text-[#FDB827] outline-none cursor-pointer"
@@ -532,6 +555,40 @@ export function ColectivasView({
       {/* ── CONTENIDO: PITCHEO COLECTIVO ── */}
       {activeTab === "pitcheo" && (
         <div className="space-y-6">
+          {/* Selector de Rol de Pitcheo */}
+          <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl px-4 py-2.5 shadow-md flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center space-x-2">
+              <Shield className="w-4 h-4 text-[#FDB827]" />
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                Rol de Pitcheo
+              </span>
+            </div>
+            <div className="flex items-center space-x-1 bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D]">
+              {(
+                [
+                  { value: "all", label: "Todos" },
+                  { value: "sp", label: "Abridores (SP)" },
+                  { value: "rp", label: "Relevistas (RP)" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handlePitchingRoleChange(opt.value)}
+                  className={cn(
+                    "px-3 py-1 rounded text-[11px] font-bold transition-all disabled:opacity-50",
+                    pitchingRole === opt.value
+                      ? "bg-[#FDB827] text-slate-950 shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Rejilla de 4 KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <KPICard
@@ -552,19 +609,32 @@ export function ColectivasView({
               teamName={data.pitchingKpis.soTeam}
               icon={Zap}
             />
-            <KPICard
-              title="LÍDER EN SALVADOS"
-              value={data.pitchingKpis.svVal}
-              teamName={data.pitchingKpis.svTeam}
-              icon={Lock}
-            />
+            {pitchingRole === "sp" ? (
+              <KPICard
+                title="MÁS INNINGS (IP)"
+                value={bestPitchIp ? bestPitchIp.ipStr : "0.0"}
+                teamName={bestPitchIp ? bestPitchIp.teamName : "-"}
+                icon={Clock}
+              />
+            ) : (
+              <KPICard
+                title="LÍDER EN SALVADOS"
+                value={data.pitchingKpis.svVal}
+                teamName={data.pitchingKpis.svTeam}
+                icon={Lock}
+              />
+            )}
           </div>
 
           {/* Tabla de Pitcheo Colectivo */}
           <div className="bg-[#0D152B] border border-[#1E2B4D] rounded-xl p-4 shadow-lg space-y-3">
             <div className="flex items-center justify-between border-b border-[#1E2B4D] pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                Staff Monticular y Efectividad Colectiva (8 Equipos)
+                {pitchingRole === "sp"
+                  ? "Abridores (SP) y Efectividad Colectiva (8 Equipos)"
+                  : pitchingRole === "rp"
+                  ? "Relevistas (RP) y Efectividad Colectiva (8 Equipos)"
+                  : "Staff Monticular y Efectividad Colectiva (8 Equipos)"}
               </h3>
               <span className="text-[10px] text-slate-400 font-mono">
                 {viewMode === "totals"

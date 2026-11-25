@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Trophy,
   Users,
+  Search,
   BarChart3,
   GitCompare,
   PieChart,
@@ -52,6 +53,7 @@ export const navigationGroups: NavGroup[] = [
     category: "Analítica Avanzada",
     items: [
       { name: "Líderes Individuales", href: "/individuales", icon: Users },
+      { name: "Buscador de Jugadores", href: "/jugadores", icon: Search, badge: "NUEVO" },
       { name: "Pitching Summary", href: "/pitching", icon: Radio },
       { name: "Matchup 360 (H2H)", href: "/matchup", icon: GitCompare },
       { name: "Estadísticas Colectivas", href: "/colectivas", icon: BarChart3 },

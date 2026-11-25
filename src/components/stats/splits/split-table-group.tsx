@@ -68,6 +68,14 @@ export function SplitTableGroup({
   });
 
   const sortedPitcherRows = [...pitcherRows].sort((a, b) => {
+    if (pitcherSortField === "eraNum" || pitcherSortField === "era") {
+      const aMissing = a.eraAvailable === false || a.era === "--" || a.eraNum < 0;
+      const bMissing = b.eraAvailable === false || b.era === "--" || b.eraNum < 0;
+      if (aMissing && bMissing) return 0;
+      if (aMissing) return 1;
+      if (bMissing) return -1;
+    }
+
     const valA = a[pitcherSortField];
     const valB = b[pitcherSortField];
     const numA =
@@ -486,18 +494,22 @@ export function SplitTableGroup({
                     <td className="py-2 px-1.5 text-center text-slate-400">{row.bb}</td>
                     <td className="py-2 px-1.5 text-center font-bold text-[#FDB827]">{row.so}</td>
                     <td className="py-2 px-1.5 text-center text-slate-400">{row.hr}</td>
-                    <td className="py-2 px-2.5 text-center font-bold text-[#FDB827]">
-                      <span
-                        className={`px-1.5 py-0.5 rounded ${
-                          row.eraNum <= 3.0
-                            ? "bg-emerald-500/20 text-emerald-400 font-extrabold"
-                            : row.eraNum <= 4.5
-                            ? "bg-[#FDB827]/20 text-[#FDB827]"
-                            : "text-rose-400"
-                        }`}
-                      >
-                        {row.era}
-                      </span>
+                    <td className="py-2 px-2.5 text-center font-bold">
+                      {row.eraAvailable === false || row.era === "--" ? (
+                        <span className="text-slate-500 font-mono">--</span>
+                      ) : (
+                        <span
+                          className={`px-1.5 py-0.5 rounded ${
+                            row.eraNum <= 3.0
+                              ? "bg-emerald-500/20 text-emerald-400 font-extrabold"
+                              : row.eraNum <= 4.5
+                              ? "bg-[#FDB827]/20 text-[#FDB827]"
+                              : "text-rose-400"
+                          }`}
+                        >
+                          {row.era}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 px-2 text-center text-sky-400 font-semibold">
                       {row.whip}

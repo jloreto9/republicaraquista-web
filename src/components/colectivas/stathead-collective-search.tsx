@@ -18,6 +18,7 @@ import {
   ChevronDown,
   Layers,
   Sparkles,
+  Info,
 } from "lucide-react";
 import {
   CollectiveStatsResult,
@@ -25,6 +26,7 @@ import {
   CollectivePitchingTeam,
   StatheadDeltaValue,
   StatheadTeamComparison,
+  PitchingRoleFilter,
 } from "@/types/collective";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +41,7 @@ export function StatheadCollectiveSearch({
 }: StatheadCollectiveSearchProps) {
   const [season, setSeason] = useState<number>(initialSeason);
   const [group, setGroup] = useState<StatGroup>("batting");
+  const [pitchingRole, setPitchingRole] = useState<PitchingRoleFilter>("all");
   const [compareEnabled, setCompareEnabled] = useState<boolean>(true);
   const [compareSeason, setCompareSeason] = useState<number>(initialSeason - 1);
 
@@ -141,15 +144,16 @@ export function StatheadCollectiveSearch({
     setLoading(true);
 
     try {
+      const roleParam = group === "pitching" ? `&pitchingRole=${pitchingRole}` : "";
       const fetchCurrent = fetch(
-        `/api/stats/collective?season=${season}&startDate=${startDate}&endDate=${endDate}`
+        `/api/stats/collective?season=${season}&startDate=${startDate}&endDate=${endDate}${roleParam}`
       ).then((r) => r.json() as Promise<{ success: boolean; data?: CollectiveStatsResult }>);
 
       let fetchPrev: Promise<{ success: boolean; data?: CollectiveStatsResult } | null> =
         Promise.resolve(null);
       if (compareEnabled && prevStartDate && prevEndDate) {
         fetchPrev = fetch(
-          `/api/stats/collective?season=${compareSeason}&startDate=${prevStartDate}&endDate=${prevEndDate}`
+          `/api/stats/collective?season=${compareSeason}&startDate=${prevStartDate}&endDate=${prevEndDate}${roleParam}`
         ).then((r) => r.json());
       }
 
@@ -178,7 +182,7 @@ export function StatheadCollectiveSearch({
   useEffect(() => {
     executeQuery();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [season, group]);
+  }, [season, group, pitchingRole]);
 
   // Modificar campo por defecto al cambiar de grupo
   useEffect(() => {
@@ -473,6 +477,49 @@ export function StatheadCollectiveSearch({
             </button>
           </div>
         </div>
+
+        {/* Selector de Rol de Pitcheo (visible cuando group === "pitching") */}
+        {group === "pitching" && (
+          <div className="pt-3 mt-1 flex flex-wrap items-center justify-between gap-2 border-b border-[#1E2B4D]/60 pb-3">
+            <div className="flex items-center space-x-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Rol de Pitcheo:
+              </span>
+              <div className="flex items-center space-x-1 bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D]">
+                {(
+                  [
+                    { value: "all", label: "Todos" },
+                    { value: "sp", label: "Abridores (SP)" },
+                    { value: "rp", label: "Relevistas (RP)" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => setPitchingRole(opt.value)}
+                    className={cn(
+                      "px-2.5 py-1 rounded text-[11px] font-bold transition-all disabled:opacity-50",
+                      pitchingRole === opt.value
+                        ? "bg-[#FDB827] text-slate-950 shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {pitchingRole !== "all" && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
+                <Info className="w-3.5 h-3.5 text-[#FDB827] shrink-0" />
+                <span>
+                  Boxscores oficiales juego a juego (±1 CL por carreras sucias de equipo).
+                </span>
+              </span>
+            )}
+          </div>
+        )}
 
         {/* ── Presets de Acceso Rápido ── */}
         <div className="pt-4 flex flex-wrap items-center gap-2">
@@ -776,10 +823,21 @@ export function StatheadCollectiveSearch({
       {/* ── Tabla de Resultados Tipo Stathead ── */}
       <div className="bg-[#0B132B] border border-[#1E2B4D] rounded-2xl shadow-xl overflow-hidden">
         <div className="px-4 py-3 bg-[#070B19] border-b border-[#1E2B4D] flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-slate-200">
-              {group === "batting" ? "Ofensiva Colectiva" : "Cuerpo de Lanzadores"}
+              {group === "batting"
+                ? "Ofensiva Colectiva"
+                : pitchingRole === "sp"
+                ? "Abridores (SP)"
+                : pitchingRole === "rp"
+                ? "Relevistas (RP)"
+                : "Cuerpo de Lanzadores"}
             </span>
+            {group === "pitching" && pitchingRole !== "all" && (
+              <span className="text-[10px] font-bold text-[#FDB827] bg-[#FDB827]/15 px-2 py-0.5 rounded border border-[#FDB827]/30 uppercase tracking-wider">
+                {pitchingRole === "sp" ? "Abridores (SP)" : "Relevistas (RP)"}
+              </span>
+            )}
             <span className="text-[11px] text-slate-400 font-mono">
               ({startDate} ➔ {endDate})
             </span>
@@ -793,6 +851,14 @@ export function StatheadCollectiveSearch({
             * Haz clic en cualquier columna para ordenar
           </span>
         </div>
+        {group === "pitching" && pitchingRole !== "all" && (
+          <div className="px-4 py-2 bg-[#090F24] border-b border-[#1E2B4D]/60 flex items-center gap-1.5 text-[11px] text-slate-400">
+            <Info className="w-3.5 h-3.5 text-[#FDB827] shrink-0" />
+            <span>
+              Agregado desde boxscores oficiales de juegos finalizados (±1 CL posible por carreras sucias de equipo).
+            </span>
+          </div>
+        )}
 
         <div className="overflow-x-auto">
           {group === "batting" ? (
@@ -1403,7 +1469,11 @@ export function StatheadCollectiveSearch({
                     <td className="py-2 px-2 text-center text-slate-500">1.0</td>
                     <td className="py-2 px-2 text-center">--</td>
                     <td className="py-2 px-2 text-center">--</td>
-                    <td className="py-2 px-2.5 text-center">18.0 IP</td>
+                    <td className="py-2 px-2.5 text-center">
+                      {pitchingRole === "all"
+                        ? "18.0 IP"
+                        : `${currentData.pitchingSummary.perGame["ipStr"] || "0.0"} IP`}
+                    </td>
                     <td className="py-2 px-2 text-center">
                       {currentData.pitchingSummary.perGame["h"]} H
                     </td>

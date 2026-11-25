@@ -1,3 +1,5 @@
+export type PitchingRoleFilter = "all" | "sp" | "rp";
+
 export interface CollectiveBattingTeam {
   teamId: number;
   teamName: string;
@@ -105,6 +107,7 @@ export interface CollectiveLeagueSummary<T> {
 }
 
 export interface CollectiveStatsResult {
+  pitchingRole?: PitchingRoleFilter;
   batting: CollectiveBattingTeam[];
   pitching: CollectivePitchingTeam[];
   fielding: CollectiveFieldingTeam[];

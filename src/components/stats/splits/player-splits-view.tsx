@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
+import { useRouter, usePathname } from "next/navigation";
 import {
   PlayerSplitsProfile,
   PlayerSelectorItem,
 } from "@/types/player-splits";
 import { SplitTableGroup } from "./split-table-group";
+import { PlayerGeneralStatsCard } from "./player-general-stats-card";
+import { LeverageSplitsCard } from "./leverage-splits-card";
 import {
   Search,
   Users,
@@ -17,147 +20,239 @@ import {
   Sparkles,
   Loader2,
   ChevronDown,
+  ChevronUp,
   Layers,
   MapPin,
   ShieldAlert,
   SlidersHorizontal,
+  Gauge,
+  TrendingUp,
+  Activity,
+  ListOrdered,
+  BatteryCharging,
 } from "lucide-react";
 import { getMlbFallbackHeadshotUrl } from "@/lib/constants";
+import { useSeason } from "@/context/season-context";
 
 interface PlayerSplitsViewProps {
   initialPlayerId?: number;
   initialType?: "batter" | "pitcher";
   season?: number;
+  syncUrl?: boolean;
+}
+
+type SelectorRoleFilter = "all" | "batter" | "pitcher";
+
+function normalizeSearch(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 export function PlayerSplitsView({
   initialPlayerId,
   initialType = "batter",
-  season = 2026,
+  season: seasonProp = 2026,
+  syncUrl = false,
 }: PlayerSplitsViewProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { season: globalSeason, setSeason: setGlobalSeason } = useSeason();
+
+  const [activeSeason, setActiveSeason] = useState<number>(seasonProp);
+  const [prevSeasonProp, setPrevSeasonProp] = useState<number>(seasonProp);
+  const [prevGlobalSeason, setPrevGlobalSeason] = useState<number>(globalSeason);
+
   const [playerType, setPlayerType] = useState<"batter" | "pitcher">(initialType);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(
     initialPlayerId ?? null
   );
+  const [prevInitialProps, setPrevInitialProps] = useState<{
+    id?: number;
+    type: "batter" | "pitcher";
+  }>({ id: initialPlayerId, type: initialType });
 
   const [playersList, setPlayersList] = useState<PlayerSelectorItem[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectorRoleFilter, setSelectorRoleFilter] = useState<SelectorRoleFilter>("all");
   const [isSelectorOpen, setIsSelectorOpen] = useState<boolean>(false);
 
-  const [profile, setProfile] = useState<PlayerSplitsProfile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
-  const [loadingList, setLoadingList] = useState<boolean>(true);
+  const [listLoadedSeason, setListLoadedSeason] = useState<number | null>(null);
+  const [profileState, setProfileState] = useState<{
+    key: string;
+    profile: PlayerSplitsProfile | null;
+  }>({ key: "", profile: null });
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [showCountMatrix, setShowCountMatrix] = useState<boolean>(false);
 
-  // Sincronizar props entrantes si cambian por navegación externa desde tablas individuales
-  useEffect(() => {
+  const selectorRef = useRef<HTMLDivElement>(null);
+
+  // Sincronización de props entrantes durante render (patrón oficial React 19)
+  if (seasonProp !== prevSeasonProp) {
+    setPrevSeasonProp(seasonProp);
+    setActiveSeason(seasonProp);
+  }
+  if (globalSeason !== prevGlobalSeason) {
+    setPrevGlobalSeason(globalSeason);
+    setActiveSeason(globalSeason);
+  }
+  if (initialPlayerId !== prevInitialProps.id || initialType !== prevInitialProps.type) {
+    setPrevInitialProps({ id: initialPlayerId, type: initialType });
     if (initialType) setPlayerType(initialType);
     if (initialPlayerId) setSelectedPlayerId(initialPlayerId);
-  }, [initialPlayerId, initialType]);
+  }
+
+  // Sincronizar SeasonContext con el parámetro de URL en /jugadores
+  useEffect(() => {
+    if (syncUrl && seasonProp !== globalSeason) {
+      setGlobalSeason(seasonProp);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncUrl, seasonProp]);
+
+  // Cerrar desplegable al hacer clic fuera
+  useEffect(() => {
+    if (!isSelectorOpen) return;
+    function handleOutsideClick(e: MouseEvent) {
+      if (selectorRef.current && !selectorRef.current.contains(e.target as Node)) {
+        setIsSelectorOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isSelectorOpen]);
+
+  const loadingList = listLoadedSeason !== activeSeason;
 
   // Cargar lista real de jugadores activos en la temporada seleccionada
   useEffect(() => {
     let isMounted = true;
-    async function fetchPlayers() {
-      setLoadingList(true);
-      try {
-        const res = await fetch(`/api/stats/player-splits?mode=list&season=${season}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (isMounted && Array.isArray(json.players)) {
-            setPlayersList(json.players);
-          }
+    const controller = new AbortController();
+
+    fetch(`/api/stats/player-splits?mode=list&season=${activeSeason}`, {
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!isMounted) return;
+        if (Array.isArray(json?.players)) {
+          setPlayersList(json.players);
+        } else {
+          setPlayersList([]);
         }
-      } catch (err) {
+        setListLoadedSeason(activeSeason);
+      })
+      .catch((err) => {
+        if (!isMounted || (err instanceof Error && err.name === "AbortError")) return;
         console.error("Error al cargar lista de jugadores:", err);
-      } finally {
-        if (isMounted) setLoadingList(false);
-      }
-    }
-    fetchPlayers();
+        setListLoadedSeason(activeSeason);
+      });
+
     return () => {
       isMounted = false;
+      controller.abort();
     };
-  }, [season]);
+  }, [activeSeason]);
 
-  // Asegurar que siempre haya un jugador activo válido de la temporada seleccionada
-  useEffect(() => {
-    if (loadingList) return;
+  // Derivar jugador efectivo válido dentro de la temporada seleccionada
+  const effectivePlayerId = useMemo(() => {
+    if (loadingList) return selectedPlayerId;
     const matching = playersList.filter((p) => p.type === playerType);
-    if (matching.length === 0) {
-      setSelectedPlayerId(null);
-      setProfile(null);
-      setLoadingProfile(false);
+    if (matching.length === 0) return null;
+    if (selectedPlayerId && matching.some((p) => p.id === selectedPlayerId)) {
+      return selectedPlayerId;
+    }
+    return matching[0].id;
+  }, [loadingList, playersList, playerType, selectedPlayerId]);
+
+  // Sincronizar URL en /jugadores cuando cambia jugador, tipo o temporada
+  useEffect(() => {
+    if (!syncUrl || loadingList || !effectivePlayerId) return;
+    const targetSearch = `?player=${effectivePlayerId}&type=${playerType}&season=${activeSeason}`;
+    if (typeof window !== "undefined" && window.location.search === targetSearch) {
       return;
     }
-    const existsInSeason = matching.some((p) => p.id === selectedPlayerId);
-    if (!selectedPlayerId || !existsInSeason) {
-      setSelectedPlayerId(matching[0].id);
-    }
-  }, [playersList, playerType, selectedPlayerId, loadingList]);
+    router.replace(`${pathname}${targetSearch}`, { scroll: false });
+  }, [syncUrl, loadingList, effectivePlayerId, playerType, activeSeason, pathname, router]);
+
+  const profileRequestKey =
+    !loadingList && effectivePlayerId
+      ? `${effectivePlayerId}-${playerType}-${activeSeason}`
+      : "";
 
   // Cargar perfil del jugador seleccionado
   useEffect(() => {
+    if (!profileRequestKey || !effectivePlayerId) return;
+
     let isMounted = true;
-    async function fetchProfile() {
-      if (!selectedPlayerId) {
-        if (!loadingList) {
-          setProfile(null);
-          setLoadingProfile(false);
-        }
-        return;
-      }
-      setLoadingProfile(true);
-      try {
-        const res = await fetch(
-          `/api/stats/player-splits?player_id=${selectedPlayerId}&type=${playerType}&season=${season}`
-        );
-        if (res.ok) {
-          const json = await res.json();
-          if (isMounted && json.profile) {
-            setProfile(json.profile);
-          }
-        } else {
-          if (isMounted) setProfile(null);
-        }
-      } catch (err) {
+    const controller = new AbortController();
+
+    fetch(
+      `/api/stats/player-splits?player_id=${effectivePlayerId}&type=${playerType}&season=${activeSeason}`,
+      { signal: controller.signal }
+    )
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!isMounted) return;
+        setProfileState({
+          key: profileRequestKey,
+          profile: json?.profile ?? null,
+        });
+      })
+      .catch((err) => {
+        if (!isMounted || (err instanceof Error && err.name === "AbortError")) return;
         console.error("Error al cargar perfil de splits:", err);
-        if (isMounted) setProfile(null);
-      } finally {
-        if (isMounted) setLoadingProfile(false);
-      }
-    }
-    fetchProfile();
+        setProfileState({ key: profileRequestKey, profile: null });
+      });
+
     return () => {
       isMounted = false;
+      controller.abort();
     };
-  }, [selectedPlayerId, playerType, season, loadingList]);
+  }, [profileRequestKey, effectivePlayerId, playerType, activeSeason]);
 
-  // Filtrar lista de jugadores según búsqueda y tipo
+  const loadingProfile =
+    Boolean(profileRequestKey) && profileState.key !== profileRequestKey;
+  const profile =
+    profileRequestKey && profileState.key === profileRequestKey
+      ? profileState.profile
+      : null;
+
+  // Filtrar lista de jugadores sin acentos en bateadores y lanzadores
   const filteredPlayers = useMemo(() => {
-    return playersList
-      .filter((p) => p.type === playerType)
-      .filter(
-        (p) =>
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.teamAbbr.toLowerCase().includes(searchQuery.toLowerCase())
+    const q = normalizeSearch(searchQuery.trim());
+    return playersList.filter((p) => {
+      if (selectorRoleFilter !== "all" && p.type !== selectorRoleFilter) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        normalizeSearch(p.name || "").includes(q) ||
+        normalizeSearch(p.teamAbbr || "").includes(q) ||
+        normalizeSearch(p.subtitle || "").includes(q)
       );
-  }, [playersList, playerType, searchQuery]);
+    });
+  }, [playersList, selectorRoleFilter, searchQuery]);
 
   const selectedPlayerMeta = useMemo(() => {
     return playersList.find(
-      (p) => p.id === selectedPlayerId && p.type === playerType
+      (p) => p.id === effectivePlayerId && p.type === playerType
     );
-  }, [playersList, selectedPlayerId, playerType]);
+  }, [playersList, effectivePlayerId, playerType]);
+
+  const batterCountMatrix = profile?.countMatrixSplits ?? [];
+  const pitcherCountMatrix = profile?.pitcherCountMatrixSplits ?? [];
 
   return (
     <div className="space-y-6">
-      {/* Barra de Control: Selector de Rol y Buscador de Jugador */}
+      {/* Barra de Control: Selector de Rol y Buscador Universal de Jugadores */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#0D152B] p-3 sm:p-4 rounded-xl border border-[#1E2B4D]">
         {/* Conmutador Bateador / Lanzador */}
         <div className="flex items-center space-x-2 bg-[#070B19] p-1 rounded-xl border border-[#1E2B4D] w-full md:w-auto">
           <button
+            type="button"
             onClick={() => {
               setPlayerType("batter");
               const firstBat = playersList.find((p) => p.type === "batter");
@@ -174,6 +269,7 @@ export function PlayerSplitsView({
             <span>Bateadores</span>
           </button>
           <button
+            type="button"
             onClick={() => {
               setPlayerType("pitcher");
               const firstPit = playersList.find((p) => p.type === "pitcher");
@@ -191,9 +287,10 @@ export function PlayerSplitsView({
           </button>
         </div>
 
-        {/* Buscador Desplegable de Jugador */}
-        <div className="relative w-full md:w-80">
+        {/* Buscador Desplegable de Todos los Jugadores (Sin Acentos) */}
+        <div ref={selectorRef} className="relative w-full md:w-96">
           <button
+            type="button"
             onClick={() => setIsSelectorOpen(!isSelectorOpen)}
             className="w-full flex items-center justify-between px-3 py-2 bg-[#070B19] border border-[#1E2B4D] rounded-xl text-xs hover:border-[#FDB827]/50 transition-colors text-left"
           >
@@ -225,6 +322,9 @@ export function PlayerSplitsView({
                   <span className="text-[10px] font-mono text-[#FDB827]">
                     ({selectedPlayerMeta.teamAbbr})
                   </span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#131E3D] border border-[#1E2B4D] text-slate-300 shrink-0">
+                    {selectedPlayerMeta.type === "batter" ? "BAT" : "LAN"}
+                  </span>
                 </>
               ) : (
                 <span className="text-slate-400">
@@ -235,19 +335,43 @@ export function PlayerSplitsView({
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
           </button>
 
-          {/* Menú Desplegable con Búsqueda */}
+          {/* Menú Desplegable con Búsqueda Universal */}
           {isSelectorOpen && (
-            <div className="absolute z-30 left-0 right-0 mt-1.5 bg-[#0D152B] border border-[#1E2B4D] rounded-xl shadow-2xl p-2 space-y-2 max-h-72 flex flex-col">
+            <div className="absolute z-30 left-0 right-0 mt-1.5 bg-[#0D152B] border border-[#1E2B4D] rounded-xl shadow-2xl p-2 space-y-2 max-h-80 flex flex-col">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Buscar jugador..."
+                  placeholder="Buscar bateador o lanzador sin acentos..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-[#070B19] border border-[#1E2B4D] rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#FDB827]"
                   autoFocus
                 />
+              </div>
+
+              {/* Filtro de Rol en Buscador */}
+              <div className="flex items-center gap-1 bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D]">
+                {(
+                  [
+                    { id: "all", label: "Todos" },
+                    { id: "batter", label: "Bateadores" },
+                    { id: "pitcher", label: "Lanzadores" },
+                  ] as const
+                ).map((rf) => (
+                  <button
+                    key={rf.id}
+                    type="button"
+                    onClick={() => setSelectorRoleFilter(rf.id)}
+                    className={`flex-1 py-1 rounded text-[10px] font-semibold transition-colors ${
+                      selectorRoleFilter === rf.id
+                        ? "bg-[#FDB827] text-[#070B19] font-bold"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    {rf.label}
+                  </button>
+                ))}
               </div>
 
               <div className="overflow-y-auto space-y-1 flex-1 pr-1 custom-scrollbar">
@@ -257,22 +381,27 @@ export function PlayerSplitsView({
                   </div>
                 ) : (
                   filteredPlayers.map((p) => {
-                    const isSelected = p.id === selectedPlayerId;
+                    const isSelected = p.id === effectivePlayerId && p.type === playerType;
                     return (
                       <button
                         key={`${p.type}-${p.id}`}
+                        type="button"
                         onClick={() => {
+                          if (p.type !== playerType) {
+                            setCategoryFilter("all");
+                          }
+                          setPlayerType(p.type);
                           setSelectedPlayerId(p.id);
                           setIsSelectorOpen(false);
                           setSearchQuery("");
                         }}
-                        className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors ${
+                        className={`w-full flex items-center justify-between gap-2 p-2 rounded-lg text-left transition-colors ${
                           isSelected
                             ? "bg-[#FDB827]/15 border border-[#FDB827]/40 text-[#FDB827]"
                             : "hover:bg-[#131E3D] text-slate-300"
                         }`}
                       >
-                        <div className="flex items-center space-x-2 truncate">
+                        <div className="flex items-center space-x-2 min-w-0">
                           <div className="w-6 h-6 rounded-full overflow-hidden bg-[#070B19] shrink-0 border border-[#1E2B4D]">
                             <Image
                               src={p.avatarUrl}
@@ -292,15 +421,25 @@ export function PlayerSplitsView({
                               }}
                             />
                           </div>
-                          <div className="truncate">
-                            <div className="text-xs font-semibold leading-tight text-slate-200">
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold leading-tight text-slate-200 truncate">
                               {p.name}
                             </div>
-                            <div className="text-[10px] font-mono text-slate-400">
+                            <div className="text-[10px] font-mono text-slate-400 truncate">
                               {p.subtitle}
                             </div>
                           </div>
                         </div>
+
+                        <span
+                          className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                            p.type === "batter"
+                              ? "bg-sky-500/10 text-sky-300 border-sky-500/30"
+                              : "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                          }`}
+                        >
+                          {p.type === "batter" ? "Bateador" : "Lanzador"}
+                        </span>
                       </button>
                     );
                   })
@@ -311,19 +450,19 @@ export function PlayerSplitsView({
         </div>
       </div>
 
-      {/* Contenido Principal de Splits */}
+      {/* Contenido Principal */}
       {loadingProfile || loadingList ? (
         <div className="p-16 flex flex-col items-center justify-center space-y-3 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
           <Loader2 className="w-7 h-7 text-[#FDB827] animate-spin" />
           <span className="text-xs font-mono text-slate-400">
-            Cargando splits oficiales del jugador...
+            Cargando ficha y splits oficiales del jugador...
           </span>
         </div>
       ) : !profile ? (
         <div className="p-12 text-center rounded-xl bg-[#0D152B] border border-[#1E2B4D] space-y-2">
           <ShieldAlert className="w-8 h-8 text-[#FDB827] mx-auto opacity-70" />
           <p className="text-xs font-mono text-slate-400">
-            No se encontraron datos de splits para el jugador seleccionado en la temporada {season}-{String(season + 1).slice(-2)}.
+            No se encontraron datos de splits para el jugador seleccionado en la temporada {activeSeason}-{String(activeSeason + 1).slice(-2)}.
           </p>
         </div>
       ) : (
@@ -411,6 +550,9 @@ export function PlayerSplitsView({
             </div>
           </div>
 
+          {/* Ficha Superior Estilo Baseball-Reference: Stats Generales, Defensivo y Bitácora */}
+          <PlayerGeneralStatsCard profile={profile} />
+
           {/* Tarjeta de LOB Tracker si el bateador la tiene disponible */}
           {profile.lobStats && (
             <div className="rounded-xl bg-[#0D152B] border border-[#1E2B4D] p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -452,6 +594,7 @@ export function PlayerSplitsView({
           {/* Pills de Filtrado por Categoría de Splits */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
             <button
+              type="button"
               onClick={() => setCategoryFilter("all")}
               className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "all"
@@ -463,6 +606,43 @@ export function PlayerSplitsView({
               <span>Todos los Splits</span>
             </button>
             <button
+              type="button"
+              onClick={() => setCategoryFilter("leverage")}
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
+                categoryFilter === "leverage"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
+                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+              }`}
+            >
+              <Gauge className="w-3 h-3" />
+              <span>Presión &amp; Leverage</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategoryFilter("trend")}
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
+                categoryFilter === "trend"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
+                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+              }`}
+            >
+              <TrendingUp className="w-3 h-3" />
+              <span>Tendencia Reciente</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategoryFilter("score")}
+              className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
+                categoryFilter === "score"
+                  ? "bg-[#FDB827] text-[#070B19] font-bold"
+                  : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+              }`}
+            >
+              <Activity className="w-3 h-3" />
+              <span>Marcador e Inercia</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setCategoryFilter("platoon")}
               className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "platoon"
@@ -474,6 +654,7 @@ export function PlayerSplitsView({
               <span>Platoon</span>
             </button>
             <button
+              type="button"
               onClick={() => setCategoryFilter("situational")}
               className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "situational"
@@ -482,9 +663,10 @@ export function PlayerSplitsView({
               }`}
             >
               <Layers className="w-3 h-3" />
-              <span>Bases & RISP</span>
+              <span>Bases &amp; RISP</span>
             </button>
             <button
+              type="button"
               onClick={() => setCategoryFilter("count")}
               className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "count"
@@ -493,9 +675,10 @@ export function PlayerSplitsView({
               }`}
             >
               <Target className="w-3 h-3" />
-              <span>Conteos & Outs</span>
+              <span>Conteos &amp; Outs</span>
             </button>
             <button
+              type="button"
               onClick={() => setCategoryFilter("inning")}
               className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "inning"
@@ -506,20 +689,49 @@ export function PlayerSplitsView({
               <Clock className="w-3 h-3" />
               <span>Por Entrada</span>
             </button>
-            {profile.type === "pitcher" && (
+            {profile.type === "batter" ? (
               <button
-                onClick={() => setCategoryFilter("role")}
+                type="button"
+                onClick={() => setCategoryFilter("lineup")}
                 className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
-                  categoryFilter === "role"
+                  categoryFilter === "lineup"
                     ? "bg-[#FDB827] text-[#070B19] font-bold"
                     : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
                 }`}
               >
-                <Sparkles className="w-3 h-3" />
-                <span>Rol (SP / RP)</span>
+                <ListOrdered className="w-3 h-3" />
+                <span>Orden al Bate y Bases</span>
               </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter("role")}
+                  className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
+                    categoryFilter === "role"
+                      ? "bg-[#FDB827] text-[#070B19] font-bold"
+                      : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Rol (SP / RP)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter("fatigue")}
+                  className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
+                    categoryFilter === "fatigue"
+                      ? "bg-[#FDB827] text-[#070B19] font-bold"
+                      : "bg-[#0D152B] text-slate-400 hover:text-slate-200 border border-[#1E2B4D]"
+                  }`}
+                >
+                  <BatteryCharging className="w-3 h-3" />
+                  <span>Uso y Descanso</span>
+                </button>
+              </>
             )}
             <button
+              type="button"
               onClick={() => setCategoryFilter("context")}
               className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "context"
@@ -528,9 +740,10 @@ export function PlayerSplitsView({
               }`}
             >
               <MapPin className="w-3 h-3" />
-              <span>Localía & Horario</span>
+              <span>Localía &amp; Horario</span>
             </button>
             <button
+              type="button"
               onClick={() => setCategoryFilter("opponent")}
               className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "opponent"
@@ -542,6 +755,7 @@ export function PlayerSplitsView({
               <span>Por Rival</span>
             </button>
             <button
+              type="button"
               onClick={() => setCategoryFilter("calendar")}
               className={`px-3 py-1.5 rounded-lg font-mono font-semibold transition-colors shrink-0 flex items-center space-x-1.5 ${
                 categoryFilter === "calendar"
@@ -550,14 +764,51 @@ export function PlayerSplitsView({
               }`}
             >
               <Calendar className="w-3 h-3" />
-              <span>Calendario & Meses</span>
+              <span>Calendario &amp; Meses</span>
             </button>
           </div>
 
           {/* Grillas de Tablas de Splits por Categoría */}
           <div className="space-y-6">
+            {/* 0. Presión & Leverage Index (Paralelo vía /api/stats/player-leverage) */}
+            {(categoryFilter === "all" || categoryFilter === "leverage") && (
+              <LeverageSplitsCard
+                playerId={profile.playerId}
+                type={profile.type}
+                season={profile.season}
+                lateCloseBatterRows={profile.lateCloseSplits}
+                lateClosePitcherRows={profile.pitcherLateCloseSplits}
+              />
+            )}
+
             {profile.type === "batter" ? (
               <>
+                {/* Tendencia Reciente */}
+                {(categoryFilter === "all" || categoryFilter === "trend") &&
+                  profile.trendSplits &&
+                  profile.trendSplits.length > 0 && (
+                    <SplitTableGroup
+                      title="Tendencia Reciente"
+                      subtitle="Producción ofensiva en los últimos 7, 15 y 30 días"
+                      icon={<TrendingUp className="w-4 h-4" />}
+                      batterRows={profile.trendSplits}
+                      badgeCount={profile.trendSplits.length}
+                    />
+                  )}
+
+                {/* Estado del Marcador e Inercia */}
+                {(categoryFilter === "all" || categoryFilter === "score") &&
+                  profile.scoreSplits &&
+                  profile.scoreSplits.length > 0 && (
+                    <SplitTableGroup
+                      title="Marcador e Inercia del Partido"
+                      subtitle="Equipo arriba, empatado, abajo y turnos con la carrera del empate o ventaja"
+                      icon={<Activity className="w-4 h-4" />}
+                      batterRows={profile.scoreSplits}
+                      badgeCount={profile.scoreSplits.length}
+                    />
+                  )}
+
                 {/* 1. Platoon (Lateralidad) */}
                 {(categoryFilter === "all" || categoryFilter === "platoon") && (
                   <SplitTableGroup
@@ -571,16 +822,27 @@ export function PlayerSplitsView({
 
                 {/* 2. Situaciones en Base & RISP */}
                 {(categoryFilter === "all" || categoryFilter === "situational") && (
-                  <SplitTableGroup
-                    title="Situación de Juego y Corredores"
-                    subtitle="Desglose con Bases Limpias, Corredores en Base, RISP, RISP con 2 Outs, Bases Llenas y Leadoff"
-                    icon={<Layers className="w-4 h-4" />}
-                    batterRows={profile.situationalSplits}
-                    badgeCount={profile.situationalSplits.length}
-                  />
+                  <>
+                    <SplitTableGroup
+                      title="Situación de Juego y Corredores"
+                      subtitle="Desglose con Bases Limpias, Corredores en Base, RISP, RISP con 2 Outs, Bases Llenas y Leadoff"
+                      icon={<Layers className="w-4 h-4" />}
+                      batterRows={profile.situationalSplits}
+                      badgeCount={profile.situationalSplits.length}
+                    />
+                    {profile.exactBaseSplits && profile.exactBaseSplits.length > 0 && (
+                      <SplitTableGroup
+                        title="Bases Exactas"
+                        subtitle="Combinación exacta de corredores en base (1B, 2B, 3B, 1B+2B, 1B+3B, 2B+3B, <2 outs, etc.)"
+                        icon={<Layers className="w-4 h-4" />}
+                        batterRows={profile.exactBaseSplits}
+                        badgeCount={profile.exactBaseSplits.length}
+                      />
+                    )}
+                  </>
                 )}
 
-                {/* 3. Conteos Clave & Outs */}
+                {/* 3. Conteos Clave, Avanzados, Matriz 12 Conteos & Outs */}
                 {(categoryFilter === "all" || categoryFilter === "count") && (
                   <>
                     {profile.countSplits && profile.countSplits.length > 0 && (
@@ -591,6 +853,46 @@ export function PlayerSplitsView({
                         batterRows={profile.countSplits}
                         badgeCount={profile.countSplits.length}
                       />
+                    )}
+                    {profile.detailedCountSplits && profile.detailedCountSplits.length > 0 && (
+                      <SplitTableGroup
+                        title="Conteos Avanzados"
+                        subtitle="Bateador adelante en la cuenta, atrás en la cuenta y en cuenta pareja"
+                        icon={<Target className="w-4 h-4" />}
+                        batterRows={profile.detailedCountSplits}
+                        badgeCount={profile.detailedCountSplits.length}
+                      />
+                    )}
+                    {batterCountMatrix.length > 0 && (
+                      <div className="space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowCountMatrix((prev) => !prev)}
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#0D152B] hover:bg-[#131E3D] border border-[#1E2B4D] hover:border-[#FDB827]/50 text-xs font-mono font-semibold text-slate-200 transition-colors"
+                        >
+                          <Target className="w-3.5 h-3.5 text-[#FDB827]" />
+                          <span>
+                            {showCountMatrix
+                              ? "Ocultar Matriz de 12 Conteos (0-0 a 3-2)"
+                              : `Ver Matriz de 12 Conteos (0-0 a 3-2) (${batterCountMatrix.length})`}
+                          </span>
+                          {showCountMatrix ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-[#FDB827]" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                          )}
+                        </button>
+
+                        {showCountMatrix && (
+                          <SplitTableGroup
+                            title="Matriz Completa de Conteos (0-0 a 3-2)"
+                            subtitle="Rendimiento desglosado en cada conteo específico de bolas y strikes"
+                            icon={<Target className="w-4 h-4" />}
+                            batterRows={batterCountMatrix}
+                            badgeCount={batterCountMatrix.length}
+                          />
+                        )}
+                      </div>
                     )}
                     <SplitTableGroup
                       title="Por Conteo de Outs"
@@ -612,6 +914,41 @@ export function PlayerSplitsView({
                     badgeCount={profile.inningSplits.length}
                   />
                 )}
+
+                {/* Orden al Bate y Bases Exactas */}
+                {categoryFilter === "lineup" && (
+                  <>
+                    {profile.lineupSplits && profile.lineupSplits.length > 0 && (
+                      <SplitTableGroup
+                        title="Posición en el Orden al Bate y Emergente"
+                        subtitle="Producción del 1ro al 9no bate, Bateador Designado (DH) y Emergente (PH)"
+                        icon={<ListOrdered className="w-4 h-4" />}
+                        batterRows={profile.lineupSplits}
+                        badgeCount={profile.lineupSplits.length}
+                      />
+                    )}
+                    {profile.exactBaseSplits && profile.exactBaseSplits.length > 0 && (
+                      <SplitTableGroup
+                        title="Bases Exactas"
+                        subtitle="Combinación exacta de corredores en circulación al tomar el turno"
+                        icon={<Layers className="w-4 h-4" />}
+                        batterRows={profile.exactBaseSplits}
+                        badgeCount={profile.exactBaseSplits.length}
+                      />
+                    )}
+                  </>
+                )}
+                {categoryFilter === "all" &&
+                  profile.lineupSplits &&
+                  profile.lineupSplits.length > 0 && (
+                    <SplitTableGroup
+                      title="Posición en el Orden al Bate y Emergente"
+                      subtitle="Producción del 1ro al 9no bate, Bateador Designado (DH) y Emergente (PH)"
+                      icon={<ListOrdered className="w-4 h-4" />}
+                      batterRows={profile.lineupSplits}
+                      badgeCount={profile.lineupSplits.length}
+                    />
+                  )}
 
                 {/* 5. Contexto & Localía */}
                 {(categoryFilter === "all" || categoryFilter === "context") && (
@@ -649,6 +986,34 @@ export function PlayerSplitsView({
             ) : (
               /* LANZADORES */
               <>
+                {/* Tendencia Reciente */}
+                {(categoryFilter === "all" || categoryFilter === "trend") &&
+                  profile.pitcherTrendSplits &&
+                  profile.pitcherTrendSplits.length > 0 && (
+                    <SplitTableGroup
+                      title="Tendencia Reciente"
+                      subtitle="Efectividad y comando en los últimos 7, 15 y 30 días"
+                      icon={<TrendingUp className="w-4 h-4" />}
+                      pitcherRows={profile.pitcherTrendSplits}
+                      isPitcher={true}
+                      badgeCount={profile.pitcherTrendSplits.length}
+                    />
+                  )}
+
+                {/* Marcador e Inercia */}
+                {(categoryFilter === "all" || categoryFilter === "score") &&
+                  profile.pitcherScoreSplits &&
+                  profile.pitcherScoreSplits.length > 0 && (
+                    <SplitTableGroup
+                      title="Marcador e Inercia del Partido"
+                      subtitle="Lanzando con ventaja, empate, desventaja o con la carrera del empate/ventaja al bate"
+                      icon={<Activity className="w-4 h-4" />}
+                      pitcherRows={profile.pitcherScoreSplits}
+                      isPitcher={true}
+                      badgeCount={profile.pitcherScoreSplits.length}
+                    />
+                  )}
+
                 {/* 1. Platoon (Lateralidad) */}
                 {(categoryFilter === "all" || categoryFilter === "platoon") && (
                   <SplitTableGroup
@@ -663,17 +1028,30 @@ export function PlayerSplitsView({
 
                 {/* 2. Situación de Juego y Corredores */}
                 {(categoryFilter === "all" || categoryFilter === "situational") && (
-                  <SplitTableGroup
-                    title="Situación de Juego y Corredores"
-                    subtitle="Desglose con Bases Limpias, Corredores en Base, RISP, RISP con 2 Outs, Bases Llenas y Leadoff"
-                    icon={<Layers className="w-4 h-4" />}
-                    pitcherRows={profile.pitcherSituationalSplits}
-                    isPitcher={true}
-                    badgeCount={profile.pitcherSituationalSplits?.length}
-                  />
+                  <>
+                    <SplitTableGroup
+                      title="Situación de Juego y Corredores"
+                      subtitle="Desglose con Bases Limpias, Corredores en Base, RISP, RISP con 2 Outs, Bases Llenas y Leadoff"
+                      icon={<Layers className="w-4 h-4" />}
+                      pitcherRows={profile.pitcherSituationalSplits}
+                      isPitcher={true}
+                      badgeCount={profile.pitcherSituationalSplits?.length}
+                    />
+                    {profile.pitcherExactBaseSplits &&
+                      profile.pitcherExactBaseSplits.length > 0 && (
+                        <SplitTableGroup
+                          title="Bases Exactas"
+                          subtitle="Combinación exacta de corredores en base enfrentados"
+                          icon={<Layers className="w-4 h-4" />}
+                          pitcherRows={profile.pitcherExactBaseSplits}
+                          isPitcher={true}
+                          badgeCount={profile.pitcherExactBaseSplits.length}
+                        />
+                      )}
+                  </>
                 )}
 
-                {/* 3. Conteos Clave & Outs */}
+                {/* 3. Conteos Clave, Avanzados, Matriz 12 Conteos & Outs */}
                 {(categoryFilter === "all" || categoryFilter === "count") && (
                   <>
                     {profile.pitcherCountSplits && profile.pitcherCountSplits.length > 0 && (
@@ -685,6 +1063,49 @@ export function PlayerSplitsView({
                         isPitcher={true}
                         badgeCount={profile.pitcherCountSplits.length}
                       />
+                    )}
+                    {profile.pitcherDetailedCountSplits &&
+                      profile.pitcherDetailedCountSplits.length > 0 && (
+                        <SplitTableGroup
+                          title="Conteos Avanzados"
+                          subtitle="Lanzador adelante en la cuenta, atrás en la cuenta y cuenta pareja"
+                          icon={<Target className="w-4 h-4" />}
+                          pitcherRows={profile.pitcherDetailedCountSplits}
+                          isPitcher={true}
+                          badgeCount={profile.pitcherDetailedCountSplits.length}
+                        />
+                      )}
+                    {pitcherCountMatrix.length > 0 && (
+                      <div className="space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowCountMatrix((prev) => !prev)}
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#0D152B] hover:bg-[#131E3D] border border-[#1E2B4D] hover:border-[#FDB827]/50 text-xs font-mono font-semibold text-slate-200 transition-colors"
+                        >
+                          <Target className="w-3.5 h-3.5 text-[#FDB827]" />
+                          <span>
+                            {showCountMatrix
+                              ? "Ocultar Matriz de 12 Conteos (0-0 a 3-2)"
+                              : `Ver Matriz de 12 Conteos (0-0 a 3-2) (${pitcherCountMatrix.length})`}
+                          </span>
+                          {showCountMatrix ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-[#FDB827]" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                          )}
+                        </button>
+
+                        {showCountMatrix && (
+                          <SplitTableGroup
+                            title="Matriz Completa de Conteos (0-0 a 3-2)"
+                            subtitle="Dominio monticular desglosado en cada conteo de bolas y strikes"
+                            icon={<Target className="w-4 h-4" />}
+                            pitcherRows={pitcherCountMatrix}
+                            isPitcher={true}
+                            badgeCount={pitcherCountMatrix.length}
+                          />
+                        )}
+                      </div>
                     )}
                     {profile.pitcherOutsSplits && profile.pitcherOutsSplits.length > 0 && (
                       <SplitTableGroup
@@ -712,15 +1133,44 @@ export function PlayerSplitsView({
                 )}
 
                 {/* 5. Rol (Abridor vs Relevista) */}
-                {(categoryFilter === "all" || categoryFilter === "role") && profile.pitcherRoleSplits && profile.pitcherRoleSplits.length > 0 && (
-                  <SplitTableGroup
-                    title="Rol de Pitcheo"
-                    subtitle="Desempeño según rol asignado: Como Abridor (SP) vs Como Relevista (RP)"
-                    icon={<Sparkles className="w-4 h-4" />}
-                    pitcherRows={profile.pitcherRoleSplits}
-                    isPitcher={true}
-                    badgeCount={profile.pitcherRoleSplits.length}
-                  />
+                {(categoryFilter === "all" || categoryFilter === "role") &&
+                  profile.pitcherRoleSplits &&
+                  profile.pitcherRoleSplits.length > 0 && (
+                    <SplitTableGroup
+                      title="Rol de Pitcheo"
+                      subtitle="Desempeño según rol asignado: Como Abridor (SP) vs Como Relevista (RP)"
+                      icon={<Sparkles className="w-4 h-4" />}
+                      pitcherRows={profile.pitcherRoleSplits}
+                      isPitcher={true}
+                      badgeCount={profile.pitcherRoleSplits.length}
+                    />
+                  )}
+
+                {/* Uso, Descanso y Fatiga */}
+                {(categoryFilter === "all" || categoryFilter === "fatigue") && (
+                  <>
+                    {profile.pitcherRestSplits && profile.pitcherRestSplits.length > 0 && (
+                      <SplitTableGroup
+                        title="Días de Descanso"
+                        subtitle="Rendimiento según días de reposo entre salidas (0 a 5+ días)"
+                        icon={<BatteryCharging className="w-4 h-4" />}
+                        pitcherRows={profile.pitcherRestSplits}
+                        isPitcher={true}
+                        badgeCount={profile.pitcherRestSplits.length}
+                      />
+                    )}
+                    {profile.pitcherFatigueSplits &&
+                      profile.pitcherFatigueSplits.length > 0 && (
+                        <SplitTableGroup
+                          title="Uso, Primer Pitcheo y Carga de Lanzamientos"
+                          subtitle="Primer lanzamiento vs primer bateador del inning y tramos de conteo de pitcheos (1-15 a 106+)"
+                          icon={<BatteryCharging className="w-4 h-4" />}
+                          pitcherRows={profile.pitcherFatigueSplits}
+                          isPitcher={true}
+                          badgeCount={profile.pitcherFatigueSplits.length}
+                        />
+                      )}
+                  </>
                 )}
 
                 {/* 6. Contexto & Localía */}

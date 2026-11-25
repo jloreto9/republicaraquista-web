@@ -5,6 +5,7 @@ import { getTeam, ACTIVE_SEASON } from "@/lib/constants";
 import { useSeason } from "@/context/season-context";
 import { ChevronDown } from "lucide-react";
 import { ShareButton } from "./share-button";
+import { PlayerQuickSearch } from "./player-quick-search";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 
 interface HeaderProps {
@@ -34,6 +35,11 @@ export function Header({
       </div>
 
       <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+        {/* Global Player Quick Search (Desktop only; mobile already has it in the top bar) */}
+        <div className="hidden lg:block">
+          <PlayerQuickSearch />
+        </div>
+
         {/* Interactive Season Selector Dropdown */}
         <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#0D152B] border border-[#1E2B4D] text-xs shadow-sm hover:border-[#FDB827]/40 transition-colors">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />

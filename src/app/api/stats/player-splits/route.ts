@@ -3,7 +3,7 @@ import {
   getPlayerSplitsProfile,
   getAllAvailablePlayersForSplits,
 } from "@/lib/player-splits-service";
-import { ACTIVE_SEASON, getActiveSeason } from "@/lib/constants";
+import { getActiveSeason } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +11,13 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode");
-    const season = searchParams.get("season")
-      ? parseInt(searchParams.get("season")!, 10)
-      : await getActiveSeason();
+    const activeSeason = await getActiveSeason();
+    const seasonParam = searchParams.get("season");
+    const season = seasonParam ? parseInt(seasonParam, 10) : activeSeason;
+    const cacheControl =
+      season < activeSeason
+        ? "public, s-maxage=3600, stale-while-revalidate=7200"
+        : "public, s-maxage=300, stale-while-revalidate=600";
 
     if (mode === "list") {
       const players = await getAllAvailablePlayersForSplits(season);
@@ -21,7 +25,7 @@ export async function GET(request: NextRequest) {
         { success: true, count: players.length, players },
         {
           headers: {
-            "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+            "Cache-Control": cacheControl,
           },
         }
       );
@@ -35,13 +39,27 @@ export async function GET(request: NextRequest) {
         { success: true, count: players.length, players },
         {
           headers: {
-            "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+            "Cache-Control": cacheControl,
           },
         }
       );
     }
 
-    const playerId = parseInt(playerIdStr, 10);
+    if (!/^\d+$/.test(playerIdStr.trim())) {
+      return NextResponse.json(
+        { success: false, error: "Parámetro player_id debe ser un entero positivo" },
+        { status: 400 }
+      );
+    }
+
+    const playerId = parseInt(playerIdStr.trim(), 10);
+    if (!Number.isInteger(playerId) || playerId <= 0) {
+      return NextResponse.json(
+        { success: false, error: "Parámetro player_id debe ser un entero positivo" },
+        { status: 400 }
+      );
+    }
+
     const typeParam = searchParams.get("type");
     const type = typeParam === "pitcher" ? "pitcher" : "batter";
 
@@ -58,7 +76,7 @@ export async function GET(request: NextRequest) {
       { success: true, profile },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+          "Cache-Control": cacheControl,
         },
       }
     );

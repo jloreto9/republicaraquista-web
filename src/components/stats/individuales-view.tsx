@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { BattingStats, PitchingStats, FieldingStats } from "@/types/sports";
 import { StatsFilters } from "@/components/stats/stats-filters";
@@ -10,7 +11,7 @@ import { FieldingTable } from "@/components/stats/fielding-table";
 import { AwardsView } from "@/components/stats/awards-view";
 import { PlayerSplitsView } from "@/components/stats/splits/player-splits-view";
 import { StatheadIndividualSearch } from "@/components/stats/stathead-individual-search";
-import { Flame, Target, Shield, Loader2, Sparkles, Zap, Trophy, Search } from "lucide-react";
+import { Flame, Target, Shield, Loader2, Sparkles, Zap, Trophy, Search, ArrowUpRight } from "lucide-react";
 import { useSeason } from "@/context/season-context";
 
 interface IndividualesViewProps {
@@ -497,11 +498,30 @@ export function IndividualesView({
           onSelectPitcherForSplits={handleSelectPitcherForSplits}
         />
       ) : activeTab === "splits" ? (
-        <PlayerSplitsView
-          initialPlayerId={targetSplitPlayer?.id}
-          initialType={targetSplitPlayer?.type}
-          season={season}
-        />
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-[#0D152B] border border-[#1E2B4D]">
+            <p className="text-xs text-slate-300">
+              Explora la ficha completa con historial por temporada, bitácora de juegos y rendimiento por presión (LI).
+            </p>
+            <Link
+              href={
+                targetSplitPlayer
+                  ? `/jugadores?player=${targetSplitPlayer.id}&type=${targetSplitPlayer.type}&season=${season}`
+                  : `/jugadores?season=${season}`
+              }
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FDB827]/15 hover:bg-[#FDB827] text-[#FDB827] hover:text-[#070B19] border border-[#FDB827]/40 text-xs font-bold transition-colors shrink-0"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Abrir en Buscador de Jugadores</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <PlayerSplitsView
+            initialPlayerId={targetSplitPlayer?.id}
+            initialType={targetSplitPlayer?.type}
+            season={season}
+          />
+        </div>
       ) : (
         <div className="space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono text-slate-400 px-1">

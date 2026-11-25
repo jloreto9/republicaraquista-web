@@ -1,16 +1,49 @@
-import { getTeam } from "./constants";
+import { getTeam, LVBP_TEAMS } from "./constants";
 import {
   CollectiveBattingTeam,
   CollectivePitchingTeam,
   CollectiveFieldingTeam,
   CollectiveStatsResult,
   CollectiveLeagueSummary,
+  PitchingRoleFilter,
 } from "@/types/collective";
 
 interface MlbSplit {
   team?: { id?: number; name?: string };
   stat?: Record<string, unknown>;
 }
+
+interface MlbBoxscorePlayer {
+  stats?: {
+    pitching?: Record<string, unknown>;
+  };
+}
+
+interface MlbTeamBox {
+  team?: { id?: number; name?: string };
+  pitchers?: Array<number | string>;
+  players?: Record<string, MlbBoxscorePlayer>;
+}
+
+export interface MlbBoxscore {
+  gamePk?: number;
+  gameData?: { game?: { pk?: number } };
+  teams?: {
+    away?: MlbTeamBox;
+    home?: MlbTeamBox;
+  };
+  away?: MlbTeamBox;
+  home?: MlbTeamBox;
+}
+
+const FINAL_GAME_STATES = new Set([
+  "Final",
+  "Completed",
+  "Completed Early",
+  "Game Over",
+]);
+
+const finalizedBoxscoreCache = new Map<number, MlbBoxscore>();
 
 function toNum(val: unknown, defaultVal = 0): number {
   if (val === null || val === undefined || val === "") return defaultVal;
@@ -22,16 +55,33 @@ function toPctStr(val: number): string {
   return val.toFixed(3).replace(/^0/, "");
 }
 
+function parseInningsToOuts(ipVal: unknown): number {
+  if (ipVal === null || ipVal === undefined || ipVal === "") return 0;
+  const str = String(ipVal).trim();
+  const [wholePart, fracPart] = str.split(".");
+  const whole = parseInt(wholePart || "0", 10);
+  const partial = parseInt((fracPart || "0").charAt(0), 10);
+  if (isNaN(whole)) return 0;
+  const validPartial = isNaN(partial) ? 0 : Math.min(2, Math.max(0, partial));
+  return whole * 3 + validPartial;
+}
+
 async function fetchStatsGroup(
   season: number,
   phase: string,
   group: "hitting" | "pitching" | "fielding",
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  pitchingRole: PitchingRoleFilter = "all"
 ): Promise<MlbSplit[]> {
   const isDateRange = Boolean(startDate && endDate);
+  const isRoleSplit =
+    group === "pitching" && !isDateRange && (pitchingRole === "sp" || pitchingRole === "rp");
+
   const statsParam = isDateRange
     ? `stats=byDateRange&startDate=${startDate}&endDate=${endDate}`
+    : isRoleSplit
+    ? `stats=statSplits&sitCodes=${pitchingRole}${phase && phase !== "all" ? `&gameType=${phase}` : ""}`
     : `stats=season${phase && phase !== "all" ? `&gameType=${phase}` : ""}`;
   const url = `https://statsapi.mlb.com/api/v1/teams/stats?season=${season}&sportIds=17&leagueIds=135&group=${group}&${statsParam}`;
 
@@ -42,6 +92,7 @@ async function fetchStatsGroup(
 
   try {
     const res = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
       next: { revalidate },
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) RepublicaCaraquista/1.0",
@@ -63,15 +114,342 @@ async function fetchStatsGroup(
   }
 }
 
+async function fetchBoxscoresWithConcurrency(
+  gamePks: number[],
+  concurrency = 12
+): Promise<MlbBoxscore[]> {
+  const results: MlbBoxscore[] = [];
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < gamePks.length) {
+      const idx = cursor++;
+      const gamePk = gamePks[idx];
+      const cached = finalizedBoxscoreCache.get(gamePk);
+      if (cached) {
+        results.push(cached);
+        continue;
+      }
+
+      try {
+        const res = await fetch(
+          `https://statsapi.mlb.com/api/v1/game/${gamePk}/boxscore`,
+          {
+            signal: AbortSignal.timeout(10000),
+            next: { revalidate: 86400 },
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) RepublicaCaraquista/1.0",
+            },
+          }
+        );
+        if (!res.ok) continue;
+        const box = (await res.json()) as MlbBoxscore;
+        if (box && typeof box === "object") {
+          if (finalizedBoxscoreCache.size < 2000) {
+            finalizedBoxscoreCache.set(gamePk, box);
+          }
+          results.push(box);
+        }
+      } catch (err) {
+        console.error(`Error fetching boxscore for gamePk ${gamePk}:`, err);
+      }
+    }
+  }
+
+  const workerCount = Math.min(concurrency, gamePks.length);
+  if (workerCount === 0) return [];
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
+export function aggregateBoxscoresByPitchingRole(
+  boxscores: MlbBoxscore[],
+  role: "sp" | "rp"
+): CollectivePitchingTeam[] {
+  interface TeamAcc {
+    teamId: number;
+    fallbackName?: string;
+    gamesSet: Set<string | number>;
+    outs: number;
+    h: number;
+    r: number;
+    er: number;
+    bb: number;
+    so: number;
+    hr: number;
+    wins: number;
+    losses: number;
+    sv: number;
+    holds: number;
+    blownSaves: number;
+    gidp: number;
+    ab: number;
+  }
+
+  const teamMap = new Map<number, TeamAcc>();
+
+  for (let boxIdx = 0; boxIdx < boxscores.length; boxIdx++) {
+    const box = boxscores[boxIdx];
+    const teamsObj = box?.teams || box;
+    if (!teamsObj) continue;
+
+    const gameKey = box?.gamePk ?? box?.gameData?.game?.pk ?? boxIdx;
+
+    for (const side of ["away", "home"] as const) {
+      const teamBox = teamsObj[side];
+      const tid = Number(teamBox?.team?.id || 0);
+      if (!tid) continue;
+
+      let acc = teamMap.get(tid);
+      if (!acc) {
+        acc = {
+          teamId: tid,
+          fallbackName: teamBox?.team?.name,
+          gamesSet: new Set(),
+          outs: 0,
+          h: 0,
+          r: 0,
+          er: 0,
+          bb: 0,
+          so: 0,
+          hr: 0,
+          wins: 0,
+          losses: 0,
+          sv: 0,
+          holds: 0,
+          blownSaves: 0,
+          gidp: 0,
+          ab: 0,
+        };
+        teamMap.set(tid, acc);
+      }
+
+      const pitchers: Array<number | string> = Array.isArray(teamBox?.pitchers)
+        ? teamBox.pitchers
+        : [];
+      const players: Record<string, MlbBoxscorePlayer> = teamBox?.players || {};
+
+      for (let idx = 0; idx < pitchers.length; idx++) {
+        const pid = pitchers[idx];
+        const st = players[`ID${pid}`]?.stats?.pitching;
+        if (!st) continue;
+
+        const isStarter = Number(st.gamesStarted ?? 0) >= 1 || idx === 0;
+        const matches = role === "sp" ? isStarter : !isStarter;
+        if (!matches) continue;
+
+        acc.gamesSet.add(gameKey);
+        acc.outs += parseInningsToOuts(st.inningsPitched);
+        acc.h += toNum(st.hits);
+        acc.r += toNum(st.runs);
+        acc.er += toNum(st.earnedRuns);
+        acc.bb += toNum(st.baseOnBalls);
+        acc.so += toNum(st.strikeOuts);
+        acc.hr += toNum(st.homeRuns);
+        acc.wins += toNum(st.wins);
+        acc.losses += toNum(st.losses);
+        acc.sv += toNum(st.saves);
+        acc.holds += toNum(st.holds);
+        acc.blownSaves += toNum(st.blownSaves);
+        acc.gidp += toNum(st.groundIntoDoublePlay ?? st.gidp);
+        acc.ab += toNum(st.atBats ?? st.ab);
+      }
+    }
+  }
+
+  const rows: Array<{ team: CollectivePitchingTeam; outs: number }> = [];
+
+  for (const acc of teamMap.values()) {
+    const teamObj = getTeam(acc.teamId);
+    const knownTeam = LVBP_TEAMS[acc.teamId];
+    const teamName = knownTeam?.name || acc.fallbackName || teamObj.name || "Equipo";
+
+    const ipDecimal = acc.outs / 3;
+    const ipCanonical = Math.floor(acc.outs / 3) + (acc.outs % 3) / 10;
+    const ipStr = `${Math.floor(acc.outs / 3)}.${acc.outs % 3}`;
+
+    const era = ipDecimal > 0 ? (acc.er * 9) / ipDecimal : 0;
+    const whip = ipDecimal > 0 ? (acc.bb + acc.h) / ipDecimal : 0;
+    const k9 = ipDecimal > 0 ? (acc.so * 9) / ipDecimal : 0;
+    const bb9 = ipDecimal > 0 ? (acc.bb * 9) / ipDecimal : 0;
+    const kbb = acc.bb > 0 ? acc.so / acc.bb : acc.so;
+    const baa = acc.ab > 0 ? acc.h / acc.ab : 0;
+
+    rows.push({
+      team: {
+        teamId: acc.teamId,
+        teamName,
+        teamAbbr: teamObj.abbreviation || "LVBP",
+        logo: teamObj.logoUrl,
+        games: acc.gamesSet.size,
+        wins: acc.wins,
+        losses: acc.losses,
+        era,
+        eraStr: era.toFixed(2),
+        whip,
+        whipStr: whip.toFixed(2),
+        sv: acc.sv,
+        holds: acc.holds,
+        blownSaves: acc.blownSaves,
+        ip: ipCanonical,
+        ipStr,
+        h: acc.h,
+        r: acc.r,
+        er: acc.er,
+        bb: acc.bb,
+        so: acc.so,
+        hr: acc.hr,
+        gidp: acc.gidp,
+        k9,
+        k9Str: k9.toFixed(2),
+        bb9,
+        bb9Str: bb9.toFixed(2),
+        kbb,
+        kbbStr: kbb.toFixed(2),
+        baa,
+        baaStr: toPctStr(baa),
+        isLeones: acc.teamId === 695,
+      },
+      outs: acc.outs,
+    });
+  }
+
+  rows.sort((a, b) => {
+    const aHasOuts = a.outs > 0;
+    const bHasOuts = b.outs > 0;
+    if (aHasOuts !== bHasOuts) return aHasOuts ? -1 : 1;
+    return a.team.era - b.team.era;
+  });
+
+  return rows.map((r) => r.team);
+}
+
+async function fetchPitchingByRoleFromBoxscores(
+  phase: string,
+  startDate: string,
+  endDate: string,
+  role: "sp" | "rp"
+): Promise<CollectivePitchingTeam[]> {
+  const scheduleUrl = `https://statsapi.mlb.com/api/v1/schedule?sportId=17&leagueId=135&startDate=${startDate}&endDate=${endDate}${
+    phase && phase !== "all" ? `&gameType=${phase}` : ""
+  }`;
+  const isPast = new Date(endDate).getTime() < Date.now() - 86400000;
+  const revalidate = isPast ? 86400 : 300;
+
+  try {
+    const res = await fetch(scheduleUrl, {
+      signal: AbortSignal.timeout(10000),
+      next: { revalidate },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) RepublicaCaraquista/1.0",
+      },
+    });
+    if (!res.ok) {
+      console.error("Error fetching MLB schedule for role split:", res.status);
+      return [];
+    }
+    const data = await res.json();
+    const gamePksSet = new Set<number>();
+    for (const dateEntry of data.dates || []) {
+      for (const g of dateEntry.games || []) {
+        const detailedState = String(g?.status?.detailedState || "");
+        const pk = Number(g?.gamePk || 0);
+        if (pk > 0 && FINAL_GAME_STATES.has(detailedState)) {
+          gamePksSet.add(pk);
+        }
+      }
+    }
+
+    const boxscores = await fetchBoxscoresWithConcurrency(Array.from(gamePksSet), 12);
+    return aggregateBoxscoresByPitchingRole(boxscores, role);
+  } catch (err) {
+    console.error("Error fetching pitching role from boxscores:", err);
+    return [];
+  }
+}
+
+function parsePitchingSplits(pitchingSplits: MlbSplit[]): CollectivePitchingTeam[] {
+  const pitching: CollectivePitchingTeam[] = pitchingSplits.map((s) => {
+    const tid = Number(s.team?.id || 0);
+    const teamObj = getTeam(tid);
+    const stat = s.stat || {};
+
+    const era = toNum(stat.era);
+    const whip = toNum(stat.whip);
+    const ip = toNum(stat.inningsPitched);
+    const k9 = toNum(stat.strikeoutsPer9Inn);
+    const bb9 = toNum(stat.walksPer9Inn);
+    const kbb = toNum(stat.strikeoutWalkRatio);
+    const baa = toNum(stat.avg);
+
+    return {
+      teamId: tid,
+      teamName: teamObj.name || s.team?.name || "Equipo",
+      teamAbbr: teamObj.abbreviation || "LVBP",
+      logo: teamObj.logoUrl,
+      games: toNum(stat.gamesPlayed),
+      wins: toNum(stat.wins),
+      losses: toNum(stat.losses),
+      era,
+      eraStr: era.toFixed(2),
+      whip,
+      whipStr: whip.toFixed(2),
+      sv: toNum(stat.saves),
+      holds: toNum(stat.holds),
+      blownSaves: toNum(stat.blownSaves),
+      ip,
+      ipStr: ip.toFixed(1),
+      h: toNum(stat.hits),
+      r: toNum(stat.runs),
+      er: toNum(stat.earnedRuns),
+      bb: toNum(stat.baseOnBalls),
+      so: toNum(stat.strikeOuts),
+      hr: toNum(stat.homeRuns),
+      gidp: toNum(stat.groundIntoDoublePlay),
+      k9,
+      k9Str: k9.toFixed(2),
+      bb9,
+      bb9Str: bb9.toFixed(2),
+      kbb,
+      kbbStr: kbb.toFixed(2),
+      baa,
+      baaStr: toPctStr(baa),
+      isLeones: tid === 695,
+    };
+  });
+
+  pitching.sort((a, b) => {
+    const aHasIp = a.ip > 0;
+    const bHasIp = b.ip > 0;
+    if (aHasIp !== bHasIp) return aHasIp ? -1 : 1;
+    return a.era - b.era;
+  });
+
+  return pitching;
+}
+
 export async function getCollectiveStats(
   season = 2025,
   phase = "R",
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  pitchingRole: PitchingRoleFilter = "all"
 ): Promise<CollectiveStatsResult> {
-  const [hittingSplits, pitchingSplits, fieldingSplits] = await Promise.all([
+  const isDateRangeRoleSplit =
+    Boolean(startDate && endDate) && (pitchingRole === "sp" || pitchingRole === "rp");
+
+  const [hittingSplits, pitchingData, fieldingSplits] = await Promise.all([
     fetchStatsGroup(season, phase, "hitting", startDate, endDate),
-    fetchStatsGroup(season, phase, "pitching", startDate, endDate),
+    isDateRangeRoleSplit
+      ? fetchPitchingByRoleFromBoxscores(
+          phase,
+          startDate!,
+          endDate!,
+          pitchingRole as "sp" | "rp"
+        )
+      : fetchStatsGroup(season, phase, "pitching", startDate, endDate, pitchingRole).then(
+          parsePitchingSplits
+        ),
     fetchStatsGroup(season, phase, "fielding", startDate, endDate),
   ]);
 
@@ -123,58 +501,8 @@ export async function getCollectiveStats(
   // Ordenar Bateo por OPS descendente
   batting.sort((a, b) => b.ops - a.ops || b.r - a.r);
 
-  // 2. Parse Pitcheo Colectivo
-  const pitching: CollectivePitchingTeam[] = pitchingSplits.map((s) => {
-    const tid = Number(s.team?.id || 0);
-    const teamObj = getTeam(tid);
-    const stat = s.stat || {};
-
-    const era = toNum(stat.era);
-    const whip = toNum(stat.whip);
-    const ip = toNum(stat.inningsPitched);
-    const k9 = toNum(stat.strikeoutsPer9Inn);
-    const bb9 = toNum(stat.walksPer9Inn);
-    const kbb = toNum(stat.strikeoutWalkRatio);
-    const baa = toNum(stat.avg);
-
-    return {
-      teamId: tid,
-      teamName: teamObj.name || s.team?.name || "Equipo",
-      teamAbbr: teamObj.abbreviation || "LVBP",
-      logo: teamObj.logoUrl,
-      games: toNum(stat.gamesPlayed),
-      wins: toNum(stat.wins),
-      losses: toNum(stat.losses),
-      era,
-      eraStr: era.toFixed(2),
-      whip,
-      whipStr: whip.toFixed(2),
-      sv: toNum(stat.saves),
-      holds: toNum(stat.holds),
-      blownSaves: toNum(stat.blownSaves),
-      ip,
-      ipStr: ip.toFixed(1),
-      h: toNum(stat.hits),
-      r: toNum(stat.runs),
-      er: toNum(stat.earnedRuns),
-      bb: toNum(stat.baseOnBalls),
-      so: toNum(stat.strikeOuts),
-      hr: toNum(stat.homeRuns),
-      gidp: toNum(stat.groundIntoDoublePlay),
-      k9,
-      k9Str: k9.toFixed(2),
-      bb9,
-      bb9Str: bb9.toFixed(2),
-      kbb,
-      kbbStr: kbb.toFixed(2),
-      baa,
-      baaStr: toPctStr(baa),
-      isLeones: tid === 695,
-    };
-  });
-
-  // Ordenar Pitcheo por ERA ascendente
-  pitching.sort((a, b) => a.era - b.era);
+  // 2. Pitcheo Colectivo (ya resuelto desde boxscores o splits)
+  const pitching: CollectivePitchingTeam[] = pitchingData;
 
   // 3. Parse Fildeo Colectivo
   const fielding: CollectiveFieldingTeam[] = fieldingSplits.map((s) => {
@@ -221,8 +549,10 @@ export async function getCollectiveStats(
   const bestBatHr = batting.length ? [...batting].sort((a, b) => b.hr - a.hr)[0] : null;
   const bestBatR = batting.length ? [...batting].sort((a, b) => b.r - a.r)[0] : null;
 
-  const bestPitchEra = pitching.length ? [...pitching].sort((a, b) => a.era - b.era)[0] : null;
-  const bestPitchWhip = pitching.length ? [...pitching].sort((a, b) => a.whip - b.whip)[0] : null;
+  const pitchingWithIp = pitching.filter((t) => t.ip > 0);
+  const pitchingRatePool = pitchingWithIp.length ? pitchingWithIp : pitching;
+  const bestPitchEra = pitchingRatePool.length ? [...pitchingRatePool].sort((a, b) => a.era - b.era)[0] : null;
+  const bestPitchWhip = pitchingRatePool.length ? [...pitchingRatePool].sort((a, b) => a.whip - b.whip)[0] : null;
   const bestPitchSo = pitching.length ? [...pitching].sort((a, b) => b.so - a.so)[0] : null;
   const bestPitchSv = pitching.length ? [...pitching].sort((a, b) => b.sv - a.sv)[0] : null;
 
@@ -237,6 +567,7 @@ export async function getCollectiveStats(
   const fieldingSummary = calculateFieldingSummary(fielding);
 
   return {
+    pitchingRole,
     batting,
     pitching,
     fielding,

@@ -1,3 +1,5 @@
+import { BattingStats, PitchingStats, FieldingStats } from "./sports";
+
 export type SplitCategory =
   | "context"
   | "situational"
@@ -7,7 +9,14 @@ export type SplitCategory =
   | "opponent"
   | "calendar"
   | "inning"
-  | "outs";
+  | "outs"
+  | "leverage"
+  | "trend"
+  | "score"
+  | "lineup"
+  | "fatigue";
+
+export type LeverageTier = "high" | "mid" | "low";
 
 export interface PlayerSplitRow {
   splitName: string;
@@ -57,6 +66,7 @@ export interface PitcherSplitRow {
   so: number;
   hr: number;
   era: string;
+  eraAvailable?: boolean;
   whip: string;
   baa: string;
   oppObp?: string;
@@ -71,6 +81,89 @@ export interface PitcherSplitRow {
   hrPer9?: string;
   eraNum: number;
   whipNum: number;
+}
+
+export interface PlayerLeverageRow extends PlayerSplitRow {
+  tier: LeverageTier;
+  avgLi: number;
+  avgLiStr: string;
+  wpa: number;
+  wpaStr: string;
+}
+
+export interface PitcherLeverageRow extends PitcherSplitRow {
+  tier: LeverageTier;
+  avgLi: number;
+  avgLiStr: string;
+  wpa: number;
+  wpaStr: string;
+}
+
+export interface PlayerLeverageResult {
+  playerId: number;
+  type: "batter" | "pitcher";
+  season: number;
+  gamesAnalyzed: number;
+  avgLi: number;
+  avgLiStr: string;
+  totalWpa: number;
+  totalWpaStr: string;
+  thresholds: {
+    lowMax: number;
+    highMin: number;
+  };
+  batterRows?: PlayerLeverageRow[];
+  pitcherRows?: PitcherLeverageRow[];
+}
+
+export interface PlayerBatterGameLog {
+  gameId: number;
+  date: string;
+  opponentId: number;
+  opponentAbbr: string;
+  opponentName: string;
+  isHome: boolean;
+  result: "G" | "P";
+  score: string;
+  ab: number;
+  r: number;
+  h: number;
+  doubles: number;
+  triples: number;
+  hr: number;
+  rbi: number;
+  bb: number;
+  so: number;
+  sb: number;
+  avg: string;
+}
+
+export interface PlayerPitcherGameLog {
+  gameId: number;
+  date: string;
+  opponentId: number;
+  opponentAbbr: string;
+  opponentName: string;
+  isHome: boolean;
+  result: "G" | "P";
+  score: string;
+  isStart: boolean;
+  ipDisplay: string;
+  h: number;
+  r: number;
+  er: number;
+  bb: number;
+  so: number;
+  hr: number;
+  eraGame: string;
+}
+
+export interface PlayerGeneralProfile {
+  seasonsBatting: Array<{ season: number; stats: BattingStats }>;
+  seasonsPitching: Array<{ season: number; stats: PitchingStats }>;
+  fielding: FieldingStats[];
+  batterGameLogs: PlayerBatterGameLog[];
+  pitcherGameLogs: PlayerPitcherGameLog[];
 }
 
 export interface PlayerSplitsProfile {
@@ -91,6 +184,7 @@ export interface PlayerSplitsProfile {
     labelSecondary: string;
     slashLine: string;
   };
+  general?: PlayerGeneralProfile;
   contextSplits: PlayerSplitRow[];
   opponentSplits: PlayerSplitRow[];
   calendarSplits: PlayerSplitRow[];
@@ -99,6 +193,13 @@ export interface PlayerSplitsProfile {
   countSplits?: PlayerSplitRow[];
   inningSplits: PlayerSplitRow[];
   outsSplits: PlayerSplitRow[];
+  lateCloseSplits?: PlayerSplitRow[];
+  trendSplits?: PlayerSplitRow[];
+  scoreSplits?: PlayerSplitRow[];
+  detailedCountSplits?: PlayerSplitRow[];
+  countMatrixSplits?: PlayerSplitRow[];
+  lineupSplits?: PlayerSplitRow[];
+  exactBaseSplits?: PlayerSplitRow[];
   pitcherSplits?: PitcherSplitRow[];
   pitcherPlatoonSplits?: PitcherSplitRow[];
   pitcherSituationalSplits?: PitcherSplitRow[];
@@ -109,6 +210,14 @@ export interface PlayerSplitsProfile {
   pitcherContextSplits?: PitcherSplitRow[];
   pitcherOpponentSplits?: PitcherSplitRow[];
   pitcherCalendarSplits?: PitcherSplitRow[];
+  pitcherLateCloseSplits?: PitcherSplitRow[];
+  pitcherTrendSplits?: PitcherSplitRow[];
+  pitcherScoreSplits?: PitcherSplitRow[];
+  pitcherDetailedCountSplits?: PitcherSplitRow[];
+  pitcherCountMatrixSplits?: PitcherSplitRow[];
+  pitcherExactBaseSplits?: PitcherSplitRow[];
+  pitcherRestSplits?: PitcherSplitRow[];
+  pitcherFatigueSplits?: PitcherSplitRow[];
   lobStats?: {
     lobEnding: number;
     rispLobEnding: number;
