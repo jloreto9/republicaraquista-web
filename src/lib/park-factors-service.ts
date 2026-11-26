@@ -8,7 +8,7 @@ import {
 } from "@/types/park-factors";
 import { ACTIVE_SEASON, LVBP_TEAM_IDS } from "./constants";
 import { LVBP_STADIUMS } from "./stadiums-service";
-import { FINALIZED_GAME_STATUSES, supabase } from "./supabase";
+import { FINALIZED_GAME_STATUSES, fetchAllSupabasePages, supabase } from "./supabase";
 
 export const PARK_FACTOR_PRIOR_WEIGHT = 30;
 export const VALID_PARK_FACTOR_SCOPES: readonly ParkFactorScope[] = [
@@ -377,13 +377,16 @@ async function fetchSupabaseBoxscoreGames(
   if (!supabase || seasons.length === 0) return [];
 
   try {
-    const { data: rawGames, error: gamesErr } = await supabase
-      .from("games")
-      .select(
-        "id, season, game_type, status, venue, home_team_id, away_team_id, home_score, away_score"
-      )
-      .in("season", seasons)
-      .limit(2000);
+    const { data: rawGames, error: gamesErr } = await fetchAllSupabasePages<SupabaseBoxGameRow>(
+      () =>
+        supabase!
+          .from("games")
+          .select(
+            "id, season, game_type, status, venue, home_team_id, away_team_id, home_score, away_score",
+            { count: "exact" }
+          )
+          .in("season", seasons)
+    );
 
     if (gamesErr || !Array.isArray(rawGames)) {
       if (gamesErr) {
@@ -393,7 +396,7 @@ async function fetchSupabaseBoxscoreGames(
     }
 
     const regGamesMap = new Map<number, SupabaseBoxGameRow>();
-    for (const g of rawGames as SupabaseBoxGameRow[]) {
+    for (const g of rawGames) {
       const gt = String(g.game_type || "").trim().toLowerCase();
       if (gt !== "r" && gt !== "regular") continue;
       if (!isFinalStatus(g.status)) continue;
@@ -406,7 +409,7 @@ async function fetchSupabaseBoxscoreGames(
     const gameIds = Array.from(regGamesMap.keys());
     if (gameIds.length === 0) return [];
 
-    // Consultar batting_stats en lotes de 30 juegos con paginación defensiva (evita tope de 1000 filas de PostgREST)
+    // Consultar batting_stats en lotes de 30 juegos con paginación determinística
     const CHUNK_SIZE = 30;
     const chunks: number[][] = [];
     for (let i = 0; i < gameIds.length; i += CHUNK_SIZE) {
@@ -415,26 +418,18 @@ async function fetchSupabaseBoxscoreGames(
 
     const batRowsPerChunk = await Promise.all(
       chunks.map(async (chunkIds) => {
-        const collected: SupabaseBatEventRow[] = [];
-        let offset = 0;
-        const pageSize = 1000;
-        while (true) {
-          const { data, error } = await supabase!
-            .from("batting_stats")
-            .select("game_id, r, h, doubles, triples, hr, bb, so")
-            .in("game_id", chunkIds)
-            .range(offset, offset + pageSize - 1);
-
-          if (error) {
-            console.warn("Error consultando batting_stats para park factors:", error);
-            break;
-          }
-          const rows = (data || []) as SupabaseBatEventRow[];
-          collected.push(...rows);
-          if (rows.length < pageSize) break;
-          offset += pageSize;
+        const { data, error } = await fetchAllSupabasePages<SupabaseBatEventRow>(
+          () =>
+            supabase!
+              .from("batting_stats")
+              .select("game_id, r, h, doubles, triples, hr, bb, so", { count: "exact" })
+              .in("game_id", chunkIds)
+        );
+        if (error) {
+          console.warn("Error consultando batting_stats para park factors:", error);
+          return [];
         }
-        return collected;
+        return data || [];
       })
     );
 

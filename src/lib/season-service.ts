@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { fetchAllSupabasePages, supabase } from "./supabase";
 
 export const FALLBACK_SEASON = 2026;
 export const UPCOMING_SEASON = 2026;
@@ -60,10 +60,10 @@ export async function getAvailableSeasons(): Promise<number[]> {
   }
 
   try {
-    const { data, error } = await supabase
-      .from("games")
-      .select("season")
-      .order("season", { ascending: false });
+    const { data, error } = await fetchAllSupabasePages<{ season?: number | null }>(
+      () => supabase!.from("games").select("season", { count: "exact" }),
+      { orderColumn: "season", ascending: false }
+    );
 
     if (error || !data) {
       return [FALLBACK_SEASON];

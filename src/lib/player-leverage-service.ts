@@ -1,7 +1,9 @@
 import {
   supabase,
+  fetchAllSupabasePages,
   hasBatterAppearance,
   hasPitcherAppearance,
+  isExhibitionGameType,
   isPlayedGameStatus,
 } from "./supabase";
 import { ACTIVE_SEASON, LVBP_TEAM_IDS } from "./constants";
@@ -703,38 +705,46 @@ export async function getPlayerLeverageSplits(
   if (supabase) {
     try {
       if (type === "batter") {
-        const { data, error } = await supabase
-          .from("batting_stats")
-          .select(
-            "game_id, ab, r, bb, sb, cs, hbp, sf, sh, games!inner(id, season, status)"
-          )
-          .eq("player_id", playerId)
-          .eq("games.season", season);
+        const { data, error } = await fetchAllSupabasePages(
+          () =>
+            supabase!
+              .from("batting_stats")
+              .select(
+                "game_id, ab, r, bb, sb, cs, hbp, sf, sh, games!inner(id, season, status, game_type)",
+                { count: "exact" }
+              )
+              .eq("player_id", playerId)
+              .eq("games.season", season)
+        );
 
         if (!error && Array.isArray(data)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           for (const row of data as any[]) {
             const g = Array.isArray(row.games) ? row.games[0] : row.games;
-            if (!g || !isPlayedGameStatus(g.status)) continue;
+            if (!g || isExhibitionGameType(g.game_type) || !isPlayedGameStatus(g.status)) continue;
             if (!hasBatterAppearance(row)) continue;
             const gid = Number(g.id ?? row.game_id ?? 0);
             if (gid > 0) gameIdSet.add(gid);
           }
         }
       } else {
-        const { data, error } = await supabase
-          .from("pitching_stats")
-          .select(
-            "game_id, ip_decimal, h, r, er, bb, hbp, so, hr, games!inner(id, season, status)"
-          )
-          .eq("player_id", playerId)
-          .eq("games.season", season);
+        const { data, error } = await fetchAllSupabasePages(
+          () =>
+            supabase!
+              .from("pitching_stats")
+              .select(
+                "game_id, ip_decimal, h, r, er, bb, hbp, so, hr, games!inner(id, season, status, game_type)",
+                { count: "exact" }
+              )
+              .eq("player_id", playerId)
+              .eq("games.season", season)
+        );
 
         if (!error && Array.isArray(data)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           for (const row of data as any[]) {
             const g = Array.isArray(row.games) ? row.games[0] : row.games;
-            if (!g || !isPlayedGameStatus(g.status)) continue;
+            if (!g || isExhibitionGameType(g.game_type) || !isPlayedGameStatus(g.status)) continue;
             if (!hasPitcherAppearance(row)) continue;
             const gid = Number(g.id ?? row.game_id ?? 0);
             if (gid > 0) gameIdSet.add(gid);

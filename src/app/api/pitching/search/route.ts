@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { CARACAS_FEATURED_PITCHERS } from "@/lib/pitching-constants";
 import { getKnownPitcherHand } from "@/lib/pitcher-hand-service";
 import { PitcherProfile } from "@/types/pitching";
-import { supabase } from "@/lib/supabase";
+import { fetchAllSupabasePages, isExhibitionGameType, supabase } from "@/lib/supabase";
 import {
   LVBP_TEAMS,
   getPlayerHeadshotUrl,
@@ -21,6 +21,14 @@ interface LvbpDirectoryEntry {
   latestSeason: number;
   activeSeasonIp: number;
   activeSeasonCaracas: boolean;
+}
+
+interface PitcherDirectoryRow {
+  player_id: number;
+  team_id: number;
+  ip_decimal?: number | null;
+  players?: { full_name?: string | null } | { full_name?: string | null }[] | null;
+  games?: { season?: number | null; game_type?: string | null } | { season?: number | null; game_type?: string | null }[] | null;
 }
 
 let lvbpPitcherCache: {
@@ -69,17 +77,28 @@ async function getLvbpPitcherDirectory(): Promise<{
 
   if (supabase) {
     try {
-      const { data: rawRows, error } = await supabase
-        .from("pitching_stats")
-        .select(
-          "player_id, team_id, ip_decimal, h, bb, r, players!inner(full_name), games!inner(season, game_type)"
-        )
-        .in("games.season", [2026, 2025, 2024])
-        .or("ip_decimal.gt.0,h.gt.0,bb.gt.0,r.gt.0");
+      const { data: rawRows, error } = await fetchAllSupabasePages<PitcherDirectoryRow>(
+        () =>
+          supabase!
+            .from("pitching_stats")
+            .select(
+              "player_id, team_id, ip_decimal, h, bb, r, players!inner(full_name), games!inner(season, game_type)",
+              { count: "exact" }
+            )
+            .in("games.season", [2026, 2025, 2024])
+            .or("ip_decimal.gt.0,h.gt.0,bb.gt.0,r.gt.0")
+      );
 
       if (!error && Array.isArray(rawRows) && rawRows.length > 0) {
-        const seasonsFound = rawRows
-          .map((r: any) => Number(r.games?.season || 0))
+        const filteredRows = rawRows.filter((r) => {
+          const gObj = Array.isArray(r.games) ? r.games[0] : r.games;
+          return !isExhibitionGameType(gObj?.game_type);
+        });
+        const seasonsFound = filteredRows
+          .map((r) => {
+            const gObj = Array.isArray(r.games) ? r.games[0] : r.games;
+            return Number(gObj?.season || 0);
+          })
           .filter((s) => s > 0);
         if (seasonsFound.length > 0) {
           detectedActiveSeason = Math.max(...seasonsFound);
@@ -99,13 +118,15 @@ async function getLvbpPitcherDirectory(): Promise<{
           }
         >();
 
-        for (const r of rawRows as any[]) {
+        for (const r of filteredRows) {
           const pId = Number(r.player_id);
           if (!pId) continue;
-          const pName = String(r.players?.full_name || "").trim();
+          const pObj = Array.isArray(r.players) ? r.players[0] : r.players;
+          const gObj = Array.isArray(r.games) ? r.games[0] : r.games;
+          const pName = String(pObj?.full_name || "").trim();
           const teamId = Number(r.team_id);
-          const gameSeason = Number(r.games?.season || 2025);
-          const gameType = String(r.games?.game_type || "R").toUpperCase();
+          const gameSeason = Number(gObj?.season || 2025);
+          const gameType = String(gObj?.game_type || "R").toUpperCase();
           const isRegular = gameType === "R" || gameType === "REGULAR";
           const ipDec = Number(r.ip_decimal || 0);
 

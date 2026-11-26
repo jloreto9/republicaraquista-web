@@ -1,12 +1,16 @@
 import {
   supabase,
+  fetchAllSupabasePages,
+  decimalInningsToOuts,
   hasBatterAppearance,
   hasPitcherAppearance,
+  isExhibitionGameType,
   isPlayedGameStatus,
   getBattingStats,
   getPitchingStats,
   getFieldingStats,
 } from "./supabase";
+export { decimalInningsToOuts } from "./supabase";
 import { ACTIVE_SEASON, LVBP_TEAM_IDS, getTeam, getPlayerHeadshotUrl } from "./constants";
 import { isDayGame, getVenezuelanDate } from "./utils";
 import {
@@ -105,18 +109,6 @@ export function formatRate(val: number): string {
 export function formatEraWhip(val: number): string {
   if (isNaN(val) || !isFinite(val)) return "0.00";
   return val.toFixed(2);
-}
-
-export function decimalInningsToOuts(val: number): number {
-  if (!val || val <= 0) return 0;
-  const whole = Math.floor(val + 1e-6);
-  const frac = val - whole;
-  let outs = 0;
-  if (frac >= 0.55) outs = 2;
-  else if (frac >= 0.25) outs = 1;
-  else if (Math.abs(frac - 0.2) < 0.04) outs = 2;
-  else if (Math.abs(frac - 0.1) < 0.04) outs = 1;
-  return whole * 3 + outs;
 }
 
 export function parseInningsStringToOuts(ipVal?: string | number | null): number {
@@ -1194,15 +1186,21 @@ export async function getPlayerSplitsProfile(
     if (type === "batter") {
       let rawRows: any[] = [];
       if (supabase) {
-        const { data, error } = await supabase
-          .from("batting_stats")
-          .select(`
+        const { data, error } = await fetchAllSupabasePages(
+          () =>
+            supabase!
+              .from("batting_stats")
+              .select(
+                `
             game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh,
             players ( full_name ),
             games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
-          `)
-          .eq("player_id", playerId)
-          .eq("games.season", season);
+          `,
+                { count: "exact" }
+              )
+              .eq("player_id", playerId)
+              .eq("games.season", season)
+        );
 
         if (!error && data) rawRows = data;
       }
@@ -1211,7 +1209,7 @@ export async function getPlayerSplitsProfile(
       const validRows: RawGameBattingRow[] = [];
       for (const r of rawRows) {
         const g = Array.isArray(r.games) ? r.games[0] : r.games;
-        if (!g || !isPlayedGameStatus(g.status)) continue;
+        if (!g || isExhibitionGameType(g.game_type) || !isPlayedGameStatus(g.status)) continue;
         if (!hasBatterAppearance(r)) continue;
         if (g.id != null) {
           if (seenGameIds.has(Number(g.id))) continue;
@@ -1282,8 +1280,8 @@ export async function getPlayerSplitsProfile(
         if (isWin) winRows.push(row);
         else lossRows.push(row);
 
-        if (!rivalMap[opponentId] && opponentId !== teamId) rivalMap[opponentId] = [];
-        if (rivalMap[opponentId]) rivalMap[opponentId].push(row);
+        if (opponentId && !rivalMap[opponentId] && opponentId !== teamId) rivalMap[opponentId] = [];
+        if (opponentId && rivalMap[opponentId]) rivalMap[opponentId].push(row);
 
         const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
         if (effDate) {
@@ -1510,15 +1508,21 @@ export async function getPlayerSplitsProfile(
       // PERFIL DE LANZADOR
       let rawRows: any[] = [];
       if (supabase) {
-        const { data, error } = await supabase
-          .from("pitching_stats")
-          .select(`
+        const { data, error } = await fetchAllSupabasePages(
+          () =>
+            supabase!
+              .from("pitching_stats")
+              .select(
+                `
             game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr,
             players ( full_name ),
             games!inner ( id, season, game_date, game_datetime, home_team_id, away_team_id, home_score, away_score, status, game_type )
-          `)
-          .eq("player_id", playerId)
-          .eq("games.season", season);
+          `,
+                { count: "exact" }
+              )
+              .eq("player_id", playerId)
+              .eq("games.season", season)
+        );
 
         if (!error && data) rawRows = data;
       }
@@ -1527,7 +1531,7 @@ export async function getPlayerSplitsProfile(
       const validRows: RawGamePitchingRow[] = [];
       for (const r of rawRows) {
         const g = Array.isArray(r.games) ? r.games[0] : r.games;
-        if (!g || !isPlayedGameStatus(g.status)) continue;
+        if (!g || isExhibitionGameType(g.game_type) || !isPlayedGameStatus(g.status)) continue;
         if (!hasPitcherAppearance(r)) continue;
         if (g.id != null) {
           if (seenGameIds.has(Number(g.id))) continue;
@@ -1597,8 +1601,8 @@ export async function getPlayerSplitsProfile(
         if (isWin) winRows.push(row);
         else lossRows.push(row);
 
-        if (!rivalMap[opponentId] && opponentId !== teamId) rivalMap[opponentId] = [];
-        if (rivalMap[opponentId]) rivalMap[opponentId].push(row);
+        if (opponentId && !rivalMap[opponentId] && opponentId !== teamId) rivalMap[opponentId] = [];
+        if (opponentId && rivalMap[opponentId]) rivalMap[opponentId].push(row);
 
         const effDate = getVenezuelanDate(g.game_date, g.game_datetime);
         if (effDate) {
@@ -1856,20 +1860,26 @@ export async function getAllAvailablePlayersForSplits(
 
   try {
     const [batRes, pitRes] = await Promise.all([
-      supabase
-        .from("batting_stats")
-        .select(
-          "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players(full_name), games!inner(id, season, status, game_date)"
-        )
-        .eq("games.season", season)
-        .limit(10000),
-      supabase
-        .from("pitching_stats")
-        .select(
-          "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players(full_name), games!inner(id, season, status, game_date)"
-        )
-        .eq("games.season", season)
-        .limit(10000),
+      fetchAllSupabasePages(
+        () =>
+          supabase!
+            .from("batting_stats")
+            .select(
+              "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players(full_name), games!inner(id, season, status, game_date, game_type)",
+              { count: "exact" }
+            )
+            .eq("games.season", season)
+      ),
+      fetchAllSupabasePages(
+        () =>
+          supabase!
+            .from("pitching_stats")
+            .select(
+              "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players(full_name), games!inner(id, season, status, game_date, game_type)",
+              { count: "exact" }
+            )
+            .eq("games.season", season)
+      ),
     ]);
 
     if (batRes.data && batRes.data.length > 0) {
@@ -1897,6 +1907,7 @@ export async function getAllAvailablePlayersForSplits(
 
       for (const row of batRes.data as any[]) {
         const gObj = Array.isArray(row.games) ? row.games[0] : row.games;
+        if (isExhibitionGameType(gObj?.game_type)) continue;
         if (!isPlayedGameStatus(gObj?.status)) continue;
         if (!hasBatterAppearance(row)) continue;
 
@@ -2001,6 +2012,7 @@ export async function getAllAvailablePlayersForSplits(
 
       for (const row of pitRes.data as any[]) {
         const gObj = Array.isArray(row.games) ? row.games[0] : row.games;
+        if (isExhibitionGameType(gObj?.game_type)) continue;
         if (!isPlayedGameStatus(gObj?.status)) continue;
         if (!hasPitcherAppearance(row)) continue;
 

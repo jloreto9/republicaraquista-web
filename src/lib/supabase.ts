@@ -113,6 +113,7 @@ interface RawPitchingRow {
   game_id?: number | null;
   player_id: number;
   team_id: number;
+  ip_string?: string | null;
   ip_decimal?: number | null;
   h?: number | null;
   r?: number | null;
@@ -196,6 +197,37 @@ function normalizePhase(rawType?: string | null): string {
   if (!trimmed) return "regular";
   if (trimmed.toLowerCase() === "all") return "all";
   return MLB_GAME_TYPE_TO_PHASE[trimmed.toUpperCase()] || trimmed.toLowerCase();
+}
+
+/**
+ * Determina si `game_type` o `phase` corresponde a un encuentro de exhibición ('E'/'e').
+ */
+export function isExhibitionGameType(rawType?: string | null): boolean {
+  if (!rawType) return false;
+  const trimmed = String(rawType).trim().toLowerCase();
+  return trimmed === "e" || trimmed === "exhibition";
+}
+
+function toCanonicalMlbGameType(rawType?: string | null): string {
+  if (isExhibitionGameType(rawType)) return "E";
+  const phase = normalizePhase(rawType);
+  if (phase === "all") return "R";
+  return PHASE_TO_MLB_GAME_TYPE[phase] || (rawType ? String(rawType).trim().toUpperCase() : "R");
+}
+
+/**
+ * Convierte innings decimales o en notación decimal/béisbol a outs enteros exactos.
+ */
+export function decimalInningsToOuts(val: number): number {
+  if (!val || !Number.isFinite(val) || val <= 0) return 0;
+  const whole = Math.floor(val + 1e-6);
+  const frac = val - whole;
+  let outs = 0;
+  if (frac >= 0.55) outs = 2;
+  else if (frac >= 0.25) outs = 1;
+  else if (Math.abs(frac - 0.2) < 0.04) outs = 2;
+  else if (Math.abs(frac - 0.1) < 0.04) outs = 1;
+  return whole * 3 + outs;
 }
 
 function isFinalizedGameStatus(status?: string | null): boolean {
@@ -468,6 +500,125 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+export interface SupabaseQueryResult<T> {
+  data: T[] | null;
+  error: unknown;
+  count?: number | null;
+}
+
+export interface SupabasePaginationOptions {
+  pageSize?: number;
+  orderColumn?: string | null;
+  ascending?: boolean;
+  concurrency?: number;
+}
+
+const DEFAULT_SUPABASE_PAGE_SIZE = 1000;
+const DEFAULT_SUPABASE_PAGE_CONCURRENCY = 6;
+
+/**
+ * Ejecuta una consulta Supabase paginada de forma determinística (`.order()` + `.range()`),
+ * usando `count: "exact"` para cargar páginas restantes en paralelo con concurrencia acotada
+ * y manteniendo compatibilidad con mocks de test que no implementen `.range()` o `.order()`.
+ */
+export async function fetchAllSupabasePages<T = Record<string, unknown>>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  buildQuery: () => any,
+  options?: SupabasePaginationOptions
+): Promise<{ data: T[] | null; error: unknown }> {
+  const pageSize = Math.max(1, options?.pageSize ?? DEFAULT_SUPABASE_PAGE_SIZE);
+  const orderColumn = options?.orderColumn === undefined ? "id" : options.orderColumn;
+  const ascending = options?.ascending ?? true;
+  const concurrency = Math.max(1, options?.concurrency ?? DEFAULT_SUPABASE_PAGE_CONCURRENCY);
+
+  const prepareQuery = () => {
+    let q = buildQuery();
+    if (orderColumn && typeof q?.order === "function") {
+      q = q.order(orderColumn, { ascending });
+    }
+    return q;
+  };
+
+  try {
+    let firstQuery = prepareQuery();
+    const supportsRange = typeof firstQuery?.range === "function";
+    if (supportsRange) {
+      firstQuery = firstQuery.range(0, pageSize - 1);
+    }
+
+    const firstRes = (await firstQuery) as SupabaseQueryResult<T>;
+    if (firstRes?.error) {
+      return { data: null, error: firstRes.error };
+    }
+
+    const firstRows = Array.isArray(firstRes?.data) ? firstRes.data : [];
+    if (!supportsRange || firstRows.length === 0) {
+      return { data: firstRows, error: null };
+    }
+
+    const totalCount =
+      typeof firstRes?.count === "number" && Number.isFinite(firstRes.count)
+        ? firstRes.count
+        : null;
+
+    if (totalCount !== null) {
+      if (firstRows.length >= totalCount) {
+        return { data: firstRows, error: null };
+      }
+
+      const step = firstRows.length;
+      const ranges: Array<{ from: number; to: number }> = [];
+      for (let offset = step; offset < totalCount; offset += step) {
+        ranges.push({
+          from: offset,
+          to: offset + step - 1,
+        });
+      }
+
+      const pageResults = await mapWithConcurrency(ranges, concurrency, async ({ from, to }) => {
+        const pageQuery = prepareQuery().range(from, to);
+        return (await pageQuery) as SupabaseQueryResult<T>;
+      });
+
+      const collected: T[] = [...firstRows];
+      for (const pageRes of pageResults) {
+        if (pageRes?.error) {
+          return { data: null, error: pageRes.error };
+        }
+        if (Array.isArray(pageRes?.data)) {
+          collected.push(...pageRes.data);
+        }
+      }
+      return { data: collected, error: null };
+    }
+
+    if (firstRows.length < pageSize) {
+      return { data: firstRows, error: null };
+    }
+
+    const collected: T[] = [...firstRows];
+    let offset = firstRows.length;
+    while (true) {
+      const pageRes = (await prepareQuery().range(
+        offset,
+        offset + pageSize - 1
+      )) as SupabaseQueryResult<T>;
+      if (pageRes?.error) {
+        return { data: null, error: pageRes.error };
+      }
+      const rows = Array.isArray(pageRes?.data) ? pageRes.data : [];
+      if (rows.length === 0) break;
+      collected.push(...rows);
+      if (rows.length < pageSize) break;
+      offset += rows.length;
+    }
+
+    return { data: collected, error: null };
+  } catch (err) {
+    return { data: null, error: err };
+  }
+}
+
 function canPerformWriteThrough(): boolean {
   if (!supabaseAdmin) return false;
   return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) || supabaseAdmin !== supabase;
@@ -537,7 +688,9 @@ function sortGamesChronologically(games: SupabaseGameRow[]): SupabaseGameRow[] {
 
 function filterGamesByPhase(games: SupabaseGameRow[], phase: string): SupabaseGameRow[] {
   const targetPhase = normalizePhase(phase);
-  if (targetPhase === "all") return games;
+  if (targetPhase === "all") {
+    return games.filter((g) => !isExhibitionGameType(g.phase || g.game_type));
+  }
   return games.filter((g) => normalizePhase(g.phase || g.game_type) === targetPhase);
 }
 
@@ -546,7 +699,9 @@ async function reconcileSeasonGames(season: number): Promise<SupabaseGameRow[]> 
 
   const [sbResult, mlbScheduleResult] = await Promise.all([
     supabase
-      ? Promise.resolve(supabase.from("games").select("*").eq("season", season)).catch((err) => {
+      ? fetchAllSupabasePages<SupabaseGameRow>(
+          () => supabase!.from("games").select("*", { count: "exact" }).eq("season", season)
+        ).catch((err) => {
           console.warn("Error consultando games en Supabase:", err);
           return { data: null, error: err };
         })
@@ -655,7 +810,7 @@ async function reconcileSeasonGames(season: number): Promise<SupabaseGameRow[]> 
           season: mlbRow.season ?? season,
           game_date: mlbRow.game_date || null,
           game_datetime: mlbRow.game_datetime || null,
-          game_type: mlbRow.game_type || "regular",
+          game_type: toCanonicalMlbGameType(mlbRow.phase || mlbRow.game_type),
           status: mlbRow.status || "Final",
           home_team_id: mlbRow.home_team_id,
           away_team_id: mlbRow.away_team_id,
@@ -713,7 +868,7 @@ async function reconcileSeasonGames(season: number): Promise<SupabaseGameRow[]> 
             season: merged.season ?? season,
             game_date: merged.game_date || null,
             game_datetime: merged.game_datetime || null,
-            game_type: merged.game_type || "regular",
+            game_type: toCanonicalMlbGameType(merged.phase || merged.game_type),
             status: merged.status || "Final",
             home_team_id: merged.home_team_id,
             away_team_id: merged.away_team_id,
@@ -943,29 +1098,51 @@ export async function getCanonicalGameBoxscoreRows(
 
   if (supabase) {
     try {
-      let batQuery = supabase
-        .from("batting_stats")
-        .select("*, players(full_name)")
-        .in("game_id", targetGameIds)
-        .limit(5000);
-      let pitQuery = supabase
-        .from("pitching_stats")
-        .select("*, players(full_name)")
-        .in("game_id", targetGameIds)
-        .limit(5000);
-
-      if (teamId !== undefined && teamId !== null) {
-        batQuery = batQuery.eq("team_id", Number(teamId));
-        pitQuery = pitQuery.eq("team_id", Number(teamId));
+      const GAME_ID_CHUNK_SIZE = 30;
+      const gameIdChunks: number[][] = [];
+      for (let i = 0; i < targetGameIds.length; i += GAME_ID_CHUNK_SIZE) {
+        gameIdChunks.push(targetGameIds.slice(i, i + GAME_ID_CHUNK_SIZE));
       }
 
-      const [batRes, pitRes] = await Promise.all([batQuery, pitQuery]);
-      if (!batRes.error && Array.isArray(batRes.data)) {
-        dbBatRows = batRes.data;
-      }
-      if (!pitRes.error && Array.isArray(pitRes.data)) {
-        dbPitRows = pitRes.data;
-      }
+      const [batChunkRows, pitChunkRows] = await Promise.all([
+        mapWithConcurrency(gameIdChunks, 4, async (chunkIds) => {
+          const res = await fetchAllSupabasePages(() => {
+            let q = supabase!
+              .from("batting_stats")
+              .select("*, players(full_name)", { count: "exact" })
+              .in("game_id", chunkIds);
+            if (teamId !== undefined && teamId !== null) {
+              q = q.eq("team_id", Number(teamId));
+            }
+            return q;
+          });
+          if (res.error) {
+            console.warn("Error consultando batting_stats en getCanonicalGameBoxscoreRows:", res.error);
+            return [];
+          }
+          return res.data || [];
+        }),
+        mapWithConcurrency(gameIdChunks, 4, async (chunkIds) => {
+          const res = await fetchAllSupabasePages(() => {
+            let q = supabase!
+              .from("pitching_stats")
+              .select("*, players(full_name)", { count: "exact" })
+              .in("game_id", chunkIds);
+            if (teamId !== undefined && teamId !== null) {
+              q = q.eq("team_id", Number(teamId));
+            }
+            return q;
+          });
+          if (res.error) {
+            console.warn("Error consultando pitching_stats en getCanonicalGameBoxscoreRows:", res.error);
+            return [];
+          }
+          return res.data || [];
+        }),
+      ]);
+
+      dbBatRows = batChunkRows.flat();
+      dbPitRows = pitChunkRows.flat();
     } catch (err) {
       console.warn("Error consultando boxscores en Supabase:", err);
     }
@@ -1788,6 +1965,7 @@ function aggregateBattingRows(
 
   mergedRows.forEach((row: RawBattingRow) => {
     const gObj = Array.isArray(row.games) ? row.games[0] : row.games;
+    if (isExhibitionGameType(gObj?.game_type)) return;
     if (!isPlayedGameStatus(gObj?.status)) return;
     if (dateFilter && gObj?.game_date) {
       const gDate = String(gObj.game_date).slice(0, 10);
@@ -2148,26 +2326,28 @@ export async function getBattingStats(
     const fallbackRows: RawBattingRow[] = [];
     if (supabase) {
       try {
-        let query = supabase
-          .from("batting_stats")
-          .select(
-            "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players!inner(full_name), games!inner(season, game_type, status, game_date)"
-          )
-          .eq("games.season", season)
-          .gte("games.game_date", startDate)
-          .lte("games.game_date", endDate)
-          .limit(10000);
+        const dbResult = await fetchAllSupabasePages<RawBattingRow>(() => {
+          let query = supabase!
+            .from("batting_stats")
+            .select(
+              "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players!inner(full_name), games!inner(season, game_type, status, game_date)",
+              { count: "exact" }
+            )
+            .eq("games.season", season)
+            .gte("games.game_date", startDate)
+            .lte("games.game_date", endDate);
 
-        if (targetTeamId !== null) {
-          query = query.eq("team_id", targetTeamId);
-        }
+          if (targetTeamId !== null) {
+            query = query.eq("team_id", targetTeamId);
+          }
 
-        const dbResult = await Promise.resolve(query).catch((err) => ({ data: null, error: err }));
+          return query;
+        });
         if (dbResult.error) {
           console.error("Error al consultar batting_stats por rango de fechas:", dbResult.error);
         }
         if (Array.isArray(dbResult.data)) {
-          fallbackRows.push(...(dbResult.data as RawBattingRow[]));
+          fallbackRows.push(...dbResult.data);
         }
       } catch (err) {
         console.error("Error en fallback de batting_stats por rango de fechas:", err);
@@ -2197,40 +2377,42 @@ export async function getBattingStats(
     return aggregateBattingRows(fallbackRows, new Map(), minAb, limit, { startDate, endDate });
   }
 
-  let dbPromise: Promise<{ data: unknown[] | null; error: unknown }> = Promise.resolve({
+  let dbPromise: Promise<{ data: RawBattingRow[] | null; error: unknown }> = Promise.resolve({
     data: null,
     error: null,
   });
 
   if (supabase) {
-    let query = supabase
-      .from("batting_stats")
-      .select(
-        "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players!inner(full_name), games!inner(season, game_type, status)"
-      )
-      .eq("games.season", season)
-      .limit(10000);
+    dbPromise = fetchAllSupabasePages<RawBattingRow>(() => {
+      let query = supabase!
+        .from("batting_stats")
+        .select(
+          "game_id, player_id, team_id, ab, r, h, doubles, triples, hr, rbi, bb, so, sb, cs, hbp, sf, sh, players!inner(full_name), games!inner(season, game_type, status)",
+          { count: "exact" }
+        )
+        .eq("games.season", season);
 
-    if (phase && phase !== "all") {
-      const normalized = normalizePhase(phase);
-      const targetTypes =
-        normalized === "regular"
-          ? ["R", "regular"]
-          : normalized === "round_robin"
-          ? ["L", "round_robin"]
-          : normalized === "final"
-          ? ["F", "W", "final"]
-          : normalized === "wildcard_playin"
-          ? ["D", "wildcard_playin"]
-          : [phase];
-      query = query.in("games.game_type", targetTypes);
-    }
+      if (phase && phase !== "all") {
+        const normalized = normalizePhase(phase);
+        const targetTypes =
+          normalized === "regular"
+            ? ["R", "regular"]
+            : normalized === "round_robin"
+            ? ["L", "round_robin"]
+            : normalized === "final"
+            ? ["F", "W", "final"]
+            : normalized === "wildcard_playin"
+            ? ["D", "wildcard_playin"]
+            : [phase];
+        query = query.in("games.game_type", targetTypes);
+      }
 
-    if (teamId && teamId !== "all") {
-      query = query.eq("team_id", Number(teamId));
-    }
+      if (teamId && teamId !== "all") {
+        query = query.eq("team_id", Number(teamId));
+      }
 
-    dbPromise = Promise.resolve(query).catch((err) => ({ data: null, error: err }));
+      return query;
+    }).catch((err) => ({ data: null, error: err }));
   }
 
   const [canonicalPlayedGames, dbResult, gidpMap] = await Promise.all([
@@ -2284,7 +2466,7 @@ function aggregatePitchingRows(
       playerName: string;
       teamsCount: Record<number, number>;
       appearances: number;
-      inningsDecimal: number;
+      totalOuts: number;
       hits: number;
       runs: number;
       earnedRuns: number;
@@ -2297,6 +2479,7 @@ function aggregatePitchingRows(
 
   mergedRows.forEach((row: RawPitchingRow) => {
     const gObj = Array.isArray(row.games) ? row.games[0] : row.games;
+    if (isExhibitionGameType(gObj?.game_type)) return;
     if (!isPlayedGameStatus(gObj?.status)) return;
     if (dateFilter && gObj?.game_date) {
       const gDate = String(gObj.game_date).slice(0, 10);
@@ -2321,7 +2504,7 @@ function aggregatePitchingRows(
         playerName: pName,
         teamsCount: {},
         appearances: 0,
-        inningsDecimal: 0,
+        totalOuts: 0,
         hits: 0,
         runs: 0,
         earnedRuns: 0,
@@ -2335,7 +2518,11 @@ function aggregatePitchingRows(
     const p = pitcherMap[pId];
     p.appearances += 1;
     p.teamsCount[tId] = (p.teamsCount[tId] || 0) + 1;
-    p.inningsDecimal += Number(row.ip_decimal || 0);
+    const rowOuts =
+      row.ip_string !== undefined && row.ip_string !== null && String(row.ip_string).trim() !== ""
+        ? Math.round(parseBaseballInningsToDecimal(row.ip_string) * 3)
+        : decimalInningsToOuts(Number(row.ip_decimal || 0));
+    p.totalOuts += rowOuts;
     p.hits += Number(row.h || 0);
     p.runs += Number(row.r || 0);
     p.earnedRuns += Number(row.er || 0);
@@ -2356,16 +2543,14 @@ function aggregatePitchingRows(
     }
 
     const team = getTeam(primaryTeamId);
-    const ip = Number(p.inningsDecimal.toFixed(1));
-    const fullInnings = Math.floor(ip);
-    const fraction = Math.round((ip - fullInnings) * 10) / 10;
-    const displayPart = fraction >= 0.6 ? 2 : fraction >= 0.3 ? 1 : 0;
-    const inningsDisplay = `${fullInnings}.${displayPart}`;
+    const ipExact = p.totalOuts / 3;
+    const ip = Number(ipExact.toFixed(2));
+    const inningsDisplay = formatDecimalToBaseballInnings(ipExact);
 
-    const era = ip > 0 ? Number(((p.earnedRuns * 9) / ip).toFixed(2)) : 0.0;
-    const whip = ip > 0 ? Number(((p.hits + p.walks) / ip).toFixed(2)) : 0.0;
-    const kPer9 = ip > 0 ? Number(((p.strikeouts * 9) / ip).toFixed(2)) : 0.0;
-    const bbPer9 = ip > 0 ? Number(((p.walks * 9) / ip).toFixed(2)) : 0.0;
+    const era = ipExact > 0 ? Number(((p.earnedRuns * 9) / ipExact).toFixed(2)) : 0.0;
+    const whip = ipExact > 0 ? Number(((p.hits + p.walks) / ipExact).toFixed(2)) : 0.0;
+    const kPer9 = ipExact > 0 ? Number(((p.strikeouts * 9) / ipExact).toFixed(2)) : 0.0;
+    const bbPer9 = ipExact > 0 ? Number(((p.walks * 9) / ipExact).toFixed(2)) : 0.0;
     const kToBb = p.walks > 0 ? Number((p.strikeouts / p.walks).toFixed(2)) : p.strikeouts;
     const pitchMeta = pitchingMetaMap.get(p.playerId);
 
@@ -2643,26 +2828,28 @@ export async function getPitchingStats(
     const fallbackRows: RawPitchingRow[] = [];
     if (supabase) {
       try {
-        let query = supabase
-          .from("pitching_stats")
-          .select(
-            "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players!inner(full_name), games!inner(season, game_type, status, game_date)"
-          )
-          .eq("games.season", season)
-          .gte("games.game_date", startDate)
-          .lte("games.game_date", endDate)
-          .limit(10000);
+        const dbResult = await fetchAllSupabasePages<RawPitchingRow>(() => {
+          let query = supabase!
+            .from("pitching_stats")
+            .select(
+              "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players!inner(full_name), games!inner(season, game_type, status, game_date)",
+              { count: "exact" }
+            )
+            .eq("games.season", season)
+            .gte("games.game_date", startDate)
+            .lte("games.game_date", endDate);
 
-        if (targetTeamId !== null) {
-          query = query.eq("team_id", targetTeamId);
-        }
+          if (targetTeamId !== null) {
+            query = query.eq("team_id", targetTeamId);
+          }
 
-        const dbResult = await Promise.resolve(query).catch((err) => ({ data: null, error: err }));
+          return query;
+        });
         if (dbResult.error) {
           console.error("Error al consultar pitching_stats por rango de fechas:", dbResult.error);
         }
         if (Array.isArray(dbResult.data)) {
-          fallbackRows.push(...(dbResult.data as RawPitchingRow[]));
+          fallbackRows.push(...dbResult.data);
         }
       } catch (err) {
         console.error("Error en fallback de pitching_stats por rango de fechas:", err);
@@ -2692,40 +2879,42 @@ export async function getPitchingStats(
     return aggregatePitchingRows(fallbackRows, new Map(), minIp, limit, { startDate, endDate });
   }
 
-  let dbPromise: Promise<{ data: unknown[] | null; error: unknown }> = Promise.resolve({
+  let dbPromise: Promise<{ data: RawPitchingRow[] | null; error: unknown }> = Promise.resolve({
     data: null,
     error: null,
   });
 
   if (supabase) {
-    let query = supabase
-      .from("pitching_stats")
-      .select(
-        "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players!inner(full_name), games!inner(season, game_type, status)"
-      )
-      .eq("games.season", season)
-      .limit(10000);
+    dbPromise = fetchAllSupabasePages<RawPitchingRow>(() => {
+      let query = supabase!
+        .from("pitching_stats")
+        .select(
+          "game_id, player_id, team_id, ip_decimal, h, r, er, bb, hbp, so, hr, players!inner(full_name), games!inner(season, game_type, status)",
+          { count: "exact" }
+        )
+        .eq("games.season", season);
 
-    if (phase && phase !== "all") {
-      const normalized = normalizePhase(phase);
-      const targetTypes =
-        normalized === "regular"
-          ? ["R", "regular"]
-          : normalized === "round_robin"
-          ? ["L", "round_robin"]
-          : normalized === "final"
-          ? ["F", "W", "final"]
-          : normalized === "wildcard_playin"
-          ? ["D", "wildcard_playin"]
-          : [phase];
-      query = query.in("games.game_type", targetTypes);
-    }
+      if (phase && phase !== "all") {
+        const normalized = normalizePhase(phase);
+        const targetTypes =
+          normalized === "regular"
+            ? ["R", "regular"]
+            : normalized === "round_robin"
+            ? ["L", "round_robin"]
+            : normalized === "final"
+            ? ["F", "W", "final"]
+            : normalized === "wildcard_playin"
+            ? ["D", "wildcard_playin"]
+            : [phase];
+        query = query.in("games.game_type", targetTypes);
+      }
 
-    if (teamId && teamId !== "all") {
-      query = query.eq("team_id", Number(teamId));
-    }
+      if (teamId && teamId !== "all") {
+        query = query.eq("team_id", Number(teamId));
+      }
 
-    dbPromise = Promise.resolve(query).catch((err) => ({ data: null, error: err }));
+      return query;
+    }).catch((err) => ({ data: null, error: err }));
   }
 
   const [canonicalPlayedGames, dbResult, pitchingMetaMap] = await Promise.all([
