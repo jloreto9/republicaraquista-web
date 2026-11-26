@@ -8,7 +8,7 @@ import {
 } from "@/types/player-splits";
 import { BattingStats, PitchingStats } from "@/types/sports";
 import { formatSeason, getTeam } from "@/lib/constants";
-import { BarChart3, Shield, CalendarDays } from "lucide-react";
+import { BarChart3, Shield, CalendarDays, Trophy } from "lucide-react";
 
 interface PlayerGeneralStatsCardProps {
   profile: PlayerSplitsProfile;
@@ -16,6 +16,14 @@ interface PlayerGeneralStatsCardProps {
 
 type ColumnView = "all" | "traditional" | "advanced";
 type GameLogLimit = "7" | "15" | "all";
+
+interface TableRowItem<T> {
+  key: string;
+  label: string;
+  badge?: string;
+  isHighlight?: boolean;
+  stats: T;
+}
 
 const COLUMN_VIEW_OPTIONS: Array<{ id: ColumnView; label: string }> = [
   { id: "all", label: "Todas" },
@@ -56,6 +64,65 @@ function PlusStatBadge({ value }: { value?: number }) {
     >
       {rounded}
     </span>
+  );
+}
+
+function ColumnViewToggle({
+  columnView,
+  onChange,
+  ariaLabel,
+}: {
+  columnView: ColumnView;
+  onChange: (next: ColumnView) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className="inline-flex items-center gap-1 bg-[#0D152B] p-1 rounded-lg border border-[#1E2B4D]"
+    >
+      {COLUMN_VIEW_OPTIONS.map((option) => {
+        const active = columnView === option.id;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(option.id)}
+            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+              active
+                ? "bg-[#FDB827] text-[#070B19] font-bold"
+                : "text-slate-300 hover:text-slate-100 hover:bg-[#131E3D]"
+            }`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlusStatsLegend() {
+  return (
+    <div className="px-4 py-2 bg-[#070B19]/40 border-b border-[#1E2B4D]/70 flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+      <span className="text-slate-300 font-semibold mr-1">
+        100 = Promedio LVBP
+      </span>
+      <span className="px-1.5 py-0.5 rounded border bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold">
+        ≥130 Élite
+      </span>
+      <span className="px-1.5 py-0.5 rounded border bg-[#FDB827]/15 text-[#FDB827] border-[#FDB827]/35 font-semibold">
+        110–129 Sobre prom.
+      </span>
+      <span className="px-1.5 py-0.5 rounded border bg-slate-800/80 text-slate-200 border-slate-700">
+        91–109 Promedio
+      </span>
+      <span className="px-1.5 py-0.5 rounded border bg-rose-500/15 text-rose-300 border-rose-500/30">
+        1–90 Bajo prom.
+      </span>
+    </div>
   );
 }
 
@@ -301,6 +368,331 @@ function computeTotalPitching(
   };
 }
 
+function BattingSeasonTable({
+  rows,
+  totalRow,
+  totalLabel,
+  columnView,
+  firstColumnHeader,
+}: {
+  rows: Array<TableRowItem<BattingStats>>;
+  totalRow: BattingStats | null;
+  totalLabel: string;
+  columnView: ColumnView;
+  firstColumnHeader: string;
+}) {
+  const showTraditional = columnView === "all" || columnView === "traditional";
+  const showAdvanced = columnView === "all" || columnView === "advanced";
+
+  return (
+    <div className="overflow-x-auto">
+      <table
+        className={`w-full text-left text-xs ${
+          columnView === "all" ? "min-w-[1140px]" : "min-w-[740px]"
+        }`}
+      >
+        <thead>
+          <tr className="bg-[#070B19]/50 text-slate-400 font-mono border-b border-[#1E2B4D] text-[10px]">
+            <th className="py-2.5 px-3 font-semibold">{firstColumnHeader}</th>
+            <th className="py-2.5 px-2 text-center">EQ</th>
+            <th className="py-2.5 px-2 text-center">JJ</th>
+            <th className="py-2.5 px-2 text-center font-semibold text-slate-200">AP</th>
+            {showTraditional && (
+              <>
+                <th className="py-2.5 px-2 text-center">VB</th>
+                <th className="py-2.5 px-2 text-center">CA</th>
+                <th className="py-2.5 px-2 text-center font-bold text-slate-200">H</th>
+                <th className="py-2.5 px-2 text-center">2B</th>
+                <th className="py-2.5 px-2 text-center">3B</th>
+                <th className="py-2.5 px-2 text-center font-bold text-[#FDB827]">HR</th>
+                <th className="py-2.5 px-2 text-center">CI</th>
+                <th className="py-2.5 px-2 text-center">BB</th>
+                <th className="py-2.5 px-2 text-center">SO</th>
+                <th className="py-2.5 px-2 text-center">BR</th>
+              </>
+            )}
+            <th className="py-2.5 px-2 text-center font-semibold text-slate-100">AVG</th>
+            <th className="py-2.5 px-2 text-center text-sky-400 font-semibold">OBP</th>
+            <th className="py-2.5 px-2 text-center text-sky-400 font-semibold">SLG</th>
+            <th className="py-2.5 px-2.5 text-center font-bold text-[#FDB827]">OPS</th>
+            {showAdvanced && (
+              <>
+                <th className="py-2.5 px-2 text-center">ISO</th>
+                <th className="py-2.5 px-2 text-center">BABIP</th>
+                <th className="py-2.5 px-2 text-center text-sky-300 font-semibold">wOBA</th>
+                <th className="py-2.5 px-2 text-center">AVG+</th>
+                <th className="py-2.5 px-2 text-center">OBP+</th>
+                <th className="py-2.5 px-2 text-center">SLG+</th>
+                <th className="py-2.5 px-2 text-center">OPS+</th>
+                <th className="py-2.5 px-2 text-center">wOBA+</th>
+                <th className="py-2.5 px-2 text-center">wRC+</th>
+              </>
+            )}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[#1E2B4D]/60 font-mono text-[11px]">
+          {rows.map(({ key, label, badge, isHighlight, stats }) => {
+            const pa =
+              stats.plateAppearances ??
+              stats.pa ??
+              stats.atBats + stats.walks + (stats.hbp ?? 0) + (stats.sf ?? 0);
+            return (
+              <tr
+                key={key}
+                className={`hover:bg-[#131E3D]/50 transition-colors ${
+                  isHighlight ? "bg-[#002D62]/20" : ""
+                }`}
+              >
+                <td className="py-2.5 px-3 font-sans font-bold text-slate-100 whitespace-nowrap">
+                  <span>{label}</span>
+                  {badge && (
+                    <span className="ml-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30">
+                      {badge}
+                    </span>
+                  )}
+                </td>
+                <td className="py-2.5 px-2 text-center text-slate-300 font-semibold">
+                  {stats.teamAbbr || getTeam(stats.teamId).abbreviation}
+                </td>
+                <td className="py-2.5 px-2 text-center text-slate-300">{stats.games}</td>
+                <td className="py-2.5 px-2 text-center font-semibold text-slate-100">{pa}</td>
+                {showTraditional && (
+                  <>
+                    <td className="py-2.5 px-2 text-center text-slate-300">{stats.atBats}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-400">{stats.runs}</td>
+                    <td className="py-2.5 px-2 text-center font-bold text-slate-100">{stats.hits}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-400">{stats.doubles}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-400">{stats.triples}</td>
+                    <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{stats.homeRuns}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-200">{stats.rbi}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-400">{stats.walks}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-400">{stats.strikeouts}</td>
+                    <td className="py-2.5 px-2 text-center text-emerald-400">{stats.stolenBases}</td>
+                  </>
+                )}
+                <td className="py-2.5 px-2 text-center font-bold text-slate-100">{formatRate3(stats.avg)}</td>
+                <td className="py-2.5 px-2 text-center text-sky-400 font-semibold">{formatRate3(stats.obp)}</td>
+                <td className="py-2.5 px-2 text-center text-sky-400 font-semibold">{formatRate3(stats.slg)}</td>
+                <td className="py-2.5 px-2.5 text-center font-bold text-[#FDB827]">{formatRate3(stats.ops)}</td>
+                {showAdvanced && (
+                  <>
+                    <td className="py-2.5 px-2 text-center text-slate-300">{formatRate3(stats.iso)}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-300">{formatRate3(stats.babip)}</td>
+                    <td className="py-2.5 px-2 text-center font-semibold text-sky-300">
+                      {typeof stats.woba === "number" ? formatRate3(stats.woba) : "--"}
+                    </td>
+                    <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.avgPlus} /></td>
+                    <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.obpPlus} /></td>
+                    <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.slgPlus} /></td>
+                    <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.opsPlus} /></td>
+                    <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.wobaPlus} /></td>
+                    <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.wrcPlus} /></td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+
+          {totalRow && (
+            <tr className="bg-[#070B19]/80 font-bold border-t-2 border-[#1E2B4D]">
+              <td className="py-2.5 px-3 font-sans text-[#FDB827] whitespace-nowrap">
+                {totalLabel}
+              </td>
+              <td className="py-2.5 px-2 text-center text-slate-400">LVBP</td>
+              <td className="py-2.5 px-2 text-center text-slate-200">{totalRow.games}</td>
+              <td className="py-2.5 px-2 text-center text-slate-100">{totalRow.plateAppearances}</td>
+              {showTraditional && (
+                <>
+                  <td className="py-2.5 px-2 text-center text-slate-200">{totalRow.atBats}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.runs}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-100">{totalRow.hits}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.doubles}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.triples}</td>
+                  <td className="py-2.5 px-2 text-center text-[#FDB827]">{totalRow.homeRuns}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-200">{totalRow.rbi}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.walks}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.strikeouts}</td>
+                  <td className="py-2.5 px-2 text-center text-emerald-400">{totalRow.stolenBases}</td>
+                </>
+              )}
+              <td className="py-2.5 px-2 text-center text-slate-100">{formatRate3(totalRow.avg)}</td>
+              <td className="py-2.5 px-2 text-center text-sky-400">{formatRate3(totalRow.obp)}</td>
+              <td className="py-2.5 px-2 text-center text-sky-400">{formatRate3(totalRow.slg)}</td>
+              <td className="py-2.5 px-2.5 text-center text-[#FDB827]">{formatRate3(totalRow.ops)}</td>
+              {showAdvanced && (
+                <>
+                  <td className="py-2.5 px-2 text-center text-slate-200">{formatRate3(totalRow.iso)}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-200">{formatRate3(totalRow.babip)}</td>
+                  <td className="py-2.5 px-2 text-center text-sky-300">
+                    {typeof totalRow.woba === "number" ? formatRate3(totalRow.woba) : "--"}
+                  </td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalRow.avgPlus} /></td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalRow.obpPlus} /></td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalRow.slgPlus} /></td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalRow.opsPlus} /></td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalRow.wobaPlus} /></td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalRow.wrcPlus} /></td>
+                </>
+              )}
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PitchingSeasonTable({
+  rows,
+  totalRow,
+  totalLabel,
+  columnView,
+  firstColumnHeader,
+}: {
+  rows: Array<TableRowItem<PitchingStats>>;
+  totalRow: PitchingStats | null;
+  totalLabel: string;
+  columnView: ColumnView;
+  firstColumnHeader: string;
+}) {
+  const showTraditional = columnView === "all" || columnView === "traditional";
+  const showAdvanced = columnView === "all" || columnView === "advanced";
+
+  return (
+    <div className="overflow-x-auto">
+      <table
+        className={`w-full text-left text-xs ${
+          columnView === "all" ? "min-w-[1040px]" : "min-w-[720px]"
+        }`}
+      >
+        <thead>
+          <tr className="bg-[#070B19]/50 text-slate-400 font-mono border-b border-[#1E2B4D] text-[10px]">
+            <th className="py-2.5 px-3 font-semibold">{firstColumnHeader}</th>
+            <th className="py-2.5 px-2 text-center">EQ</th>
+            <th className="py-2.5 px-2 text-center">JJ</th>
+            <th className="py-2.5 px-2 text-center">JI</th>
+            <th className="py-2.5 px-2 text-center font-bold text-slate-100">IP</th>
+            {showTraditional && (
+              <>
+                <th className="py-2.5 px-2 text-center">H</th>
+                <th className="py-2.5 px-2 text-center">C</th>
+                <th className="py-2.5 px-2 text-center">CL</th>
+                <th className="py-2.5 px-2 text-center">BB</th>
+                <th className="py-2.5 px-2 text-center font-bold text-[#FDB827]">SO</th>
+                <th className="py-2.5 px-2 text-center">HR</th>
+              </>
+            )}
+            <th className="py-2.5 px-2.5 text-center font-bold text-[#FDB827]">ERA</th>
+            <th className="py-2.5 px-2 text-center text-sky-400 font-semibold">WHIP</th>
+            <th className="py-2.5 px-2 text-center">K/9</th>
+            <th className="py-2.5 px-2 text-center">BB/9</th>
+            <th className="py-2.5 px-2 text-center">K/BB</th>
+            {showAdvanced && (
+              <>
+                <th className="py-2.5 px-2 text-center text-sky-300 font-semibold">FIP</th>
+                <th className="py-2.5 px-2 text-center">ERA+</th>
+                <th className="py-2.5 px-2 text-center">WHIP+</th>
+                <th className="py-2.5 px-2 text-center">FIP+</th>
+              </>
+            )}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[#1E2B4D]/60 font-mono text-[11px]">
+          {rows.map(({ key, label, badge, isHighlight, stats }) => (
+            <tr
+              key={key}
+              className={`hover:bg-[#131E3D]/50 transition-colors ${
+                isHighlight ? "bg-[#002D62]/20" : ""
+              }`}
+            >
+              <td className="py-2.5 px-3 font-sans font-bold text-slate-100 whitespace-nowrap">
+                <span>{label}</span>
+                {badge && (
+                  <span className="ml-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30">
+                    {badge}
+                  </span>
+                )}
+              </td>
+              <td className="py-2.5 px-2 text-center text-slate-300 font-semibold">
+                {stats.teamAbbr || getTeam(stats.teamId).abbreviation}
+              </td>
+              <td className="py-2.5 px-2 text-center text-slate-300">{stats.games}</td>
+              <td className="py-2.5 px-2 text-center text-slate-300">{stats.gamesStarted}</td>
+              <td className="py-2.5 px-2 text-center font-bold text-slate-100">{stats.inningsDisplay}</td>
+              {showTraditional && (
+                <>
+                  <td className="py-2.5 px-2 text-center text-slate-300">{stats.hits}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-400">{stats.runs}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-400">{stats.earnedRuns}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-400">{stats.walks}</td>
+                  <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{stats.strikeouts}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-400">{stats.homeRuns}</td>
+                </>
+              )}
+              <td className="py-2.5 px-2.5 text-center font-bold text-[#FDB827]">{stats.era.toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center text-sky-400 font-semibold">{stats.whip.toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center text-slate-300">{stats.kPer9.toFixed(1)}</td>
+              <td className="py-2.5 px-2 text-center text-slate-300">{stats.bbPer9.toFixed(1)}</td>
+              <td className="py-2.5 px-2 text-center text-slate-300">{stats.kToBb.toFixed(1)}</td>
+              {showAdvanced && (
+                <>
+                  <td className="py-2.5 px-2 text-center font-semibold text-sky-300">
+                    {typeof stats.fip === "number" && Number.isFinite(stats.fip)
+                      ? stats.fip.toFixed(2)
+                      : "--"}
+                  </td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.eraPlus} /></td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.whipPlus} /></td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.fipPlus} /></td>
+                </>
+              )}
+            </tr>
+          ))}
+
+          {totalRow && (
+            <tr className="bg-[#070B19]/80 font-bold border-t-2 border-[#1E2B4D]">
+              <td className="py-2.5 px-3 font-sans text-[#FDB827] whitespace-nowrap">
+                {totalLabel}
+              </td>
+              <td className="py-2.5 px-2 text-center text-slate-400">LVBP</td>
+              <td className="py-2.5 px-2 text-center text-slate-200">{totalRow.games}</td>
+              <td className="py-2.5 px-2 text-center text-slate-200">{totalRow.gamesStarted}</td>
+              <td className="py-2.5 px-2 text-center text-slate-100">{totalRow.inningsDisplay}</td>
+              {showTraditional && (
+                <>
+                  <td className="py-2.5 px-2 text-center text-slate-200">{totalRow.hits}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.runs}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.earnedRuns}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.walks}</td>
+                  <td className="py-2.5 px-2 text-center text-[#FDB827]">{totalRow.strikeouts}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.homeRuns}</td>
+                </>
+              )}
+              <td className="py-2.5 px-2.5 text-center text-[#FDB827]">{totalRow.era.toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center text-sky-400">{totalRow.whip.toFixed(2)}</td>
+              <td className="py-2.5 px-2 text-center text-slate-200">{totalRow.kPer9.toFixed(1)}</td>
+              <td className="py-2.5 px-2 text-center text-slate-200">{totalRow.bbPer9.toFixed(1)}</td>
+              <td className="py-2.5 px-2 text-center text-slate-200">{totalRow.kToBb.toFixed(1)}</td>
+              {showAdvanced && (
+                <>
+                  <td className="py-2.5 px-2 text-center text-sky-300">
+                    {typeof totalRow.fip === "number" && Number.isFinite(totalRow.fip)
+                      ? totalRow.fip.toFixed(2)
+                      : "--"}
+                  </td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalRow.eraPlus} /></td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalRow.whipPlus} /></td>
+                  <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalRow.fipPlus} /></td>
+                </>
+              )}
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function formatGameDate(dateStr: string): string {
   if (!dateStr) return "-";
   const clean = dateStr.slice(0, 10);
@@ -315,20 +707,26 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
 
   const general = profile.general;
   const isPitcher = profile.type === "pitcher";
-
-  const showTraditional = columnView === "all" || columnView === "traditional";
   const showAdvanced = columnView === "all" || columnView === "advanced";
 
   const battingSeasons = useMemo(
-    () =>
-      [...(general?.seasonsBatting ?? [])].sort((a, b) => b.season - a.season),
+    () => [...(general?.seasonsBatting ?? [])].sort((a, b) => b.season - a.season),
     [general?.seasonsBatting]
   );
 
   const pitchingSeasons = useMemo(
-    () =>
-      [...(general?.seasonsPitching ?? [])].sort((a, b) => b.season - a.season),
+    () => [...(general?.seasonsPitching ?? [])].sort((a, b) => b.season - a.season),
     [general?.seasonsPitching]
+  );
+
+  const postseasonBatting = useMemo(
+    () => general?.postseasonBatting ?? [],
+    [general?.postseasonBatting]
+  );
+
+  const postseasonPitching = useMemo(
+    () => general?.postseasonPitching ?? [],
+    [general?.postseasonPitching]
   );
 
   const totalBatting = useMemo(
@@ -339,6 +737,32 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
   const totalPitching = useMemo(
     () => (pitchingSeasons.length > 1 ? computeTotalPitching(pitchingSeasons) : null),
     [pitchingSeasons]
+  );
+
+  const totalPostseasonBatting = useMemo(
+    () =>
+      postseasonBatting.length > 1
+        ? computeTotalBatting(
+            postseasonBatting.map((entry) => ({
+              season: entry.season,
+              stats: entry.stats,
+            }))
+          )
+        : null,
+    [postseasonBatting]
+  );
+
+  const totalPostseasonPitching = useMemo(
+    () =>
+      postseasonPitching.length > 1
+        ? computeTotalPitching(
+            postseasonPitching.map((entry) => ({
+              season: entry.season,
+              stats: entry.stats,
+            }))
+          )
+        : null,
+    [postseasonPitching]
   );
 
   const visibleBatterLogs: PlayerBatterGameLog[] = useMemo(() => {
@@ -360,17 +784,20 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
   const hasSeasonRows = isPitcher
     ? pitchingSeasons.length > 0
     : battingSeasons.length > 0;
+  const hasPostseasonRows = isPitcher
+    ? postseasonPitching.length > 0
+    : postseasonBatting.length > 0;
   const hasGameLogs = isPitcher
     ? (general.pitcherGameLogs?.length ?? 0) > 0
     : (general.batterGameLogs?.length ?? 0) > 0;
 
-  if (!hasSeasonRows && fieldingRows.length === 0 && !hasGameLogs) {
+  if (!hasSeasonRows && !hasPostseasonRows && fieldingRows.length === 0 && !hasGameLogs) {
     return null;
   }
 
   return (
     <div className="space-y-4">
-      {/* a) Estadísticas Generales por Temporada */}
+      {/* a) Estadísticas Generales por Temporada (Temporada Regular) */}
       {hasSeasonRows && (
         <div className="rounded-xl bg-[#0D152B] border border-[#1E2B4D] overflow-hidden shadow-sm">
           <div className="px-4 py-3 bg-[#070B19]/80 border-b border-[#1E2B4D] flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
@@ -381,350 +808,110 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
                   Estadísticas Generales por Temporada
                 </h3>
                 <p className="text-[11px] text-slate-400">
-                  Historial reciente en la LVBP con métricas tradicionales, avanzadas e índices ajustados
+                  Temporada Regular LVBP • Métricas tradicionales, avanzadas e índices ajustados
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              <div
-                role="group"
-                aria-label="Vista de columnas generales"
-                className="inline-flex items-center gap-1 bg-[#0D152B] p-1 rounded-lg border border-[#1E2B4D]"
-              >
-                {COLUMN_VIEW_OPTIONS.map((option) => {
-                  const active = columnView === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setColumnView(option.id)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
-                        active
-                          ? "bg-[#FDB827] text-[#070B19] font-bold"
-                          : "text-slate-300 hover:text-slate-100 hover:bg-[#131E3D]"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
+              <ColumnViewToggle
+                columnView={columnView}
+                onChange={setColumnView}
+                ariaLabel="Vista de columnas generales"
+              />
+            </div>
+          </div>
+
+          {showAdvanced && <PlusStatsLegend />}
+
+          {!isPitcher ? (
+            <BattingSeasonTable
+              rows={battingSeasons.map(({ season, stats }) => ({
+                key: String(season),
+                label: formatSeason(season),
+                badge: season === profile.season ? "Activa" : undefined,
+                isHighlight: season === profile.season,
+                stats,
+              }))}
+              totalRow={totalBatting}
+              totalLabel={`Total Reg. LVBP (${battingSeasons.length} temp.)`}
+              columnView={columnView}
+              firstColumnHeader="TEMPORADA"
+            />
+          ) : (
+            <PitchingSeasonTable
+              rows={pitchingSeasons.map(({ season, stats }) => ({
+                key: String(season),
+                label: formatSeason(season),
+                badge: season === profile.season ? "Activa" : undefined,
+                isHighlight: season === profile.season,
+                stats,
+              }))}
+              totalRow={totalPitching}
+              totalLabel={`Total Reg. LVBP (${pitchingSeasons.length} temp.)`}
+              columnView={columnView}
+              firstColumnHeader="TEMPORADA"
+            />
+          )}
+        </div>
+      )}
+
+      {/* a2) Postemporada LVBP */}
+      {hasPostseasonRows && (
+        <div className="rounded-xl bg-[#0D152B] border border-[#1E2B4D] overflow-hidden shadow-sm">
+          <div className="px-4 py-3 bg-[#070B19]/80 border-b border-[#1E2B4D] flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-[#FDB827] shrink-0" />
+              <div>
+                <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wider font-mono">
+                  Postemporada LVBP
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Desempeño por fase (Comodín, Round Robin y Serie Final)
+                </p>
               </div>
             </div>
-          </div>
 
-          {/* Leyenda Stats+ */}
-          {showAdvanced && (
-            <div className="px-4 py-2 bg-[#070B19]/40 border-b border-[#1E2B4D]/70 flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
-              <span className="text-slate-300 font-semibold mr-1">
-                100 = Promedio LVBP
-              </span>
-              <span className="px-1.5 py-0.5 rounded border bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold">
-                ≥130 Élite
-              </span>
-              <span className="px-1.5 py-0.5 rounded border bg-[#FDB827]/15 text-[#FDB827] border-[#FDB827]/35 font-semibold">
-                110–129 Sobre prom.
-              </span>
-              <span className="px-1.5 py-0.5 rounded border bg-slate-800/80 text-slate-200 border-slate-700">
-                91–109 Promedio
-              </span>
-              <span className="px-1.5 py-0.5 rounded border bg-rose-500/15 text-rose-300 border-rose-500/30">
-                1–90 Bajo prom.
-              </span>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <ColumnViewToggle
+                columnView={columnView}
+                onChange={setColumnView}
+                ariaLabel="Vista de columnas de postemporada"
+              />
             </div>
-          )}
-
-          <div className="overflow-x-auto">
-            {!isPitcher ? (
-              <table
-                className={`w-full text-left text-xs ${
-                  columnView === "all" ? "min-w-[1140px]" : "min-w-[740px]"
-                }`}
-              >
-                <thead>
-                  <tr className="bg-[#070B19]/50 text-slate-400 font-mono border-b border-[#1E2B4D] text-[10px]">
-                    <th className="py-2.5 px-3 font-semibold">TEMPORADA</th>
-                    <th className="py-2.5 px-2 text-center">EQ</th>
-                    <th className="py-2.5 px-2 text-center">JJ</th>
-                    <th className="py-2.5 px-2 text-center font-semibold text-slate-200">AP</th>
-                    {showTraditional && (
-                      <>
-                        <th className="py-2.5 px-2 text-center">VB</th>
-                        <th className="py-2.5 px-2 text-center">CA</th>
-                        <th className="py-2.5 px-2 text-center font-bold text-slate-200">H</th>
-                        <th className="py-2.5 px-2 text-center">2B</th>
-                        <th className="py-2.5 px-2 text-center">3B</th>
-                        <th className="py-2.5 px-2 text-center font-bold text-[#FDB827]">HR</th>
-                        <th className="py-2.5 px-2 text-center">CI</th>
-                        <th className="py-2.5 px-2 text-center">BB</th>
-                        <th className="py-2.5 px-2 text-center">SO</th>
-                        <th className="py-2.5 px-2 text-center">BR</th>
-                      </>
-                    )}
-                    <th className="py-2.5 px-2 text-center font-semibold text-slate-100">AVG</th>
-                    <th className="py-2.5 px-2 text-center text-sky-400 font-semibold">OBP</th>
-                    <th className="py-2.5 px-2 text-center text-sky-400 font-semibold">SLG</th>
-                    <th className="py-2.5 px-2.5 text-center font-bold text-[#FDB827]">OPS</th>
-                    {showAdvanced && (
-                      <>
-                        <th className="py-2.5 px-2 text-center">ISO</th>
-                        <th className="py-2.5 px-2 text-center">BABIP</th>
-                        <th className="py-2.5 px-2 text-center text-sky-300 font-semibold">wOBA</th>
-                        <th className="py-2.5 px-2 text-center">AVG+</th>
-                        <th className="py-2.5 px-2 text-center">OBP+</th>
-                        <th className="py-2.5 px-2 text-center">SLG+</th>
-                        <th className="py-2.5 px-2 text-center">OPS+</th>
-                        <th className="py-2.5 px-2 text-center">wOBA+</th>
-                        <th className="py-2.5 px-2 text-center">wRC+</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1E2B4D]/60 font-mono text-[11px]">
-                  {battingSeasons.map(({ season, stats }) => {
-                    const pa =
-                      stats.plateAppearances ??
-                      stats.pa ??
-                      stats.atBats + stats.walks + (stats.hbp ?? 0) + (stats.sf ?? 0);
-                    const isCurrent = season === profile.season;
-                    return (
-                      <tr
-                        key={season}
-                        className={`hover:bg-[#131E3D]/50 transition-colors ${
-                          isCurrent ? "bg-[#002D62]/20" : ""
-                        }`}
-                      >
-                        <td className="py-2.5 px-3 font-sans font-bold text-slate-100 whitespace-nowrap">
-                          <span>{formatSeason(season)}</span>
-                          {isCurrent && (
-                            <span className="ml-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30">
-                              Activa
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-2 text-center text-slate-300 font-semibold">
-                          {stats.teamAbbr || getTeam(stats.teamId).abbreviation}
-                        </td>
-                        <td className="py-2.5 px-2 text-center text-slate-300">{stats.games}</td>
-                        <td className="py-2.5 px-2 text-center font-semibold text-slate-100">{pa}</td>
-                        {showTraditional && (
-                          <>
-                            <td className="py-2.5 px-2 text-center text-slate-300">{stats.atBats}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-400">{stats.runs}</td>
-                            <td className="py-2.5 px-2 text-center font-bold text-slate-100">{stats.hits}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-400">{stats.doubles}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-400">{stats.triples}</td>
-                            <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{stats.homeRuns}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-200">{stats.rbi}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-400">{stats.walks}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-400">{stats.strikeouts}</td>
-                            <td className="py-2.5 px-2 text-center text-emerald-400">{stats.stolenBases}</td>
-                          </>
-                        )}
-                        <td className="py-2.5 px-2 text-center font-bold text-slate-100">{formatRate3(stats.avg)}</td>
-                        <td className="py-2.5 px-2 text-center text-sky-400 font-semibold">{formatRate3(stats.obp)}</td>
-                        <td className="py-2.5 px-2 text-center text-sky-400 font-semibold">{formatRate3(stats.slg)}</td>
-                        <td className="py-2.5 px-2.5 text-center font-bold text-[#FDB827]">{formatRate3(stats.ops)}</td>
-                        {showAdvanced && (
-                          <>
-                            <td className="py-2.5 px-2 text-center text-slate-300">{formatRate3(stats.iso)}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-300">{formatRate3(stats.babip)}</td>
-                            <td className="py-2.5 px-2 text-center font-semibold text-sky-300">
-                              {typeof stats.woba === "number" ? formatRate3(stats.woba) : "--"}
-                            </td>
-                            <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.avgPlus} /></td>
-                            <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.obpPlus} /></td>
-                            <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.slgPlus} /></td>
-                            <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.opsPlus} /></td>
-                            <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.wobaPlus} /></td>
-                            <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.wrcPlus} /></td>
-                          </>
-                        )}
-                      </tr>
-                    );
-                  })}
-
-                  {totalBatting && (
-                    <tr className="bg-[#070B19]/80 font-bold border-t-2 border-[#1E2B4D]">
-                      <td className="py-2.5 px-3 font-sans text-[#FDB827] whitespace-nowrap">
-                        Total LVBP ({battingSeasons.length} temp.)
-                      </td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">LVBP</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{totalBatting.games}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-100">{totalBatting.plateAppearances}</td>
-                      {showTraditional && (
-                        <>
-                          <td className="py-2.5 px-2 text-center text-slate-200">{totalBatting.atBats}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-300">{totalBatting.runs}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-100">{totalBatting.hits}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-300">{totalBatting.doubles}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-300">{totalBatting.triples}</td>
-                          <td className="py-2.5 px-2 text-center text-[#FDB827]">{totalBatting.homeRuns}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-200">{totalBatting.rbi}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-300">{totalBatting.walks}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-300">{totalBatting.strikeouts}</td>
-                          <td className="py-2.5 px-2 text-center text-emerald-400">{totalBatting.stolenBases}</td>
-                        </>
-                      )}
-                      <td className="py-2.5 px-2 text-center text-slate-100">{formatRate3(totalBatting.avg)}</td>
-                      <td className="py-2.5 px-2 text-center text-sky-400">{formatRate3(totalBatting.obp)}</td>
-                      <td className="py-2.5 px-2 text-center text-sky-400">{formatRate3(totalBatting.slg)}</td>
-                      <td className="py-2.5 px-2.5 text-center text-[#FDB827]">{formatRate3(totalBatting.ops)}</td>
-                      {showAdvanced && (
-                        <>
-                          <td className="py-2.5 px-2 text-center text-slate-200">{formatRate3(totalBatting.iso)}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-200">{formatRate3(totalBatting.babip)}</td>
-                          <td className="py-2.5 px-2 text-center text-sky-300">
-                            {typeof totalBatting.woba === "number" ? formatRate3(totalBatting.woba) : "--"}
-                          </td>
-                          <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalBatting.avgPlus} /></td>
-                          <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalBatting.obpPlus} /></td>
-                          <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalBatting.slgPlus} /></td>
-                          <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalBatting.opsPlus} /></td>
-                          <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalBatting.wobaPlus} /></td>
-                          <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalBatting.wrcPlus} /></td>
-                        </>
-                      )}
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            ) : (
-              <table
-                className={`w-full text-left text-xs ${
-                  columnView === "all" ? "min-w-[1040px]" : "min-w-[720px]"
-                }`}
-              >
-                <thead>
-                  <tr className="bg-[#070B19]/50 text-slate-400 font-mono border-b border-[#1E2B4D] text-[10px]">
-                    <th className="py-2.5 px-3 font-semibold">TEMPORADA</th>
-                    <th className="py-2.5 px-2 text-center">EQ</th>
-                    <th className="py-2.5 px-2 text-center">JJ</th>
-                    <th className="py-2.5 px-2 text-center">JI</th>
-                    <th className="py-2.5 px-2 text-center font-bold text-slate-100">IP</th>
-                    {showTraditional && (
-                      <>
-                        <th className="py-2.5 px-2 text-center">H</th>
-                        <th className="py-2.5 px-2 text-center">C</th>
-                        <th className="py-2.5 px-2 text-center">CL</th>
-                        <th className="py-2.5 px-2 text-center">BB</th>
-                        <th className="py-2.5 px-2 text-center font-bold text-[#FDB827]">SO</th>
-                        <th className="py-2.5 px-2 text-center">HR</th>
-                      </>
-                    )}
-                    <th className="py-2.5 px-2.5 text-center font-bold text-[#FDB827]">ERA</th>
-                    <th className="py-2.5 px-2 text-center text-sky-400 font-semibold">WHIP</th>
-                    <th className="py-2.5 px-2 text-center">K/9</th>
-                    <th className="py-2.5 px-2 text-center">BB/9</th>
-                    <th className="py-2.5 px-2 text-center">K/BB</th>
-                    {showAdvanced && (
-                      <>
-                        <th className="py-2.5 px-2 text-center text-sky-300 font-semibold">FIP</th>
-                        <th className="py-2.5 px-2 text-center">ERA+</th>
-                        <th className="py-2.5 px-2 text-center">WHIP+</th>
-                        <th className="py-2.5 px-2 text-center">FIP+</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1E2B4D]/60 font-mono text-[11px]">
-                  {pitchingSeasons.map(({ season, stats }) => {
-                    const isCurrent = season === profile.season;
-                    return (
-                      <tr
-                        key={season}
-                        className={`hover:bg-[#131E3D]/50 transition-colors ${
-                          isCurrent ? "bg-[#002D62]/20" : ""
-                        }`}
-                      >
-                        <td className="py-2.5 px-3 font-sans font-bold text-slate-100 whitespace-nowrap">
-                          <span>{formatSeason(season)}</span>
-                          {isCurrent && (
-                            <span className="ml-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30">
-                              Activa
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-2 text-center text-slate-300 font-semibold">
-                          {stats.teamAbbr || getTeam(stats.teamId).abbreviation}
-                        </td>
-                        <td className="py-2.5 px-2 text-center text-slate-300">{stats.games}</td>
-                        <td className="py-2.5 px-2 text-center text-slate-300">{stats.gamesStarted}</td>
-                        <td className="py-2.5 px-2 text-center font-bold text-slate-100">{stats.inningsDisplay}</td>
-                        {showTraditional && (
-                          <>
-                            <td className="py-2.5 px-2 text-center text-slate-300">{stats.hits}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-400">{stats.runs}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-400">{stats.earnedRuns}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-400">{stats.walks}</td>
-                            <td className="py-2.5 px-2 text-center font-bold text-[#FDB827]">{stats.strikeouts}</td>
-                            <td className="py-2.5 px-2 text-center text-slate-400">{stats.homeRuns}</td>
-                          </>
-                        )}
-                        <td className="py-2.5 px-2.5 text-center font-bold text-[#FDB827]">{stats.era.toFixed(2)}</td>
-                        <td className="py-2.5 px-2 text-center text-sky-400 font-semibold">{stats.whip.toFixed(2)}</td>
-                        <td className="py-2.5 px-2 text-center text-slate-300">{stats.kPer9.toFixed(1)}</td>
-                        <td className="py-2.5 px-2 text-center text-slate-300">{stats.bbPer9.toFixed(1)}</td>
-                        <td className="py-2.5 px-2 text-center text-slate-300">{stats.kToBb.toFixed(1)}</td>
-                        {showAdvanced && (
-                          <>
-                            <td className="py-2.5 px-2 text-center font-semibold text-sky-300">
-                              {typeof stats.fip === "number" && Number.isFinite(stats.fip)
-                                ? stats.fip.toFixed(2)
-                                : "--"}
-                            </td>
-                            <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.eraPlus} /></td>
-                            <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.whipPlus} /></td>
-                            <td className="py-2.5 px-2 text-center"><PlusStatBadge value={stats.fipPlus} /></td>
-                          </>
-                        )}
-                      </tr>
-                    );
-                  })}
-
-                  {totalPitching && (
-                    <tr className="bg-[#070B19]/80 font-bold border-t-2 border-[#1E2B4D]">
-                      <td className="py-2.5 px-3 font-sans text-[#FDB827] whitespace-nowrap">
-                        Total LVBP ({pitchingSeasons.length} temp.)
-                      </td>
-                      <td className="py-2.5 px-2 text-center text-slate-400">LVBP</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{totalPitching.games}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{totalPitching.gamesStarted}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-100">{totalPitching.inningsDisplay}</td>
-                      {showTraditional && (
-                        <>
-                          <td className="py-2.5 px-2 text-center text-slate-200">{totalPitching.hits}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-300">{totalPitching.runs}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-300">{totalPitching.earnedRuns}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-300">{totalPitching.walks}</td>
-                          <td className="py-2.5 px-2 text-center text-[#FDB827]">{totalPitching.strikeouts}</td>
-                          <td className="py-2.5 px-2 text-center text-slate-300">{totalPitching.homeRuns}</td>
-                        </>
-                      )}
-                      <td className="py-2.5 px-2.5 text-center text-[#FDB827]">{totalPitching.era.toFixed(2)}</td>
-                      <td className="py-2.5 px-2 text-center text-sky-400">{totalPitching.whip.toFixed(2)}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{totalPitching.kPer9.toFixed(1)}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{totalPitching.bbPer9.toFixed(1)}</td>
-                      <td className="py-2.5 px-2 text-center text-slate-200">{totalPitching.kToBb.toFixed(1)}</td>
-                      {showAdvanced && (
-                        <>
-                          <td className="py-2.5 px-2 text-center text-sky-300">
-                            {typeof totalPitching.fip === "number" && Number.isFinite(totalPitching.fip)
-                              ? totalPitching.fip.toFixed(2)
-                              : "--"}
-                          </td>
-                          <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalPitching.eraPlus} /></td>
-                          <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalPitching.whipPlus} /></td>
-                          <td className="py-2.5 px-2 text-center"><PlusStatBadge value={totalPitching.fipPlus} /></td>
-                        </>
-                      )}
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
           </div>
+
+          {!hasSeasonRows && showAdvanced && <PlusStatsLegend />}
+
+          {!isPitcher ? (
+            <BattingSeasonTable
+              rows={postseasonBatting.map((entry) => ({
+                key: `${entry.season}-${entry.phase}`,
+                label: formatSeason(entry.season),
+                badge: entry.phaseLabel,
+                isHighlight: entry.season === profile.season,
+                stats: entry.stats,
+              }))}
+              totalRow={totalPostseasonBatting}
+              totalLabel="Total Postemporada"
+              columnView={columnView}
+              firstColumnHeader="TEMP. / FASE"
+            />
+          ) : (
+            <PitchingSeasonTable
+              rows={postseasonPitching.map((entry) => ({
+                key: `${entry.season}-${entry.phase}`,
+                label: formatSeason(entry.season),
+                badge: entry.phaseLabel,
+                isHighlight: entry.season === profile.season,
+                stats: entry.stats,
+              }))}
+              totalRow={totalPostseasonPitching}
+              totalLabel="Total Postemporada"
+              columnView={columnView}
+              firstColumnHeader="TEMP. / FASE"
+            />
+          )}
         </div>
       )}
 

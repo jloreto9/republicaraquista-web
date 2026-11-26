@@ -1036,36 +1036,97 @@ export async function getPlayerGeneralProfile(
 ): Promise<PlayerGeneralProfile> {
   void fallbackTeamId;
   const targetSeasons = [2026, 2025];
+  const postseasonPhases: Array<{ code: "D" | "L" | "F"; label: string }> = [
+    { code: "D", label: "Comodín" },
+    { code: "L", label: "Round Robin" },
+    { code: "F", label: "Serie Final" },
+  ];
+  const phaseOrder: Record<"D" | "L" | "F", number> = { F: 0, L: 1, D: 2 };
 
-  const [batResults, pitResults, fieldResult] = await Promise.all([
-    Promise.allSettled(
-      targetSeasons.map(async (s) => ({
-        season: s,
-        rows: await getBattingStats(s, "all", "all", 1000, 0),
-      }))
-    ),
-    Promise.allSettled(
-      targetSeasons.map(async (s) => ({
-        season: s,
-        rows: await getPitchingStats(s, "all", "all", 1000, 0),
-      }))
-    ),
-    getFieldingStats(season, "all", "all", 1000, 0).catch((): FieldingStats[] => []),
-  ]);
+  const [batResults, pitResults, postBatResults, postPitResults, fieldResult] =
+    await Promise.all([
+      Promise.allSettled(
+        targetSeasons.map(async (s) => ({
+          season: s,
+          rows: await getBattingStats(s, "R", "all", 1000, 0),
+        }))
+      ),
+      Promise.allSettled(
+        targetSeasons.map(async (s) => ({
+          season: s,
+          rows: await getPitchingStats(s, "R", "all", 1000, 0),
+        }))
+      ),
+      Promise.allSettled(
+        targetSeasons.flatMap((s) =>
+          postseasonPhases.map(async (ph) => ({
+            season: s,
+            phase: ph.code,
+            phaseLabel: ph.label,
+            rows: await getBattingStats(s, ph.code, "all", 1000, 0),
+          }))
+        )
+      ),
+      Promise.allSettled(
+        targetSeasons.flatMap((s) =>
+          postseasonPhases.map(async (ph) => ({
+            season: s,
+            phase: ph.code,
+            phaseLabel: ph.label,
+            rows: await getPitchingStats(s, ph.code, "all", 1000, 0),
+          }))
+        )
+      ),
+      getFieldingStats(season, "all", "all", 1000, 0).catch((): FieldingStats[] => []),
+    ]);
 
   const seasonsBatting: Array<{ season: number; stats: BattingStats }> = [];
   for (const res of batResults) {
     if (res.status !== "fulfilled") continue;
-    const found = res.value.rows.find((r) => r.playerId === playerId);
+    const found = res.value.rows.find((r) => r.playerId === playerId && r.games > 0);
     if (found) seasonsBatting.push({ season: res.value.season, stats: found });
   }
 
   const seasonsPitching: Array<{ season: number; stats: PitchingStats }> = [];
   for (const res of pitResults) {
     if (res.status !== "fulfilled") continue;
-    const found = res.value.rows.find((r) => r.playerId === playerId);
+    const found = res.value.rows.find((r) => r.playerId === playerId && r.games > 0);
     if (found) seasonsPitching.push({ season: res.value.season, stats: found });
   }
+
+  const postseasonBatting: NonNullable<PlayerGeneralProfile["postseasonBatting"]> = [];
+  for (const res of postBatResults) {
+    if (res.status !== "fulfilled") continue;
+    const found = res.value.rows.find((r) => r.playerId === playerId && r.games > 0);
+    if (found) {
+      postseasonBatting.push({
+        season: res.value.season,
+        phase: res.value.phase,
+        phaseLabel: res.value.phaseLabel,
+        stats: found,
+      });
+    }
+  }
+  postseasonBatting.sort(
+    (a, b) => b.season - a.season || phaseOrder[a.phase] - phaseOrder[b.phase]
+  );
+
+  const postseasonPitching: NonNullable<PlayerGeneralProfile["postseasonPitching"]> = [];
+  for (const res of postPitResults) {
+    if (res.status !== "fulfilled") continue;
+    const found = res.value.rows.find((r) => r.playerId === playerId && r.games > 0);
+    if (found) {
+      postseasonPitching.push({
+        season: res.value.season,
+        phase: res.value.phase,
+        phaseLabel: res.value.phaseLabel,
+        stats: found,
+      });
+    }
+  }
+  postseasonPitching.sort(
+    (a, b) => b.season - a.season || phaseOrder[a.phase] - phaseOrder[b.phase]
+  );
 
   const fielding = Array.isArray(fieldResult)
     ? fieldResult.filter((f) => f.playerId === playerId)
@@ -1074,6 +1135,8 @@ export async function getPlayerGeneralProfile(
   return {
     seasonsBatting,
     seasonsPitching,
+    postseasonBatting,
+    postseasonPitching,
     fielding,
     batterGameLogs:
       type === "batter" ? buildBatterGameLogs(validRows as RawGameBattingRow[]) : [],

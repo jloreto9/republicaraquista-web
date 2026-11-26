@@ -161,6 +161,18 @@ export interface PlayerPitcherGameLog {
 export interface PlayerGeneralProfile {
   seasonsBatting: Array<{ season: number; stats: BattingStats }>;
   seasonsPitching: Array<{ season: number; stats: PitchingStats }>;
+  postseasonBatting?: Array<{
+    season: number;
+    phase: "D" | "L" | "F";
+    phaseLabel: string;
+    stats: BattingStats;
+  }>;
+  postseasonPitching?: Array<{
+    season: number;
+    phase: "D" | "L" | "F";
+    phaseLabel: string;
+    stats: PitchingStats;
+  }>;
   fielding: FieldingStats[];
   batterGameLogs: PlayerBatterGameLog[];
   pitcherGameLogs: PlayerPitcherGameLog[];
