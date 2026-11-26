@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import Image from "next/image";
 import {
   GitCompare,
@@ -8,11 +8,23 @@ import {
   Swords,
   Trophy,
   Info,
+  ImageDown,
+  Flame,
+  Target,
+  Loader2,
 } from "lucide-react";
 import { BattingStats, PitchingStats } from "@/types/sports";
-import { LVBP_TEAMS } from "@/lib/constants";
-import { compareBatters, comparePitchers, shortenName } from "@/lib/matchup-engine";
+import { LVBP_TEAMS, formatSeason } from "@/lib/constants";
+import {
+  compareBatters,
+  comparePitchers,
+  shortenName,
+  buildBatterMatchupCardData,
+  buildPitcherMatchupCardData,
+} from "@/lib/matchup-engine";
+import { useSeason } from "@/context/season-context";
 import { RadarChart } from "./radar-chart";
+import { MatchupCardModal } from "./matchup-card-modal";
 import { cn } from "@/lib/utils";
 
 interface MatchupViewProps {
@@ -21,66 +33,228 @@ interface MatchupViewProps {
   season?: number;
 }
 
-const PHASES = [
-  { value: "R", label: "Temporada Regular" },
-  { value: "L", label: "Round Robin (Todos contra Todos)" },
-  { value: "F", label: "Serie Final" },
-  { value: "all", label: "Todas las Fases" },
+const SEASONS = [
+  { value: 2026, label: "2026-27" },
+  { value: 2025, label: "2025-26" },
 ];
+
+const PHASES = [
+  { value: "R", label: "Temporada Regular", cardLabel: "Temp. Regular" },
+  { value: "D", label: "Comodín", cardLabel: "Comodín" },
+  {
+    value: "L",
+    label: "Round Robin (Todos contra Todos)",
+    cardLabel: "Round Robin",
+  },
+  { value: "F", label: "Serie Final", cardLabel: "Serie Final" },
+  { value: "all", label: "Todas las Fases", cardLabel: "Todas las Fases" },
+];
+
+type PoolData = BattingStats[] | PitchingStats[];
+
+function getPhaseLabel(phaseCode: string): string {
+  return (
+    PHASES.find((p) => p.value === phaseCode)?.label || "Temporada Regular"
+  );
+}
+
+function getCardPhaseLabel(phaseCode: string): string {
+  return PHASES.find((p) => p.value === phaseCode)?.cardLabel || "Temp. Regular";
+}
 
 export function MatchupView({
   initialBatters,
   initialPitchers,
   season = 2026,
 }: MatchupViewProps) {
-  const [compareType, setCompareType] = useState<"Bateadores" | "Lanzadores">("Bateadores");
-  const [team1, setTeam1] = useState<string>("695"); // Leones por defecto
-  const [phase1, setPhase1] = useState<string>("R");
-  const [team2, setTeam2] = useState<string>("all"); // Toda la liga
-  const [phase2, setPhase2] = useState<string>("R");
+  const { season: globalSeason } = useSeason();
+  const initialSeason = globalSeason || season;
 
-  const [selectedPlayer1Id, setSelectedPlayer1Id] = useState<number | null>(null);
-  const [selectedPlayer2Id, setSelectedPlayer2Id] = useState<number | null>(null);
+  const [compareType, setCompareType] = useState<"Bateadores" | "Lanzadores">(
+    "Bateadores"
+  );
+  const [season1, setSeason1] = useState<number>(initialSeason);
+  const [phase1, setPhase1] = useState<string>("R");
+  const [team1, setTeam1] = useState<string>("695"); // Leones por defecto
+
+  const [season2, setSeason2] = useState<number>(initialSeason);
+  const [phase2, setPhase2] = useState<string>("R");
+  const [team2, setTeam2] = useState<string>("all"); // Toda la liga
+
+  const [prevGlobalSeason, setPrevGlobalSeason] = useState<number>(globalSeason);
+
+  const [selectedPlayer1Id, setSelectedPlayer1Id] = useState<number | null>(
+    null
+  );
+  const [selectedPlayer2Id, setSelectedPlayer2Id] = useState<number | null>(
+    null
+  );
   const [activeTab, setActiveTab] = useState<"radar" | "table">("radar");
+  const [isCardModalOpen, setIsCardModalOpen] = useState<boolean>(false);
+
+  // Sincronización con selector global de temporada durante render (patrón React 19)
+  if (globalSeason !== prevGlobalSeason) {
+    setPrevGlobalSeason(globalSeason);
+    setSeason1(globalSeason);
+    setSeason2(globalSeason);
+    setSelectedPlayer1Id(null);
+    setSelectedPlayer2Id(null);
+  }
+
+  // Caché cliente en useRef precargada con los pools iniciales
+  const cacheRef = useRef<Map<string, PoolData>>(
+    new Map<string, PoolData>([
+      [`Bateadores-${season}-R`, initialBatters],
+      [`Lanzadores-${season}-R`, initialPitchers],
+    ])
+  );
+
+  // Estado reactivo espejo de los pools resueltos (evita leer refs en render)
+  const [poolsByKey, setPoolsByKey] = useState<Record<string, PoolData>>(() => ({
+    [`Bateadores-${season}-R`]: initialBatters,
+    [`Lanzadores-${season}-R`]: initialPitchers,
+  }));
+  const [fetchErrors, setFetchErrors] = useState<Record<string, string>>({});
+
+  const key1 = `${compareType}-${season1}-${phase1}`;
+  const key2 = `${compareType}-${season2}-${phase2}`;
+
+  // Fetch bajo demanda con AbortController para cualquier clave faltante en caché
+  useEffect(() => {
+    const requestedKeys = Array.from(new Set([key1, key2]));
+    const keysToFetch: { key: string; s: number; ph: string }[] = [];
+    const hydratedFromCache: Record<string, PoolData> = {};
+
+    for (const k of requestedKeys) {
+      const cached = cacheRef.current.get(k);
+      if (cached) {
+        if (!(k in poolsByKey)) {
+          hydratedFromCache[k] = cached;
+        }
+        continue;
+      }
+      const [, sStr, ph] = k.split("-");
+      keysToFetch.push({ key: k, s: Number(sStr), ph });
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    if (Object.keys(hydratedFromCache).length > 0) {
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setPoolsByKey((prev) => ({ ...prev, ...hydratedFromCache }));
+        }
+      });
+    }
+
+    if (keysToFetch.length === 0) {
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    }
+
+    const endpoint =
+      compareType === "Bateadores"
+        ? "/api/stats/batting"
+        : "/api/stats/pitching";
+
+    for (const item of keysToFetch) {
+      fetch(
+        `${endpoint}?season=${item.s}&phase=${encodeURIComponent(
+          item.ph
+        )}&team_id=all&limit=500`,
+        { signal: controller.signal }
+      )
+        .then(async (res) => {
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+          return res.json();
+        })
+        .then((json) => {
+          if (cancelled) return;
+          const rows: PoolData = Array.isArray(json?.data) ? json.data : [];
+          cacheRef.current.set(item.key, rows);
+          setPoolsByKey((prev) => ({ ...prev, [item.key]: rows }));
+          setFetchErrors((prev) => {
+            if (!(item.key in prev)) return prev;
+            const next = { ...prev };
+            delete next[item.key];
+            return next;
+          });
+        })
+        .catch((err) => {
+          if (
+            cancelled ||
+            (err instanceof Error && err.name === "AbortError")
+          ) {
+            return;
+          }
+          console.error(`Error cargando estadísticas (${item.key}):`, err);
+          setPoolsByKey((prev) => ({ ...prev, [item.key]: [] }));
+          setFetchErrors((prev) => ({
+            ...prev,
+            [item.key]: "No se pudieron cargar las estadísticas de esta fase.",
+          }));
+        });
+    }
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [key1, key2, compareType, poolsByKey]);
+
+  const isLoading1 = !(key1 in poolsByKey);
+  const isLoading2 = !(key2 in poolsByKey);
+  const error1 = fetchErrors[key1] ?? null;
+  const error2 = fetchErrors[key2] ?? null;
+
+  const pool1 = useMemo<PoolData>(() => poolsByKey[key1] ?? [], [poolsByKey, key1]);
+  const pool2 = useMemo<PoolData>(() => poolsByKey[key2] ?? [], [poolsByKey, key2]);
 
   // Filtrado de jugadores disponibles para Jugador 1
   const availablePlayers1 = useMemo(() => {
     if (compareType === "Bateadores") {
-      let pool = initialBatters;
+      let filtered = [...(pool1 as BattingStats[])];
       if (team1 !== "all") {
-        pool = pool.filter((p) => String(p.teamId) === team1);
+        filtered = filtered.filter((p) => String(p.teamId) === team1);
       }
-      return pool.sort((a, b) => b.atBats - a.atBats);
+      return filtered.sort((a, b) => b.atBats - a.atBats);
     } else {
-      let pool = initialPitchers;
+      let filtered = [...(pool1 as PitchingStats[])];
       if (team1 !== "all") {
-        pool = pool.filter((p) => String(p.teamId) === team1);
+        filtered = filtered.filter((p) => String(p.teamId) === team1);
       }
-      return pool.sort((a, b) => b.inningsPitched - a.inningsPitched);
+      return filtered.sort((a, b) => b.inningsPitched - a.inningsPitched);
     }
-  }, [compareType, team1, initialBatters, initialPitchers]);
+  }, [compareType, team1, pool1]);
 
   // Filtrado de jugadores disponibles para Jugador 2
   const availablePlayers2 = useMemo(() => {
     if (compareType === "Bateadores") {
-      let pool = initialBatters;
+      let filtered = [...(pool2 as BattingStats[])];
       if (team2 !== "all") {
-        pool = pool.filter((p) => String(p.teamId) === team2);
+        filtered = filtered.filter((p) => String(p.teamId) === team2);
       }
-      return pool.sort((a, b) => b.atBats - a.atBats);
+      return filtered.sort((a, b) => b.atBats - a.atBats);
     } else {
-      let pool = initialPitchers;
+      let filtered = [...(pool2 as PitchingStats[])];
       if (team2 !== "all") {
-        pool = pool.filter((p) => String(p.teamId) === team2);
+        filtered = filtered.filter((p) => String(p.teamId) === team2);
       }
-      return pool.sort((a, b) => b.inningsPitched - a.inningsPitched);
+      return filtered.sort((a, b) => b.inningsPitched - a.inningsPitched);
     }
-  }, [compareType, team2, initialBatters, initialPitchers]);
+  }, [compareType, team2, pool2]);
 
   // Jugadores activos seleccionados con fallbacks
   const p1 = useMemo(() => {
     if (selectedPlayer1Id) {
-      const found = availablePlayers1.find((p) => p.playerId === selectedPlayer1Id);
+      const found = availablePlayers1.find(
+        (p) => p.playerId === selectedPlayer1Id
+      );
       if (found) return found;
     }
     return availablePlayers1[0] || null;
@@ -88,29 +262,36 @@ export function MatchupView({
 
   const p2 = useMemo(() => {
     if (selectedPlayer2Id) {
-      const found = availablePlayers2.find((p) => p.playerId === selectedPlayer2Id);
+      const found = availablePlayers2.find(
+        (p) => p.playerId === selectedPlayer2Id
+      );
       if (found) return found;
     }
-    // Si p1 es el primero y es la misma lista, elegir el segundo
-    if (availablePlayers2.length > 1 && p1 && availablePlayers2[0]?.playerId === p1?.playerId) {
+    // Si p1 es el primero y comparan exactamente el mismo pool, elegir el segundo
+    if (
+      availablePlayers2.length > 1 &&
+      p1 &&
+      key1 === key2 &&
+      availablePlayers2[0]?.playerId === p1?.playerId
+    ) {
       return availablePlayers2[1];
     }
     return availablePlayers2[0] || null;
-  }, [availablePlayers2, selectedPlayer2Id, p1]);
+  }, [availablePlayers2, selectedPlayer2Id, p1, key1, key2]);
 
-  // Comparación matemática
+  // Comparación matemática usando los pools reales de cada jugador
   const comparison = useMemo(() => {
     if (!p1 || !p2) return null;
 
-    const phase1Label = PHASES.find((p) => p.value === phase1)?.label || "Temporada Regular";
-    const phase2Label = PHASES.find((p) => p.value === phase2)?.label || "Temporada Regular";
+    const phase1Label = getPhaseLabel(phase1);
+    const phase2Label = getPhaseLabel(phase2);
 
     if (compareType === "Bateadores") {
       return compareBatters(
         p1 as BattingStats,
         p2 as BattingStats,
-        initialBatters,
-        initialBatters,
+        pool1 as BattingStats[],
+        pool2 as BattingStats[],
         phase1Label,
         phase2Label
       );
@@ -118,13 +299,47 @@ export function MatchupView({
       return comparePitchers(
         p1 as PitchingStats,
         p2 as PitchingStats,
-        initialPitchers,
-        initialPitchers,
+        pool1 as PitchingStats[],
+        pool2 as PitchingStats[],
         phase1Label,
         phase2Label
       );
     }
-  }, [p1, p2, compareType, phase1, phase2, initialBatters, initialPitchers]);
+  }, [p1, p2, compareType, phase1, phase2, pool1, pool2]);
+
+  // Datos estructurados para la Tarjeta PNG Editorial
+  const cardData = useMemo(() => {
+    if (!p1 || !p2) return null;
+
+    const meta1 = {
+      seasonLabel: formatSeason(season1),
+      phaseLabel: getCardPhaseLabel(phase1),
+    };
+    const meta2 = {
+      seasonLabel: formatSeason(season2),
+      phaseLabel: getCardPhaseLabel(phase2),
+    };
+
+    if (compareType === "Bateadores") {
+      return buildBatterMatchupCardData(
+        p1 as BattingStats,
+        p2 as BattingStats,
+        meta1,
+        meta2
+      );
+    }
+    return buildPitcherMatchupCardData(
+      p1 as PitchingStats,
+      p2 as PitchingStats,
+      meta1,
+      meta2
+    );
+  }, [p1, p2, compareType, season1, phase1, season2, phase2]);
+
+  const headerSeasonLabel =
+    season1 === season2
+      ? formatSeason(season1)
+      : `${formatSeason(season1)} vs ${formatSeason(season2)}`;
 
   return (
     <div className="space-y-6">
@@ -137,48 +352,69 @@ export function MatchupView({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-100 flex items-center space-x-2">
-                <span>Matchup 360 Head-to-Head</span>
+                <span>Matchup 360 Cara a Cara</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FDB827]/10 text-[#FDB827] border border-[#FDB827]/20 uppercase font-mono">
-                  {season}
+                  {headerSeasonLabel}
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Comparador multidimensional cara a cara con radar polar y veredicto de rendimiento.
+                Comparador multidimensional cara a cara con radar polar, estadísticas de liga y veredicto de rendimiento.
               </p>
             </div>
           </div>
 
-          {/* Toggle Bateadores / Lanzadores */}
-          <div className="flex items-center space-x-2 self-start md:self-auto bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D]">
+          {/* Toggle Bateadores / Lanzadores + Botón Tarjeta PNG */}
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            <div className="flex items-center space-x-1 bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D]">
+              <button
+                type="button"
+                onClick={() => {
+                  setCompareType("Bateadores");
+                  setSelectedPlayer1Id(null);
+                  setSelectedPlayer2Id(null);
+                }}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  compareType === "Bateadores"
+                    ? "bg-[#FDB827] text-slate-950 shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                <Flame className="w-3.5 h-3.5" />
+                <span>Bateadores</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCompareType("Lanzadores");
+                  setSelectedPlayer1Id(null);
+                  setSelectedPlayer2Id(null);
+                }}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  compareType === "Lanzadores"
+                    ? "bg-[#FDB827] text-slate-950 shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                <Target className="w-3.5 h-3.5" />
+                <span>Lanzadores</span>
+              </button>
+            </div>
+
             <button
-              onClick={() => {
-                setCompareType("Bateadores");
-                setSelectedPlayer1Id(null);
-                setSelectedPlayer2Id(null);
-              }}
+              type="button"
+              disabled={!cardData}
+              onClick={() => setIsCardModalOpen(true)}
               className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-bold transition-all",
-                compareType === "Bateadores"
-                  ? "bg-[#FDB827] text-slate-950 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
+                "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold border transition-all shadow-sm",
+                cardData
+                  ? "bg-[#002D62] border-[#FDB827]/50 text-[#FDB827] hover:bg-[#003A7D] hover:border-[#FDB827] cursor-pointer"
+                  : "bg-slate-800/60 border-slate-700 text-slate-500 cursor-not-allowed"
               )}
             >
-              🏏 Bateadores
-            </button>
-            <button
-              onClick={() => {
-                setCompareType("Lanzadores");
-                setSelectedPlayer1Id(null);
-                setSelectedPlayer2Id(null);
-              }}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-bold transition-all",
-                compareType === "Lanzadores"
-                  ? "bg-[#FDB827] text-slate-950 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
-              )}
-            >
-              ⚡ Lanzadores
+              <ImageDown className="w-4 h-4" />
+              <span>Tarjeta PNG</span>
             </button>
           </div>
         </div>
@@ -187,28 +423,53 @@ export function MatchupView({
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] items-center gap-4">
           {/* Jugador 1 Controls */}
           <div className="bg-[#070B19]/80 border border-[#FDB827]/30 rounded-lg p-3 space-y-2.5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center space-x-2">
                 <span className="w-5 h-5 rounded-full bg-[#FDB827] text-slate-950 font-bold text-xs flex items-center justify-center">
                   1
                 </span>
-                <span className="text-xs font-bold text-[#FDB827]">Jugador 1</span>
+                <span className="text-xs font-bold text-[#FDB827]">
+                  Jugador 1
+                </span>
+                {isLoading1 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                    <Loader2 className="w-3 h-3 animate-spin text-[#FDB827]" />
+                    Cargando...
+                  </span>
+                )}
               </div>
-              <select
-                value={phase1}
-                onChange={(e) => setPhase1(e.target.value)}
-                className="bg-[#0D152B] border border-[#1E2B4D] text-[11px] text-slate-300 rounded px-2 py-1 outline-none focus:border-[#FDB827]"
-              >
-                {PHASES.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+
+              <div className="flex items-center gap-1.5">
+                <select
+                  aria-label="Temporada del Jugador 1"
+                  value={season1}
+                  onChange={(e) => setSeason1(Number(e.target.value))}
+                  className="bg-[#0D152B] border border-[#1E2B4D] text-[11px] font-mono text-slate-200 rounded px-2 py-1 outline-none focus:border-[#FDB827]"
+                >
+                  {SEASONS.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Fase del Jugador 1"
+                  value={phase1}
+                  onChange={(e) => setPhase1(e.target.value)}
+                  className="bg-[#0D152B] border border-[#1E2B4D] text-[11px] text-slate-300 rounded px-2 py-1 outline-none focus:border-[#FDB827]"
+                >
+                  {PHASES.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <select
+                aria-label="Equipo del Jugador 1"
                 value={team1}
                 onChange={(e) => {
                   setTeam1(e.target.value);
@@ -225,17 +486,26 @@ export function MatchupView({
               </select>
 
               <select
+                aria-label="Seleccionar Jugador 1"
                 value={p1?.playerId || ""}
+                disabled={isLoading1 || availablePlayers1.length === 0}
                 onChange={(e) => setSelectedPlayer1Id(Number(e.target.value))}
-                className="bg-[#0D152B] border border-[#1E2B4D] text-xs text-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#FDB827]"
+                className="bg-[#0D152B] border border-[#1E2B4D] text-xs text-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#FDB827] disabled:opacity-60"
               >
-                {availablePlayers1.map((p) => (
-                  <option key={p.playerId} value={p.playerId}>
-                    {p.playerName} ({p.teamAbbr})
-                  </option>
-                ))}
+                {isLoading1 ? (
+                  <option value="">Cargando jugadores...</option>
+                ) : availablePlayers1.length === 0 ? (
+                  <option value="">Sin jugadores disponibles</option>
+                ) : (
+                  availablePlayers1.map((p) => (
+                    <option key={p.playerId} value={p.playerId}>
+                      {p.playerName} ({p.teamAbbr})
+                    </option>
+                  ))
+                )}
               </select>
             </div>
+            {error1 && <p className="text-[11px] text-rose-400">{error1}</p>}
           </div>
 
           {/* VS Divider */}
@@ -247,28 +517,53 @@ export function MatchupView({
 
           {/* Jugador 2 Controls */}
           <div className="bg-[#070B19]/80 border border-[#38BDF8]/30 rounded-lg p-3 space-y-2.5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center space-x-2">
                 <span className="w-5 h-5 rounded-full bg-[#38BDF8] text-slate-950 font-bold text-xs flex items-center justify-center">
                   2
                 </span>
-                <span className="text-xs font-bold text-[#38BDF8]">Jugador 2</span>
+                <span className="text-xs font-bold text-[#38BDF8]">
+                  Jugador 2
+                </span>
+                {isLoading2 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                    <Loader2 className="w-3 h-3 animate-spin text-[#38BDF8]" />
+                    Cargando...
+                  </span>
+                )}
               </div>
-              <select
-                value={phase2}
-                onChange={(e) => setPhase2(e.target.value)}
-                className="bg-[#0D152B] border border-[#1E2B4D] text-[11px] text-slate-300 rounded px-2 py-1 outline-none focus:border-[#38BDF8]"
-              >
-                {PHASES.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+
+              <div className="flex items-center gap-1.5">
+                <select
+                  aria-label="Temporada del Jugador 2"
+                  value={season2}
+                  onChange={(e) => setSeason2(Number(e.target.value))}
+                  className="bg-[#0D152B] border border-[#1E2B4D] text-[11px] font-mono text-slate-200 rounded px-2 py-1 outline-none focus:border-[#38BDF8]"
+                >
+                  {SEASONS.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Fase del Jugador 2"
+                  value={phase2}
+                  onChange={(e) => setPhase2(e.target.value)}
+                  className="bg-[#0D152B] border border-[#1E2B4D] text-[11px] text-slate-300 rounded px-2 py-1 outline-none focus:border-[#38BDF8]"
+                >
+                  {PHASES.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <select
+                aria-label="Equipo del Jugador 2"
                 value={team2}
                 onChange={(e) => {
                   setTeam2(e.target.value);
@@ -285,17 +580,26 @@ export function MatchupView({
               </select>
 
               <select
+                aria-label="Seleccionar Jugador 2"
                 value={p2?.playerId || ""}
+                disabled={isLoading2 || availablePlayers2.length === 0}
                 onChange={(e) => setSelectedPlayer2Id(Number(e.target.value))}
-                className="bg-[#0D152B] border border-[#1E2B4D] text-xs text-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#38BDF8]"
+                className="bg-[#0D152B] border border-[#1E2B4D] text-xs text-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#38BDF8] disabled:opacity-60"
               >
-                {availablePlayers2.map((p) => (
-                  <option key={p.playerId} value={p.playerId}>
-                    {p.playerName} ({p.teamAbbr})
-                  </option>
-                ))}
+                {isLoading2 ? (
+                  <option value="">Cargando jugadores...</option>
+                ) : availablePlayers2.length === 0 ? (
+                  <option value="">Sin jugadores disponibles</option>
+                ) : (
+                  availablePlayers2.map((p) => (
+                    <option key={p.playerId} value={p.playerId}>
+                      {p.playerName} ({p.teamAbbr})
+                    </option>
+                  ))
+                )}
               </select>
             </div>
+            {error2 && <p className="text-[11px] text-rose-400">{error2}</p>}
           </div>
         </div>
       </div>
@@ -329,7 +633,8 @@ export function MatchupView({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 truncate">
-                  {comparison.player1.team} • {comparison.player1.pos}
+                  {comparison.player1.team} • {comparison.player1.pos} •{" "}
+                  {formatSeason(season1)} ({getCardPhaseLabel(phase1)})
                 </p>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mt-2">
                   {comparison.player1.mainStats.map((st) => (
@@ -337,8 +642,12 @@ export function MatchupView({
                       key={st.label}
                       className="bg-[#070B19] rounded p-1 text-center border border-white/5"
                     >
-                      <div className="text-[9px] text-slate-400 font-mono">{st.label}</div>
-                      <div className="text-xs font-bold text-[#FDB827]">{st.value}</div>
+                      <div className="text-[9px] text-slate-400 font-mono">
+                        {st.label}
+                      </div>
+                      <div className="text-xs font-bold text-[#FDB827]">
+                        {st.value}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -370,7 +679,8 @@ export function MatchupView({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 truncate">
-                  {comparison.player2.team} • {comparison.player2.pos}
+                  {comparison.player2.team} • {comparison.player2.pos} •{" "}
+                  {formatSeason(season2)} ({getCardPhaseLabel(phase2)})
                 </p>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mt-2">
                   {comparison.player2.mainStats.map((st) => (
@@ -378,8 +688,12 @@ export function MatchupView({
                       key={st.label}
                       className="bg-[#070B19] rounded p-1 text-center border border-white/5"
                     >
-                      <div className="text-[9px] text-slate-400 font-mono">{st.label}</div>
-                      <div className="text-xs font-bold text-[#38BDF8]">{st.value}</div>
+                      <div className="text-[9px] text-slate-400 font-mono">
+                        {st.label}
+                      </div>
+                      <div className="text-xs font-bold text-[#38BDF8]">
+                        {st.value}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -400,9 +714,10 @@ export function MatchupView({
                 </div>
                 <div className="flex items-center space-x-1 bg-[#070B19] p-1 rounded-lg border border-[#1E2B4D]">
                   <button
+                    type="button"
                     onClick={() => setActiveTab("radar")}
                     className={cn(
-                      "px-2.5 py-1 rounded text-xs font-semibold transition-all",
+                      "px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer",
                       activeTab === "radar"
                         ? "bg-[#FDB827] text-slate-950"
                         : "text-slate-400 hover:text-slate-200"
@@ -411,9 +726,10 @@ export function MatchupView({
                     Radar Polar
                   </button>
                   <button
+                    type="button"
                     onClick={() => setActiveTab("table")}
                     className={cn(
-                      "px-2.5 py-1 rounded text-xs font-semibold transition-all",
+                      "px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer",
                       activeTab === "table"
                         ? "bg-[#FDB827] text-slate-950"
                         : "text-slate-400 hover:text-slate-200"
@@ -427,8 +743,12 @@ export function MatchupView({
               {activeTab === "radar" ? (
                 <RadarChart
                   axes={comparison.radarAxes}
-                  p1Name={`${shortenName(comparison.player1.name)} (${comparison.player1.teamAbbr})`}
-                  p2Name={`${shortenName(comparison.player2.name)} (${comparison.player2.teamAbbr})`}
+                  p1Name={`${shortenName(comparison.player1.name)} (${
+                    comparison.player1.teamAbbr
+                  })`}
+                  p2Name={`${shortenName(comparison.player2.name)} (${
+                    comparison.player2.teamAbbr
+                  })`}
                 />
               ) : (
                 <div className="overflow-x-auto">
@@ -448,15 +768,21 @@ export function MatchupView({
                     <tbody className="divide-y divide-white/5">
                       {comparison.radarAxes.map((ax) => (
                         <tr key={ax.key} className="hover:bg-white/[0.02]">
-                          <td className="py-2.5 px-3 font-medium text-slate-200">{ax.name}</td>
+                          <td className="py-2.5 px-3 font-medium text-slate-200">
+                            {ax.name}
+                          </td>
                           <td className="py-2.5 px-3 font-mono">
-                            <span className="text-slate-100 font-bold">{ax.val1}</span>
+                            <span className="text-slate-100 font-bold">
+                              {ax.val1}
+                            </span>
                             <span className="ml-1 text-[10px] text-[#FDB827] font-semibold">
                               (P{ax.pct1})
                             </span>
                           </td>
                           <td className="py-2.5 px-3 font-mono">
-                            <span className="text-slate-100 font-bold">{ax.val2}</span>
+                            <span className="text-slate-100 font-bold">
+                              {ax.val2}
+                            </span>
                             <span className="ml-1 text-[10px] text-[#38BDF8] font-semibold">
                               (P{ax.pct2})
                             </span>
@@ -522,7 +848,10 @@ export function MatchupView({
                     {comparison.h2hRows.map((r, idx) => {
                       if (r.isHeader) {
                         return (
-                          <tr key={`header-${idx}`} className="bg-[#070B19]/80">
+                          <tr
+                            key={`header-${idx}`}
+                            className="bg-[#070B19]/80"
+                          >
                             <td
                               colSpan={4}
                               className="py-1.5 px-3 font-bold text-[10px] uppercase tracking-wider text-[#FDB827]"
@@ -583,9 +912,14 @@ export function MatchupView({
                   {comparison.verdict}
                 </p>
                 <div className="text-[11px] text-slate-400 pt-1 flex items-center space-x-3">
-                  <span>Balance: {comparison.p1Wins} vs {comparison.p2Wins} ({comparison.ties} empates)</span>
+                  <span>
+                    Balance: {comparison.p1Wins} vs {comparison.p2Wins} (
+                    {comparison.ties} empates)
+                  </span>
                   <span>•</span>
-                  <span>Metodología: Tango RE24 & Percentiles Relativos LVBP</span>
+                  <span>
+                    Metodología: Tango RE24 &amp; Percentiles Relativos LVBP
+                  </span>
                 </div>
               </div>
             </div>
@@ -600,10 +934,21 @@ export function MatchupView({
           <span>Metodología del Radar 360°</span>
         </div>
         <p>
-          Los percentiles de cada eje (P0 a P100) se calculan en base a la distribución de todos los jugadores calificados en la LVBP.
-          Para métricas inversas donde menos es mejor (como ERA, WHIP y BB/9), los valores menores obtienen un percentil más alto, garantizando que un área mayor en el radar refleje un rendimiento superior de manera intuitiva y consistente.
+          Los percentiles de cada eje (P0 a P100) se calculan en base a la
+          distribución de todos los jugadores calificados en la LVBP. Para
+          métricas inversas donde menos es mejor (como ERA, WHIP y BB/9), los
+          valores menores obtienen un percentil más alto, garantizando que un
+          área mayor en el radar refleje un rendimiento superior de manera
+          intuitiva y consistente.
         </p>
       </div>
+
+      {/* Modal de Tarjeta PNG Editorial */}
+      <MatchupCardModal
+        isOpen={isCardModalOpen}
+        onClose={() => setIsCardModalOpen(false)}
+        data={cardData}
+      />
     </div>
   );
 }

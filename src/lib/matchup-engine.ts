@@ -4,6 +4,11 @@ import {
   H2HRow,
   PlayerProfileCardData,
   MatchupComparisonData,
+  MatchupCardData,
+  MatchupCardPlayerMeta,
+  MatchupCardRow,
+  MatchupCardSection,
+  MatchupCardWinner,
 } from "@/types/matchup";
 
 export function shortenName(name: string): string {
@@ -30,7 +35,7 @@ function calculatePercentile(
 
 // Cálculo aproximado de wOBA si no viene explícito
 export function computeWoba(b: BattingStats): number {
-  // Coeficientes sabermétricos de wOBA estándar LVBP
+  // Coeficientes lineales estándar LVBP
   const pa = b.atBats + b.walks;
   if (pa === 0) return 0;
   const singles = Math.max(0, b.hits - b.doubles - b.triples - b.homeRuns);
@@ -66,16 +71,16 @@ export function compareBatters(
   phase1Label = "Temporada Regular",
   phase2Label = "Temporada Regular"
 ): MatchupComparisonData {
-  const p1Woba = computeWoba(p1);
-  const p2Woba = computeWoba(p2);
-  const p1Wrc = computeWrcPlus(p1Woba);
-  const p2Wrc = computeWrcPlus(p2Woba);
+  const p1Woba = p1.woba ?? computeWoba(p1);
+  const p2Woba = p2.woba ?? computeWoba(p2);
+  const p1Wrc = p1.wrcPlus ?? computeWrcPlus(p1Woba);
+  const p2Wrc = p2.wrcPlus ?? computeWrcPlus(p2Woba);
 
   // Pool de valores
-  const pool1Woba = pool1.map(computeWoba);
-  const pool2Woba = pool2.map(computeWoba);
-  const pool1Wrc = pool1Woba.map((w) => computeWrcPlus(w));
-  const pool2Wrc = pool2Woba.map((w) => computeWrcPlus(w));
+  const pool1Woba = pool1.map((b) => b.woba ?? computeWoba(b));
+  const pool2Woba = pool2.map((b) => b.woba ?? computeWoba(b));
+  const pool1Wrc = pool1.map((b, idx) => b.wrcPlus ?? computeWrcPlus(pool1Woba[idx]));
+  const pool2Wrc = pool2.map((b, idx) => b.wrcPlus ?? computeWrcPlus(pool2Woba[idx]));
 
   const axesConfig: {
     name: string;
@@ -126,9 +131,9 @@ export function compareBatters(
       name: "wOBA",
       key: "woba",
       higherBetter: true,
-      getVal: (b) => (b.playerId === p1.playerId ? p1Woba : p2Woba),
+      getVal: (b) => (b === p1 ? p1Woba : p2Woba),
       formatVal: (b) =>
-        (b.playerId === p1.playerId ? p1Woba : p2Woba).toFixed(3).replace(/^0/, ""),
+        (b === p1 ? p1Woba : p2Woba).toFixed(3).replace(/^0/, ""),
       pool1Vals: pool1Woba,
       pool2Vals: pool2Woba,
     },
@@ -136,8 +141,8 @@ export function compareBatters(
       name: "wRC+",
       key: "wrc_plus",
       higherBetter: true,
-      getVal: (b) => (b.playerId === p1.playerId ? p1Wrc : p2Wrc),
-      formatVal: (b) => `${b.playerId === p1.playerId ? p1Wrc : p2Wrc}`,
+      getVal: (b) => (b === p1 ? p1Wrc : p2Wrc),
+      formatVal: (b) => `${b === p1 ? p1Wrc : p2Wrc}`,
       pool1Vals: pool1Wrc,
       pool2Vals: pool2Wrc,
     },
@@ -200,7 +205,7 @@ export function compareBatters(
     isP1Win: boolean;
     isP2Win: boolean;
   }[] = [
-    // ⚡ Sabermetría
+    // Métricas de Impacto
     {
       category: "⚡ Métricas de Impacto",
       metric: "OPS (On-base Plus Slugging)",
@@ -458,10 +463,10 @@ export function comparePitchers(
   phase1Label = "Temporada Regular",
   phase2Label = "Temporada Regular"
 ): MatchupComparisonData {
-  const p1Fip = computeFip(p1);
-  const p2Fip = computeFip(p2);
-  const pool1Fip = pool1.map((p) => computeFip(p));
-  const pool2Fip = pool2.map((p) => computeFip(p));
+  const p1Fip = p1.fip ?? computeFip(p1);
+  const p2Fip = p2.fip ?? computeFip(p2);
+  const pool1Fip = pool1.map((p) => p.fip ?? computeFip(p));
+  const pool2Fip = pool2.map((p) => p.fip ?? computeFip(p));
 
   const axesConfig: {
     name: string;
@@ -494,8 +499,8 @@ export function comparePitchers(
       name: "FIP Independiente",
       key: "fip",
       higherBetter: false,
-      getVal: (p) => (p.playerId === p1.playerId ? p1Fip : p2Fip),
-      formatVal: (p) => (p.playerId === p1.playerId ? p1Fip : p2Fip).toFixed(2),
+      getVal: (p) => (p === p1 ? p1Fip : p2Fip),
+      formatVal: (p) => (p === p1 ? p1Fip : p2Fip).toFixed(2),
       pool1Vals: pool1Fip,
       pool2Vals: pool2Fip,
     },
@@ -815,5 +820,297 @@ export function comparePitchers(
     p1Wins,
     p2Wins,
     ties,
+  };
+}
+
+const CARD_FOOTER_NOTE = "100 = Promedio LVBP";
+
+function toFiniteNumber(val: number | undefined | null, fallback = 0): number {
+  return typeof val === "number" && Number.isFinite(val) ? val : fallback;
+}
+
+function formatRate(val: number): string {
+  const safe = toFiniteNumber(val, 0);
+  return safe.toFixed(3).replace(/^0/, "");
+}
+
+function formatDecimal2(val: number): string {
+  return toFiniteNumber(val, 0).toFixed(2);
+}
+
+function formatPct1(val: number): string {
+  return `${toFiniteNumber(val, 0).toFixed(1)}%`;
+}
+
+function compareCardValues(v1: number, v2: number, higherBetter: boolean): MatchupCardWinner {
+  const n1 = toFiniteNumber(v1, 0);
+  const n2 = toFiniteNumber(v2, 0);
+  if (Math.abs(n1 - n2) < 1e-9) return "tie";
+  if (higherBetter) return n1 > n2 ? "p1" : "p2";
+  return n1 < n2 ? "p1" : "p2";
+}
+
+function buildRow(
+  key: string,
+  label: string,
+  val1: string,
+  val2: string,
+  winner: MatchupCardWinner
+): MatchupCardRow {
+  return { key, label, val1, val2, winner };
+}
+
+function buildNumericRow(
+  key: string,
+  label: string,
+  n1: number,
+  n2: number,
+  higherBetter: boolean,
+  format: (n: number) => string = (n) => `${Math.round(toFiniteNumber(n, 0))}`
+): MatchupCardRow {
+  const safe1 = toFiniteNumber(n1, 0);
+  const safe2 = toFiniteNumber(n2, 0);
+  return buildRow(key, label, format(safe1), format(safe2), compareCardValues(safe1, safe2, higherBetter));
+}
+
+function normalizePlusIndex(v: number | undefined): number {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : 0;
+}
+
+function buildPlusRow(key: string, label: string, raw1: number | undefined, raw2: number | undefined): MatchupCardRow {
+  const v1 = normalizePlusIndex(raw1);
+  const v2 = normalizePlusIndex(raw2);
+  const val1 = v1 > 0 ? `${v1}` : "--";
+  const val2 = v2 > 0 ? `${v2}` : "--";
+  const winner: MatchupCardWinner = v1 > 0 && v2 > 0 ? compareCardValues(v1, v2, true) : "tie";
+  return buildRow(key, label, val1, val2, winner);
+}
+
+/** Compara récords G-P por porcentaje de victorias, desempatando por más victorias y menos derrotas. */
+export function compareWinLoss(w1: number, l1: number, w2: number, l2: number): MatchupCardWinner {
+  const safeW1 = Math.max(0, toFiniteNumber(w1, 0));
+  const safeL1 = Math.max(0, toFiniteNumber(l1, 0));
+  const safeW2 = Math.max(0, toFiniteNumber(w2, 0));
+  const safeL2 = Math.max(0, toFiniteNumber(l2, 0));
+  const tot1 = safeW1 + safeL1;
+  const tot2 = safeW2 + safeL2;
+  const pct1 = tot1 > 0 ? safeW1 / tot1 : 0;
+  const pct2 = tot2 > 0 ? safeW2 / tot2 : 0;
+
+  if (Math.abs(pct1 - pct2) > 1e-9) {
+    return pct1 > pct2 ? "p1" : "p2";
+  }
+  if (safeW1 !== safeW2) {
+    return safeW1 > safeW2 ? "p1" : "p2";
+  }
+  if (safeL1 !== safeL2) {
+    return safeL1 < safeL2 ? "p1" : "p2";
+  }
+  return "tie";
+}
+
+function buildPlayerMeta(
+  p: BattingStats | PitchingStats,
+  meta: { seasonLabel: string; phaseLabel: string }
+): MatchupCardPlayerMeta {
+  return {
+    playerId: p.playerId,
+    name: p.playerName,
+    teamName: p.teamName,
+    teamAbbr: p.teamAbbr,
+    teamLogo: p.teamLogo ?? "",
+    headshot: p.playerAvatar ?? "",
+    seasonLabel: meta.seasonLabel,
+    phaseLabel: meta.phaseLabel,
+  };
+}
+
+function summarizeCardSections(sections: MatchupCardSection[]): {
+  p1Wins: number;
+  p2Wins: number;
+  ties: number;
+} {
+  let p1Wins = 0;
+  let p2Wins = 0;
+  let ties = 0;
+  for (const section of sections) {
+    for (const row of section.rows) {
+      if (row.winner === "p1") p1Wins += 1;
+      else if (row.winner === "p2") p2Wins += 1;
+      else ties += 1;
+    }
+  }
+  return { p1Wins, p2Wins, ties };
+}
+
+function resolvePlateAppearances(b: BattingStats): number {
+  const explicit = b.plateAppearances ?? b.pa;
+  if (typeof explicit === "number" && Number.isFinite(explicit)) {
+    return Math.max(0, explicit);
+  }
+  return Math.max(
+    0,
+    toFiniteNumber(b.atBats) +
+      toFiniteNumber(b.walks) +
+      toFiniteNumber(b.hbp) +
+      toFiniteNumber(b.sf) +
+      toFiniteNumber(b.sh)
+  );
+}
+
+/** Construye los datos estructurados de la Tarjeta PNG Editorial para bateadores (18 métricas). */
+export function buildBatterMatchupCardData(
+  p1: BattingStats,
+  p2: BattingStats,
+  meta1: { seasonLabel: string; phaseLabel: string },
+  meta2: { seasonLabel: string; phaseLabel: string }
+): MatchupCardData {
+  const pa1 = resolvePlateAppearances(p1);
+  const pa2 = resolvePlateAppearances(p2);
+
+  const woba1 = p1.woba ?? computeWoba(p1);
+  const woba2 = p2.woba ?? computeWoba(p2);
+  const wrcPlus1 = Math.round(p1.wrcPlus ?? computeWrcPlus(woba1));
+  const wrcPlus2 = Math.round(p2.wrcPlus ?? computeWrcPlus(woba2));
+
+  const bbPct1 = pa1 > 0 ? (toFiniteNumber(p1.walks) / pa1) * 100 : 0;
+  const bbPct2 = pa2 > 0 ? (toFiniteNumber(p2.walks) / pa2) * 100 : 0;
+  const kPct1 = pa1 > 0 ? (toFiniteNumber(p1.strikeouts) / pa1) * 100 : 0;
+  const kPct2 = pa2 > 0 ? (toFiniteNumber(p2.strikeouts) / pa2) * 100 : 0;
+
+  const sections: MatchupCardSection[] = [
+    {
+      title: "Estadísticas Generales",
+      rows: [
+        buildNumericRow("games", "JJ", p1.games, p2.games, true),
+        buildNumericRow("pa", "AP", pa1, pa2, true),
+        buildNumericRow("hits", "H", p1.hits, p2.hits, true),
+        buildNumericRow("doubles", "2B", p1.doubles, p2.doubles, true),
+        buildNumericRow("homeRuns", "HR", p1.homeRuns, p2.homeRuns, true),
+        buildNumericRow("rbi", "CI", p1.rbi, p2.rbi, true),
+        buildNumericRow("runs", "CA", p1.runs, p2.runs, true),
+        buildNumericRow("stolenBases", "BR", p1.stolenBases, p2.stolenBases, true),
+        buildNumericRow("avg", "AVG", p1.avg, p2.avg, true, formatRate),
+        buildNumericRow("obp", "OBP", p1.obp, p2.obp, true, formatRate),
+        buildNumericRow("slg", "SLG", p1.slg, p2.slg, true, formatRate),
+        buildNumericRow("ops", "OPS", p1.ops, p2.ops, true, formatRate),
+      ],
+    },
+    {
+      title: "Métricas Avanzadas e Índices (+)",
+      rows: [
+        buildNumericRow("wrcPlus", "wRC+", wrcPlus1, wrcPlus2, true),
+        buildPlusRow("opsPlus", "OPS+", p1.opsPlus, p2.opsPlus),
+        buildNumericRow("woba", "wOBA", woba1, woba2, true, formatRate),
+        buildNumericRow("iso", "ISO", p1.iso, p2.iso, true, formatRate),
+        buildNumericRow("bbPct", "BB%", bbPct1, bbPct2, true, formatPct1),
+        buildNumericRow("kPct", "K%", kPct1, kPct2, false, formatPct1),
+      ],
+    },
+  ];
+
+  const { p1Wins, p2Wins, ties } = summarizeCardSections(sections);
+
+  return {
+    compareType: "Bateadores",
+    player1: buildPlayerMeta(p1, meta1),
+    player2: buildPlayerMeta(p2, meta2),
+    sections,
+    p1Wins,
+    p2Wins,
+    ties,
+    footerNote: CARD_FOOTER_NOTE,
+  };
+}
+
+/** Construye los datos estructurados de la Tarjeta PNG Editorial para lanzadores (17 métricas). */
+export function buildPitcherMatchupCardData(
+  p1: PitchingStats,
+  p2: PitchingStats,
+  meta1: { seasonLabel: string; phaseLabel: string },
+  meta2: { seasonLabel: string; phaseLabel: string }
+): MatchupCardData {
+  const bf1 = Math.max(
+    0,
+    Math.round(
+      toFiniteNumber(p1.inningsPitched) * 3 +
+        toFiniteNumber(p1.hits) +
+        toFiniteNumber(p1.walks) +
+        toFiniteNumber(p1.hbp)
+    )
+  );
+  const bf2 = Math.max(
+    0,
+    Math.round(
+      toFiniteNumber(p2.inningsPitched) * 3 +
+        toFiniteNumber(p2.hits) +
+        toFiniteNumber(p2.walks) +
+        toFiniteNumber(p2.hbp)
+    )
+  );
+
+  const fip1 = p1.fip ?? computeFip(p1);
+  const fip2 = p2.fip ?? computeFip(p2);
+
+  const kPct1 = bf1 > 0 ? (toFiniteNumber(p1.strikeouts) / bf1) * 100 : 0;
+  const kPct2 = bf2 > 0 ? (toFiniteNumber(p2.strikeouts) / bf2) * 100 : 0;
+  const bbPct1 = bf1 > 0 ? (toFiniteNumber(p1.walks) / bf1) * 100 : 0;
+  const bbPct2 = bf2 > 0 ? (toFiniteNumber(p2.walks) / bf2) * 100 : 0;
+
+  const w1 = p1.wins || 0;
+  const l1 = p1.losses || 0;
+  const w2 = p2.wins || 0;
+  const l2 = p2.losses || 0;
+
+  const ipStr1 = p1.inningsDisplay || toFiniteNumber(p1.inningsPitched).toFixed(1);
+  const ipStr2 = p2.inningsDisplay || toFiniteNumber(p2.inningsPitched).toFixed(1);
+
+  const sections: MatchupCardSection[] = [
+    {
+      title: "Estadísticas Generales",
+      rows: [
+        buildNumericRow("games", "JJ", p1.games, p2.games, true),
+        buildNumericRow("gamesStarted", "JI", p1.gamesStarted, p2.gamesStarted, true),
+        buildRow(
+          "ip",
+          "IP",
+          ipStr1,
+          ipStr2,
+          compareCardValues(p1.inningsPitched, p2.inningsPitched, true)
+        ),
+        buildRow("winLoss", "G-P", `${w1}-${l1}`, `${w2}-${l2}`, compareWinLoss(w1, l1, w2, l2)),
+        buildNumericRow("saves", "SV", p1.saves || 0, p2.saves || 0, true),
+        buildNumericRow("era", "ERA", p1.era, p2.era, false, formatDecimal2),
+        buildNumericRow("whip", "WHIP", p1.whip, p2.whip, false, formatDecimal2),
+        buildNumericRow("strikeouts", "SO", p1.strikeouts, p2.strikeouts, true),
+        buildNumericRow("walks", "BB", p1.walks, p2.walks, false),
+        buildNumericRow("homeRuns", "HR", p1.homeRuns, p2.homeRuns, false),
+      ],
+    },
+    {
+      title: "Dominio y Avanzadas",
+      rows: [
+        buildPlusRow("eraPlus", "ERA+", p1.eraPlus, p2.eraPlus),
+        buildNumericRow("fip", "FIP", fip1, fip2, false, formatDecimal2),
+        buildPlusRow("fipPlus", "FIP+", p1.fipPlus, p2.fipPlus),
+        buildPlusRow("whipPlus", "WHIP+", p1.whipPlus, p2.whipPlus),
+        buildNumericRow("kPer9", "K/9", p1.kPer9, p2.kPer9, true, formatDecimal2),
+        buildNumericRow("kPct", "K%", kPct1, kPct2, true, formatPct1),
+        buildNumericRow("bbPct", "BB%", bbPct1, bbPct2, false, formatPct1),
+      ],
+    },
+  ];
+
+  const { p1Wins, p2Wins, ties } = summarizeCardSections(sections);
+
+  return {
+    compareType: "Lanzadores",
+    player1: buildPlayerMeta(p1, meta1),
+    player2: buildPlayerMeta(p2, meta2),
+    sections,
+    p1Wins,
+    p2Wins,
+    ties,
+    footerNote: CARD_FOOTER_NOTE,
   };
 }

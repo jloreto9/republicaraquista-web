@@ -46,3 +46,40 @@ export interface MatchupComparisonData {
   p2Wins: number;
   ties: number;
 }
+
+export type MatchupCardWinner = "p1" | "p2" | "tie";
+
+export interface MatchupCardRow {
+  key: string;
+  label: string;
+  val1: string;
+  val2: string;
+  winner: MatchupCardWinner;
+}
+
+export interface MatchupCardSection {
+  title: string;
+  rows: MatchupCardRow[];
+}
+
+export interface MatchupCardPlayerMeta {
+  playerId: number;
+  name: string;
+  teamName: string;
+  teamAbbr: string;
+  teamLogo: string;
+  headshot: string;
+  seasonLabel: string;
+  phaseLabel: string;
+}
+
+export interface MatchupCardData {
+  compareType: CompareType;
+  player1: MatchupCardPlayerMeta;
+  player2: MatchupCardPlayerMeta;
+  sections: MatchupCardSection[];
+  p1Wins: number;
+  p2Wins: number;
+  ties: number;
+  footerNote: string;
+}
