@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { GameCenterPlayerMatchup } from "@/types/game-center";
+import { getMlbFallbackHeadshotUrl } from "@/lib/constants";
 import { Crosshair } from "lucide-react";
 
 interface CurrentMatchupCardProps {
@@ -41,7 +42,17 @@ export function CurrentMatchupCard({
                 alt={batter.name}
                 fill
                 sizes="56px"
+                unoptimized
                 className="object-cover"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  const mlbFallback = getMlbFallbackHeadshotUrl(batter.id);
+                  if (target.src !== mlbFallback && !target.src.includes("mlbstatic.com")) {
+                    target.src = mlbFallback;
+                  } else if (!target.src.endsWith("/assets/logo.png")) {
+                    target.src = "/assets/logo.png";
+                  }
+                }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold">
@@ -89,7 +100,17 @@ export function CurrentMatchupCard({
                 alt={pitcher.name}
                 fill
                 sizes="56px"
+                unoptimized
                 className="object-cover"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  const mlbFallback = getMlbFallbackHeadshotUrl(pitcher.id);
+                  if (target.src !== mlbFallback && !target.src.includes("mlbstatic.com")) {
+                    target.src = mlbFallback;
+                  } else if (!target.src.endsWith("/assets/logo.png")) {
+                    target.src = "/assets/logo.png";
+                  }
+                }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold">

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { BullpenBudgetData, RelieverBudgetItem, RelieverDayUsage } from "@/types/bullpen";
 import { cn } from "@/lib/utils";
-import { getPlayerHeadshotUrl } from "@/lib/constants";
+import { getMlbFallbackHeadshotUrl, getPlayerHeadshotUrl } from "@/lib/constants";
 
 interface BullpenBudgetTabProps {
   budgetData?: BullpenBudgetData;
@@ -485,8 +485,13 @@ export function BullpenBudgetTab({
                             className="object-cover w-full h-full"
                             loading="lazy"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).src =
-                                "https://cdn.tujonron.net/public_photos/no_picture.png";
+                              const target = e.currentTarget;
+                              const mlbFallback = getMlbFallbackHeadshotUrl(r.pitcherId);
+                              if (target.src !== mlbFallback && !target.src.includes("mlbstatic.com")) {
+                                target.src = mlbFallback;
+                              } else if (!target.src.endsWith("/assets/logo.png")) {
+                                target.src = "/assets/logo.png";
+                              }
                             }}
                           />
                         </div>

@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Search, Filter, FileText, Download, UserCheck } from "lucide-react";
 import { RosterPlayer, PlayerPositionCategory, PlayerOrigin } from "@/data/roster-data";
 import { cn } from "@/lib/utils";
-import { getPlayerHeadshotUrl } from "@/lib/constants";
+import { getMlbFallbackHeadshotUrl, getPlayerHeadshotUrl } from "@/lib/constants";
 
 interface WeeklyRosterTabProps {
   players: RosterPlayer[];
@@ -153,7 +153,7 @@ export function WeeklyRosterTab({ players, onOpenPdf }: WeeklyRosterTabProps) {
                       src={
                         player.mlbId
                           ? getPlayerHeadshotUrl(player.mlbId)
-                          : "https://cdn.tujonron.net/public_photos/no_picture.png"
+                          : "/assets/logo.png"
                       }
                       alt={player.name}
                       width={32}
@@ -161,8 +161,17 @@ export function WeeklyRosterTab({ players, onOpenPdf }: WeeklyRosterTabProps) {
                       className="object-cover w-full h-full"
                       loading="lazy"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          "https://cdn.tujonron.net/public_photos/no_picture.png";
+                        const target = e.currentTarget;
+                        if (player.mlbId) {
+                          const mlbFallback = getMlbFallbackHeadshotUrl(player.mlbId);
+                          if (target.src !== mlbFallback && !target.src.includes("mlbstatic.com")) {
+                            target.src = mlbFallback;
+                            return;
+                          }
+                        }
+                        if (!target.src.endsWith("/assets/logo.png")) {
+                          target.src = "/assets/logo.png";
+                        }
                       }}
                     />
                   </div>
@@ -253,7 +262,7 @@ export function WeeklyRosterTab({ players, onOpenPdf }: WeeklyRosterTabProps) {
                   src={
                     player.mlbId
                       ? getPlayerHeadshotUrl(player.mlbId)
-                      : "https://cdn.tujonron.net/public_photos/no_picture.png"
+                      : "/assets/logo.png"
                   }
                   alt={player.name}
                   width={40}
@@ -261,8 +270,17 @@ export function WeeklyRosterTab({ players, onOpenPdf }: WeeklyRosterTabProps) {
                   className="object-cover w-full h-full"
                   loading="lazy"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      "https://cdn.tujonron.net/public_photos/no_picture.png";
+                    const target = e.currentTarget;
+                    if (player.mlbId) {
+                      const mlbFallback = getMlbFallbackHeadshotUrl(player.mlbId);
+                      if (target.src !== mlbFallback && !target.src.includes("mlbstatic.com")) {
+                        target.src = mlbFallback;
+                        return;
+                      }
+                    }
+                    if (!target.src.endsWith("/assets/logo.png")) {
+                      target.src = "/assets/logo.png";
+                    }
                   }}
                 />
               </div>

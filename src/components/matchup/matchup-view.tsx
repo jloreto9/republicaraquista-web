@@ -14,7 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { BattingStats, PitchingStats } from "@/types/sports";
-import { LVBP_TEAMS, formatSeason } from "@/lib/constants";
+import { LVBP_TEAMS, formatSeason, getMlbFallbackHeadshotUrl } from "@/lib/constants";
 import {
   compareBatters,
   comparePitchers,
@@ -616,10 +616,18 @@ export function MatchupView({
                   alt={comparison.player1.name}
                   width={64}
                   height={64}
+                  unoptimized
                   className="object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      comparison.player1.teamLogo || "/assets/logo.png";
+                    const target = e.currentTarget;
+                    const mlbFallback = getMlbFallbackHeadshotUrl(comparison.player1.playerId);
+                    if (target.src !== mlbFallback && !target.src.includes("mlbstatic.com")) {
+                      target.src = mlbFallback;
+                    } else if (comparison.player1.teamLogo && target.src !== comparison.player1.teamLogo) {
+                      target.src = comparison.player1.teamLogo;
+                    } else if (!target.src.endsWith("/assets/logo.png")) {
+                      target.src = "/assets/logo.png";
+                    }
                   }}
                 />
               </div>
@@ -662,10 +670,18 @@ export function MatchupView({
                   alt={comparison.player2.name}
                   width={64}
                   height={64}
+                  unoptimized
                   className="object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      comparison.player2.teamLogo || "/assets/logo.png";
+                    const target = e.currentTarget;
+                    const mlbFallback = getMlbFallbackHeadshotUrl(comparison.player2.playerId);
+                    if (target.src !== mlbFallback && !target.src.includes("mlbstatic.com")) {
+                      target.src = mlbFallback;
+                    } else if (comparison.player2.teamLogo && target.src !== comparison.player2.teamLogo) {
+                      target.src = comparison.player2.teamLogo;
+                    } else if (!target.src.endsWith("/assets/logo.png")) {
+                      target.src = "/assets/logo.png";
+                    }
                   }}
                 />
               </div>
