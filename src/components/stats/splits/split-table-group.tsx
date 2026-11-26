@@ -23,8 +23,8 @@ export function SplitTableGroup({
   pitcherRows = [],
   isPitcher = false,
 }: SplitTableGroupProps) {
-  const [batterSortField, setBatterSortField] = useState<keyof PlayerSplitRow>("opsNum");
-  const [pitcherSortField, setPitcherSortField] = useState<keyof PitcherSplitRow>("eraNum");
+  const [batterSortField, setBatterSortField] = useState<keyof PlayerSplitRow | null>(null);
+  const [pitcherSortField, setPitcherSortField] = useState<keyof PitcherSplitRow | null>(null);
   const [sortAsc, setSortAsc] = useState<boolean>(false);
 
   const handleBatterSort = (field: keyof PlayerSplitRow) => {
@@ -32,7 +32,7 @@ export function SplitTableGroup({
       setSortAsc(!sortAsc);
     } else {
       setBatterSortField(field);
-      setSortAsc(false);
+      setSortAsc(field === "splitName");
     }
   };
 
@@ -41,58 +41,62 @@ export function SplitTableGroup({
       setSortAsc(!sortAsc);
     } else {
       setPitcherSortField(field);
-      const lowerIsBetter = ["eraNum", "whipNum", "baa", "bb", "bbPer9", "bbPct", "er", "r", "h", "hr"].includes(
+      const lowerIsBetter = ["splitName", "eraNum", "whipNum", "baa", "bb", "bbPer9", "bbPct", "er", "r", "h", "hr"].includes(
         field as string
       );
       setSortAsc(lowerIsBetter);
     }
   };
 
-  const sortedBatterRows = [...batterRows].sort((a, b) => {
-    const valA = a[batterSortField];
-    const valB = b[batterSortField];
-    const numA =
-      typeof valA === "number"
-        ? valA
-        : parseFloat(String(valA || "0").replace("%", ""));
-    const numB =
-      typeof valB === "number"
-        ? valB
-        : parseFloat(String(valB || "0").replace("%", ""));
-    if (!isNaN(numA) && !isNaN(numB)) {
-      return sortAsc ? numA - numB : numB - numA;
-    }
-    return sortAsc
-      ? String(valA || "").localeCompare(String(valB || ""))
-      : String(valB || "").localeCompare(String(valA || ""));
-  });
+  const sortedBatterRows = !batterSortField
+    ? batterRows
+    : [...batterRows].sort((a, b) => {
+        const valA = a[batterSortField];
+        const valB = b[batterSortField];
+        const numA =
+          typeof valA === "number"
+            ? valA
+            : parseFloat(String(valA || "0").replace("%", ""));
+        const numB =
+          typeof valB === "number"
+            ? valB
+            : parseFloat(String(valB || "0").replace("%", ""));
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return sortAsc ? numA - numB : numB - numA;
+        }
+        return sortAsc
+          ? String(valA || "").localeCompare(String(valB || ""))
+          : String(valB || "").localeCompare(String(valA || ""));
+      });
 
-  const sortedPitcherRows = [...pitcherRows].sort((a, b) => {
-    if (pitcherSortField === "eraNum" || pitcherSortField === "era") {
-      const aMissing = a.eraAvailable === false || a.era === "--" || a.eraNum < 0;
-      const bMissing = b.eraAvailable === false || b.era === "--" || b.eraNum < 0;
-      if (aMissing && bMissing) return 0;
-      if (aMissing) return 1;
-      if (bMissing) return -1;
-    }
+  const sortedPitcherRows = !pitcherSortField
+    ? pitcherRows
+    : [...pitcherRows].sort((a, b) => {
+        if (pitcherSortField === "eraNum" || pitcherSortField === "era") {
+          const aMissing = a.eraAvailable === false || a.era === "--" || a.eraNum < 0;
+          const bMissing = b.eraAvailable === false || b.era === "--" || b.eraNum < 0;
+          if (aMissing && bMissing) return 0;
+          if (aMissing) return 1;
+          if (bMissing) return -1;
+        }
 
-    const valA = a[pitcherSortField];
-    const valB = b[pitcherSortField];
-    const numA =
-      typeof valA === "number"
-        ? valA
-        : parseFloat(String(valA || "0").replace("%", ""));
-    const numB =
-      typeof valB === "number"
-        ? valB
-        : parseFloat(String(valB || "0").replace("%", ""));
-    if (!isNaN(numA) && !isNaN(numB)) {
-      return sortAsc ? numA - numB : numB - numA;
-    }
-    return sortAsc
-      ? String(valA || "").localeCompare(String(valB || ""))
-      : String(valB || "").localeCompare(String(valA || ""));
-  });
+        const valA = a[pitcherSortField];
+        const valB = b[pitcherSortField];
+        const numA =
+          typeof valA === "number"
+            ? valA
+            : parseFloat(String(valA || "0").replace("%", ""));
+        const numB =
+          typeof valB === "number"
+            ? valB
+            : parseFloat(String(valB || "0").replace("%", ""));
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return sortAsc ? numA - numB : numB - numA;
+        }
+        return sortAsc
+          ? String(valA || "").localeCompare(String(valB || ""))
+          : String(valB || "").localeCompare(String(valA || ""));
+      });
 
   const isEmpty = isPitcher ? pitcherRows.length === 0 : batterRows.length === 0;
 
