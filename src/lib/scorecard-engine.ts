@@ -125,6 +125,8 @@ function deduceScorecardEventCode(play: any): string {
     case "Fielders Choice":
     case "Fielders Choice Out":
       return "FC";
+    case "Runner Placed On Base":
+      return "2B*";
     default:
       if (res.isOut) return "OUT";
       return rawEvent.slice(0, 4).toUpperCase();
@@ -139,7 +141,7 @@ function formatBaseOutLabel(rawEvent: string, outAt: "1B" | "2B" | "3B" | "HP"):
   if (ev.includes("caught stealing")) return `CS ${outAt}`;
   if (ev.includes("pickoff")) return `PO ${outAt}`;
   if (ev.includes("forceout") || ev.includes("force out")) return `FO ${outAt}`;
-  if (ev.includes("double play")) return `DP ${outAt}`;
+  if (ev.includes("double play") || ev.includes("dp")) return `DP ${outAt}`;
   if (ev.includes("fielders choice")) return `FC ${outAt}`;
   return `OUT ${outAt}`;
 }
@@ -154,6 +156,44 @@ interface RawPlayRunner {
     outBase?: string | null;
     outNumber?: number;
   };
+}
+
+/**
+ * Obtiene o crea la fila de bateador en la hoja de anotación para registrar turnos o corredores fantasma.
+ */
+function getOrCreateBatterRow(
+  currentBatters: ScorecardBatterRow[],
+  currentBatterMap: Map<number, ScorecardBatterRow>,
+  playerId: number,
+  playerName: string,
+  fallbackPosition = "PH"
+): ScorecardBatterRow {
+  let batterRow = currentBatterMap.get(playerId);
+  if (!batterRow) {
+    batterRow = {
+      id: playerId,
+      name: playerName,
+      jersey: "-",
+      position: fallbackPosition,
+      slot: currentBatters.length > 0 ? Math.min(9, currentBatters.length + 1) : 1,
+      order: (currentBatters.length + 1) * 100,
+      isSubstitute: true,
+      ab: 0,
+      r: 0,
+      h: 0,
+      doubles: 0,
+      triples: 0,
+      hr: 0,
+      rbi: 0,
+      bb: 0,
+      so: 0,
+      avg: ".000",
+      innings: {},
+    };
+    currentBatters.push(batterRow);
+    currentBatterMap.set(playerId, batterRow);
+  }
+  return batterRow;
 }
 
 /**
@@ -408,6 +448,107 @@ export function buildGameScorecard(
     }
     const inningRunners = activeRunnersByInning.get(halfKey)!;
 
+    // 0. Procesar eventos de acción previos al turno (corredor fantasma de extrainnings y pinch runners)
+    const playEvents: any[] = Array.isArray(play.playEvents) ? play.playEvents : [];
+    const immediatePrMap = new Map<number, { prId: number; prName: string; desc: string }>();
+    const placedIdsInPlay = new Set<number>();
+
+    for (const ev of playEvents) {
+      if (ev?.type !== "action") continue;
+      const evType = String(ev?.details?.eventType || "");
+      const evDesc = String(ev?.details?.description || "");
+      if (evType === "runner_placed" || ev?.details?.event === "Runner Placed On Base") {
+        const placedId = Number(ev?.player?.id ?? 0);
+        if (placedId > 0) placedIdsInPlay.add(placedId);
+      } else if (evType === "offensive_substitution") {
+        const prId = Number(ev?.player?.id ?? 0);
+        const match = evDesc.match(/Pinch-runner\s+(.+?)\s+replaces\s+(.+?)\.?$/i);
+        if (prId > 0 && match) {
+          const prName = match[1].trim();
+          const replacedName = match[2].trim();
+          // Buscar si el reemplazado coincide con un corredor colocado en este mismo play o ya activo
+          for (const placedId of placedIdsInPlay) {
+            const pRow = currentBatterMap.get(placedId);
+            if (pRow && pRow.name.toLowerCase() === replacedName.toLowerCase()) {
+              immediatePrMap.set(placedId, { prId, prName, desc: evDesc });
+            }
+          }
+          // Si reemplaza a un corredor que ya estaba activo en la entrada, transferir seguimiento
+          for (const [activeId, activeCell] of inningRunners.entries()) {
+            const aRow = currentBatterMap.get(activeId);
+            if (aRow && aRow.name.toLowerCase() === replacedName.toLowerCase()) {
+              inningRunners.delete(activeId);
+              inningRunners.set(prId, activeCell);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    for (const ev of playEvents) {
+      if (ev?.type !== "action") continue;
+      const evType = String(ev?.details?.eventType || "");
+      if (evType !== "runner_placed" && ev?.details?.event !== "Runner Placed On Base") continue;
+
+      const placedId = Number(ev?.player?.id ?? 0);
+      if (!placedId) continue;
+
+      const prSwap = immediatePrMap.get(placedId);
+      const effectiveRunnerId = prSwap ? prSwap.prId : placedId;
+      if (inningRunners.has(effectiveRunnerId)) continue;
+
+      const origRow = currentBatterMap.get(placedId);
+      const effectiveRow = getOrCreateBatterRow(
+        currentBatters,
+        currentBatterMap,
+        effectiveRunnerId,
+        prSwap ? prSwap.prName : origRow?.name || "Corredor",
+        "PR"
+      );
+
+      const ghostDesc = prSwap
+        ? `${effectiveRow.name} entra como corredor emergente (por ${origRow?.name || "titular"}) en 2da base por regla de extrainning.`
+        : String(ev?.details?.description || `${effectiveRow.name} inicia la entrada en 2da base.`);
+
+      const ghostCell: ScorecardCell = {
+        playId: `sc-ghost-${inning}-${effectiveRunnerId}-${play.atBatIndex ?? 0}`,
+        atBatIndex: Number(play.atBatIndex ?? 0),
+        inning,
+        isTopInning,
+        batterId: effectiveRunnerId,
+        batterName: effectiveRow.name,
+        pitcherName,
+        event: "Runner Placed On Base",
+        eventCode: "2B*",
+        description: ghostDesc,
+        rbi: 0,
+        diamond: {
+          reach1B: false,
+          reach2B: true,
+          reach3B: false,
+          scored: false,
+          outAt: null,
+        },
+        outNumber: null,
+        isGhostRunner: true,
+        isHit: false,
+        isOut: false,
+        isScoringPlay: false,
+      };
+
+      if (!effectiveRow.innings[inning]) {
+        effectiveRow.innings[inning] = [];
+      }
+      effectiveRow.innings[inning].push(ghostCell);
+      inningRunners.set(effectiveRunnerId, ghostCell);
+    }
+
+    // Evitar crear celdas vacías para turnos en curso sin evento registrado
+    if (!rawEvent && !play.about?.isComplete) {
+      continue;
+    }
+
     // 1. Deducir código de evento canónico y rombo inicial
     const eventCode = deduceScorecardEventCode(play);
     const runners = play.runners || [];
@@ -503,32 +644,13 @@ export function buildGameScorecard(
     };
 
     // 2. Asignar la celda a la fila del bateador correspondiente
-    let batterRow = currentBatterMap.get(batterId);
-    if (!batterRow) {
-      // Fallback: Si el bateador no está en el mapa, agregarlo
-      batterRow = {
-        id: batterId,
-        name: batterName,
-        jersey: "-",
-        position: "PH",
-        slot: currentBatters.length > 0 ? Math.min(9, currentBatters.length + 1) : 1,
-        order: (currentBatters.length + 1) * 100,
-        isSubstitute: true,
-        ab: 0,
-        r: 0,
-        h: 0,
-        doubles: 0,
-        triples: 0,
-        hr: 0,
-        rbi: 0,
-        bb: 0,
-        so: 0,
-        avg: ".000",
-        innings: {},
-      };
-      currentBatters.push(batterRow);
-      currentBatterMap.set(batterId, batterRow);
-    }
+    const batterRow = getOrCreateBatterRow(
+      currentBatters,
+      currentBatterMap,
+      batterId,
+      batterName,
+      "PH"
+    );
 
     if (!batterRow.innings[inning]) {
       batterRow.innings[inning] = [];

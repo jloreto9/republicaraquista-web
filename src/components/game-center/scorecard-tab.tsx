@@ -188,7 +188,7 @@ export function ScorecardTab({
                 <span>Outs de Campo</span>
               </div>
               <p className="text-slate-400">
-                <strong>6-3</strong> (Short a 1ra), <strong>4-3</strong> (2da a 1ra), <strong>F8</strong> (Fly al center), <strong>L6</strong> (Línea al short), <strong>DP</strong> (Doble Play). El badge circular <strong className="text-rose-400">➀, ➁, ➂</strong> marca el out de la entrada, y el corchete rojo <strong className="text-red-400">CL</strong> indica un cambio de lanzador.
+                <strong>6-3</strong> (Short a 1ra), <strong>4-3</strong> (2da a 1ra), <strong>F8</strong> (Fly al center), <strong>L6</strong> (Línea al short), <strong>DP</strong> (Doble Play). El badge <strong className="text-rose-400">➀, ➁, ➂</strong> marca el out, el corchete rojo <strong className="text-red-400">CL</strong> indica cambio de lanzador y <strong className="text-violet-300">2B* (CF)</strong> el corredor de extrainning.
               </p>
             </div>
           </div>
@@ -285,7 +285,7 @@ export function ScorecardTab({
 
             {/* CUERPO DE BATEADORES */}
             <tbody className="divide-y divide-[#1E2B4D]/40 text-xs">
-              {activeTeamData.batters.map((batter) => {
+              {activeTeamData.batters.map((batter, rowIndex) => {
                 const isSub = batter.isSubstitute;
 
                 return (
@@ -336,7 +336,11 @@ export function ScorecardTab({
                     {/* Celdas de Entradas 1 a 9+ */}
                     {inningCols.map((inn) => (
                       <td key={inn} className="p-0 text-center">
-                        <ScorecardDiamondCell cells={batter.innings[inn]} />
+                        <ScorecardDiamondCell
+                          cells={batter.innings[inn]}
+                          openTooltipDown={rowIndex < 2}
+                          alignTooltipLeft={inn === 1}
+                        />
                       </td>
                     ))}
 

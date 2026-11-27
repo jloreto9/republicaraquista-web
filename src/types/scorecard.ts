@@ -24,6 +24,7 @@ export interface ScorecardCell {
   isPitchingChange?: boolean;
   pitchingChangeFrom?: string;
   pitchingChangeTo?: string;
+  isGhostRunner?: boolean;
   countText?: string; // ej: "3-2"
   isHit: boolean;
   isOut: boolean;

@@ -141,9 +141,49 @@ const allRawPlays = [
     },
     runners: [{ details: { runner: { id: 685744 }, event: "Walk" }, movement: { start: null, end: "1B", isOut: false } }],
   },
+  // Alta del 11mo: Lorenzo Cedrola (ghost runner en 2B) avanza y es puesto out en 3B (Out #2) en FC de Wuilfredo Antunez
+  {
+    atBatIndex: 90,
+    about: { inning: 11, isTopInning: true, isComplete: true },
+    result: { event: "Groundout", isOut: true, rbi: 0, description: "Alberth Martinez grounds out. Lorenzo Cedrola to 3rd." },
+    count: { balls: 1, strikes: 1, outs: 1 },
+    matchup: {
+      batter: { id: 594021, fullName: "Alberth Martinez" },
+      pitcher: { id: 683681, fullName: "Jose Gonzalez" },
+    },
+    playEvents: [
+      {
+        type: "action",
+        player: { id: 661411 },
+        details: {
+          event: "Runner Placed On Base",
+          eventType: "runner_placed",
+          description: "Lorenzo Cedrola starts inning at 2nd base.",
+        },
+      },
+    ],
+    runners: [
+      { details: { runner: { id: 594021 }, event: "Groundout" }, movement: { start: null, end: null, isOut: true, outBase: "1B", outNumber: 1 } },
+      { details: { runner: { id: 661411 }, event: "Groundout" }, movement: { start: "2B", end: "3B", isOut: false } },
+    ],
+  },
+  {
+    atBatIndex: 91,
+    about: { inning: 11, isTopInning: true, isComplete: true },
+    result: { event: "Fielders Choice Out", isOut: true, rbi: 0, description: "Jorbit Vivas reaches on a fielder's choice out. Lorenzo Cedrola out at 3rd." },
+    count: { balls: 0, strikes: 1, outs: 2 },
+    matchup: {
+      batter: { id: 594021, fullName: "Alberth Martinez" },
+      pitcher: { id: 683681, fullName: "Jose Gonzalez" },
+    },
+    runners: [
+      { details: { runner: { id: 661411 }, event: "Fielders Choice Out" }, movement: { start: "3B", end: null, isOut: true, outBase: "3B", outNumber: 2 } },
+      { details: { runner: { id: 594021 }, event: "Fielders Choice Out" }, movement: { start: null, end: "1B", isOut: false } },
+    ],
+  },
 ];
 
-const sc = buildGameScorecard(allRawPlays, boxscore, homeTeam, awayTeam, 9);
+const sc = buildGameScorecard(allRawPlays, boxscore, homeTeam, awayTeam, 11);
 
 const coronaCell = sc.home.batters.find((b) => b.id === 685744)?.innings[2]?.[0];
 assert.ok(coronaCell, "Debe existir la celda de Kenedy Corona en el 2do inning");
@@ -171,5 +211,15 @@ assert.equal(martinezCell.outNumber, 3, "Alberth Martinez debe recibir el Out #3
 assert.equal(martinezCell.diamond.outAt, "2B");
 assert.equal(martinezCell.outEvent, "FO 2B");
 assert.equal(cedrolaCell.outNumber, null, "Lorenzo Cedrola llegó a 1B en Forceout, no debe tener outNumber");
+
+const cedrolaGhost11 = sc.away.batters.find((b) => b.id === 661411)?.innings[11]?.[0];
+assert.ok(cedrolaGhost11, "Debe existir celda de corredor fantasma en el 11mo inning");
+assert.equal(cedrolaGhost11.isGhostRunner, true);
+assert.equal(cedrolaGhost11.eventCode, "2B*");
+assert.equal(cedrolaGhost11.diamond.reach2B, true);
+assert.equal(cedrolaGhost11.diamond.reach3B, true);
+assert.equal(cedrolaGhost11.diamond.outAt, "3B");
+assert.equal(cedrolaGhost11.outNumber, 2, "El corredor fantasma puesto out en 3B debe mostrar Out #2");
+assert.equal(cedrolaGhost11.outEvent, "FC 3B");
 
 console.log("scorecard-base-outs.test.ts: PASS");

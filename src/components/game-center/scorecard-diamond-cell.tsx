@@ -5,9 +5,15 @@ import { ScorecardCell } from "@/types/scorecard";
 
 interface ScorecardDiamondCellProps {
   cells?: ScorecardCell[];
+  openTooltipDown?: boolean;
+  alignTooltipLeft?: boolean;
 }
 
-export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
+export function ScorecardDiamondCell({
+  cells,
+  openTooltipDown = false,
+  alignTooltipLeft = false,
+}: ScorecardDiamondCellProps) {
   const [activeTooltip, setActiveTooltip] = useState<ScorecardCell | null>(null);
 
   if (!cells || cells.length === 0) {
@@ -25,8 +31,10 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
 
         // Colores temáticos de la notación
         let textColor = "text-slate-300";
-        if (eventCode === "HR" || isScoringPlay) {
+        if (eventCode === "HR" || isScoringPlay || diamond.scored) {
           textColor = "text-[#FDB827] font-black";
+        } else if (cell.isGhostRunner) {
+          textColor = "text-violet-300 font-bold";
         } else if (isHit) {
           textColor = "text-emerald-400 font-bold";
         } else if (eventCode === "K" || eventCode === "ꓘ") {
@@ -40,9 +48,13 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
         // Color de las líneas del rombo
         const pathColor = diamond.scored
           ? "#FDB827"
+          : cell.isGhostRunner
+          ? "#A78BFA"
           : isHit
           ? "#10B981"
           : "#60A5FA";
+
+        const reach1BTo2B = diamond.reach2B && !cell.isGhostRunner;
 
         return (
           <div
@@ -110,8 +122,8 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
                 y1="50"
                 x2="50"
                 y2="18"
-                stroke={diamond.reach2B ? pathColor : "#1E2B4D"}
-                strokeWidth={diamond.reach2B ? "3.5" : "1.5"}
+                stroke={reach1BTo2B ? pathColor : "#1E2B4D"}
+                strokeWidth={reach1BTo2B ? "3.5" : "1.5"}
                 strokeLinecap="round"
               />
               {/* 2B -> 3B */}
@@ -172,7 +184,12 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
 
               {/* Puntos de Base (Esquinas del diamante) */}
               <circle cx="82" cy="50" r="2.5" fill={diamond.reach1B ? pathColor : "#334155"} />
-              <circle cx="50" cy="18" r="2.5" fill={diamond.reach2B ? pathColor : "#334155"} />
+              <circle
+                cx="50"
+                cy="18"
+                r={cell.isGhostRunner ? "3.5" : "2.5"}
+                fill={diamond.reach2B ? pathColor : "#334155"}
+              />
               <circle cx="18" cy="50" r="2.5" fill={diamond.reach3B ? pathColor : "#334155"} />
               <polygon points="50,85 47,81 53,81" fill={diamond.scored ? pathColor : "#334155"} />
 
@@ -243,6 +260,16 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
               </div>
             )}
 
+            {/* Badge de Corredor Fantasma (Extrainning) */}
+            {cell.isGhostRunner && !cell.isPitchingChange && (
+              <div
+                title="Corredor Fantasma (inicia en 2da base)"
+                className="absolute top-0.5 left-1/2 -translate-x-1/2 px-1 rounded bg-violet-500/25 border border-violet-400/60 text-violet-300 font-mono text-[8px] font-bold leading-tight pointer-events-none"
+              >
+                CF
+              </div>
+            )}
+
             {/* Badge de Carrera Anotada */}
             {diamond.scored && (
               <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FDB827]/30 border border-[#FDB827]/60 text-[#FDB827] font-bold text-[8px] flex items-center justify-center pointer-events-none">
@@ -252,7 +279,11 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
 
             {/* Popover / Tooltip al hacer hover o tap */}
             {activeTooltip === cell && (
-              <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 rounded-xl bg-[#0D152B] border border-[#1E2B4D] shadow-2xl text-left pointer-events-none backdrop-blur-md">
+              <div
+                className={`absolute z-50 w-64 p-3 rounded-xl bg-[#0D152B] border border-[#1E2B4D] shadow-2xl text-left pointer-events-none backdrop-blur-md ${
+                  openTooltipDown ? "top-full mt-2" : "bottom-full mb-2"
+                } ${alignTooltipLeft ? "left-1" : "left-1/2 -translate-x-1/2"}`}
+              >
                 <div className="flex items-center justify-between pb-1.5 border-b border-[#1E2B4D] mb-1.5">
                   <span className="text-[10px] font-mono font-bold text-[#FDB827] uppercase">
                     Entrada {cell.inning} • {cell.isTopInning ? "Alta" : "Baja"}
@@ -261,6 +292,11 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
                     {cell.eventCode}
                   </span>
                 </div>
+                {cell.isGhostRunner && (
+                  <div className="mb-1.5 px-2 py-1 rounded-md bg-violet-500/15 border border-violet-400/40 text-[10px] text-violet-300 font-semibold">
+                    Corredor Fantasma (Extrainning en 2da base)
+                  </div>
+                )}
                 {cell.isPitchingChange && cell.pitchingChangeTo && (
                   <div className="mb-1.5 px-2 py-1 rounded-md bg-red-500/15 border border-red-500/40 text-[10px] text-red-300 font-semibold">
                     Cambio de lanzador: Entra {cell.pitchingChangeTo}
