@@ -132,6 +132,45 @@ function deduceScorecardEventCode(play: any): string {
 }
 
 /**
+ * Formatea una etiqueta corta para outs ocurridos en las bases (CS, PO, FO, DP).
+ */
+function formatBaseOutLabel(rawEvent: string, outAt: "1B" | "2B" | "3B" | "HP"): string {
+  const ev = rawEvent.toLowerCase();
+  if (ev.includes("caught stealing")) return `CS ${outAt}`;
+  if (ev.includes("pickoff")) return `PO ${outAt}`;
+  if (ev.includes("forceout") || ev.includes("force out")) return `FO ${outAt}`;
+  if (ev.includes("double play")) return `DP ${outAt}`;
+  if (ev.includes("fielders choice")) return `FC ${outAt}`;
+  return `OUT ${outAt}`;
+}
+
+interface RawPlayRunner {
+  details?: { runner?: { id?: number | string }; event?: string };
+  movement?: {
+    originBase?: string | null;
+    start?: string | null;
+    end?: string | null;
+    isOut?: boolean;
+    outBase?: string | null;
+    outNumber?: number;
+  };
+}
+
+/**
+ * Busca el registro de movimiento correspondiente al bateador en `play.runners`.
+ */
+function findBatterRunner(runners: RawPlayRunner[], batterId: number): RawPlayRunner | undefined {
+  return (
+    runners.find((r) => Number(r?.details?.runner?.id) === batterId) ||
+    runners.find(
+      (r) =>
+        (r?.movement?.originBase === null || r?.movement?.originBase === undefined) &&
+        (r?.movement?.start === null || r?.movement?.start === undefined)
+    )
+  );
+}
+
+/**
  * Inicializa el avance del rombo de bases para el bateador según el resultado inicial de su turno.
  */
 function initDiamondForPlay(rawEvent: string, runners: any[], batterId: number): ScorecardDiamond {
@@ -180,12 +219,7 @@ function initDiamondForPlay(rawEvent: string, runners: any[], batterId: number):
   }
 
   // Comprobar movimientos del bateador en la jugada en sí
-  const batterRunner = runners.find(
-    (r: any) =>
-      Number(r?.details?.runner?.id) === batterId ||
-      r?.movement?.originBase === null ||
-      r?.movement?.originBase === undefined
-  );
+  const batterRunner = findBatterRunner(runners, batterId);
 
   if (batterRunner) {
     const end = batterRunner.movement?.end;
@@ -373,7 +407,12 @@ export function buildGameScorecard(
 
     // Conteo y Outs
     const outsOnPlay = Number(play.count?.outs ?? 0);
-    const outNumber = isOut ? (outsOnPlay > 0 ? outsOnPlay : null) : null;
+    const batterRunner = findBatterRunner(runners, batterId);
+    const batterIsOut = batterRunner
+      ? Boolean(batterRunner.movement?.isOut)
+      : isOut;
+    const batterOutNum = Number(batterRunner?.movement?.outNumber ?? outsOnPlay);
+    const outNumber = batterIsOut ? (batterOutNum > 0 ? batterOutNum : null) : null;
     const countText =
       play.count?.balls !== undefined && play.count?.strikes !== undefined
         ? `${play.count.balls}-${play.count.strikes}`
@@ -395,7 +434,7 @@ export function buildGameScorecard(
       outNumber,
       countText,
       isHit,
-      isOut,
+      isOut: batterIsOut,
       isScoringPlay: isScoring,
     };
 
@@ -459,10 +498,23 @@ export function buildGameScorecard(
 
         if (r?.movement?.isOut) {
           const outBase = r.movement?.outBase || end;
-          if (outBase === "2B") activeCell.diamond.outAt = "2B";
-          else if (outBase === "3B") activeCell.diamond.outAt = "3B";
-          else if (outBase === "score" || outBase === "HP") activeCell.diamond.outAt = "HP";
-          else activeCell.diamond.outAt = "1B";
+          const resolvedOutAt: "1B" | "2B" | "3B" | "HP" =
+            outBase === "2B"
+              ? "2B"
+              : outBase === "3B"
+              ? "3B"
+              : outBase === "score" || outBase === "HP"
+              ? "HP"
+              : "1B";
+          activeCell.diamond.outAt = resolvedOutAt;
+          const runnerOutNum = Number(r?.movement?.outNumber ?? outsOnPlay);
+          if (runnerOutNum > 0) {
+            activeCell.outNumber = runnerOutNum;
+          }
+          activeCell.outEvent = formatBaseOutLabel(
+            String(r?.details?.event || rawEvent || ""),
+            resolvedOutAt
+          );
           inningRunners.delete(runnerId); // Puesto out
         }
       }

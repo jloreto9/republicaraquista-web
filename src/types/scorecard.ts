@@ -20,6 +20,7 @@ export interface ScorecardCell {
   rbi: number;
   diamond: ScorecardDiamond;
   outNumber: number | null; // 1, 2, 3 o null si no generó out en la entrada
+  outEvent?: string | null; // ej: "CS 2B", "PO 1B", "FO 2B" cuando fue puesto out en las bases
   countText?: string; // ej: "3-2"
   isHit: boolean;
   isOut: boolean;

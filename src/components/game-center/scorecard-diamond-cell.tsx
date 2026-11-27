@@ -108,7 +108,7 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
                 strokeWidth={diamond.reach3B ? "3.5" : "1.5"}
                 strokeLinecap="round"
               />
-              {/* 3B -> Home */}
+                {/* 3B -> Home */}
               <line
                 x1="18"
                 y1="50"
@@ -119,6 +119,41 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
                 strokeLinecap="round"
               />
 
+              {/* Marca de out en las bases (ej: CS 2B, PO 1B, FO 2B) */}
+              {diamond.outAt && (diamond.reach1B || diamond.outAt !== "1B") && (() => {
+                const seg =
+                  diamond.outAt === "2B"
+                    ? { x1: 82, y1: 50, x2: 66, y2: 34, tx1: 62, ty1: 38, tx2: 70, ty2: 30 }
+                    : diamond.outAt === "3B"
+                    ? { x1: 50, y1: 18, x2: 34, y2: 34, tx1: 30, ty1: 30, tx2: 38, ty2: 38 }
+                    : diamond.outAt === "HP"
+                    ? { x1: 18, y1: 50, x2: 34, y2: 66, tx1: 30, ty1: 70, tx2: 38, ty2: 62 }
+                    : { x1: 50, y1: 82, x2: 66, y2: 66, tx1: 62, ty1: 62, tx2: 70, ty2: 70 };
+                return (
+                  <g>
+                    <line
+                      x1={seg.x1}
+                      y1={seg.y1}
+                      x2={seg.x2}
+                      y2={seg.y2}
+                      stroke="#FB7185"
+                      strokeWidth="3"
+                      strokeDasharray="3 2"
+                      strokeLinecap="round"
+                    />
+                    <line
+                      x1={seg.tx1}
+                      y1={seg.ty1}
+                      x2={seg.tx2}
+                      y2={seg.ty2}
+                      stroke="#FB7185"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    />
+                  </g>
+                );
+              })()}
+
               {/* Puntos de Base (Esquinas del diamante) */}
               <circle cx="82" cy="50" r="2.5" fill={diamond.reach1B ? pathColor : "#334155"} />
               <circle cx="50" cy="18" r="2.5" fill={diamond.reach2B ? pathColor : "#334155"} />
@@ -128,7 +163,7 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
               {/* Notación Central de la Jugada */}
               <text
                 x="50"
-                y="53"
+                y={cell.outEvent ? "47" : "53"}
                 textAnchor="middle"
                 dominantBaseline="central"
                 className={`font-mono select-none ${
@@ -138,6 +173,17 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
               >
                 {eventCode}
               </text>
+              {cell.outEvent && (
+                <text
+                  x="50"
+                  y="62"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  className="text-[8.5px] font-mono font-bold fill-rose-400 select-none"
+                >
+                  {cell.outEvent}
+                </text>
+              )}
 
               {/* Conteo de pitcheos (B-S) en la esquina inferior derecha */}
               {countText && (
@@ -207,7 +253,7 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
                     )}
                     {cell.outNumber !== null && (
                       <span className="text-rose-400 font-semibold">
-                        Out #{cell.outNumber} de la entrada
+                        Out #{cell.outNumber} de la entrada{cell.outEvent ? ` (${cell.outEvent})` : ""}
                       </span>
                     )}
                   </div>
