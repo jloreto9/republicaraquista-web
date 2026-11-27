@@ -1,14 +1,23 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   PlayerSplitsProfile,
   PlayerBatterGameLog,
   PlayerPitcherGameLog,
+  PlayerCareerSeasonEntry,
+  PlayerCareerPostseasonEntry,
+  PlayerLvbpCareerResult,
 } from "@/types/player-splits";
 import { BattingStats, PitchingStats } from "@/types/sports";
 import { formatSeason, getTeam } from "@/lib/constants";
-import { BarChart3, Shield, CalendarDays, Trophy } from "lucide-react";
+import {
+  mergeRegularCareerSeasons,
+  mergePostseasonCareerSeasons,
+} from "@/lib/player-career-service";
+import { BarChart3, Shield, CalendarDays, Trophy, Loader2 } from "lucide-react";
+
+const clientCareerCache = new Map<string, PlayerLvbpCareerResult>();
 
 interface PlayerGeneralStatsCardProps {
   profile: PlayerSplitsProfile;
@@ -22,6 +31,8 @@ interface TableRowItem<T> {
   label: string;
   badge?: string;
   isHighlight?: boolean;
+  isCombined?: boolean;
+  isTeamSplit?: boolean;
   stats: T;
 }
 
@@ -160,28 +171,36 @@ function outsToDisplay(outs: number): string {
   return `${Math.floor(safe / 3)}.${safe % 3}`;
 }
 
-function weightedAverage(
-  items: Array<{ value?: number; weight: number }>
+function weightedAverageIfComplete(
+  items: Array<{ value?: number; weight: number }>,
+  expectedCount: number
 ): number | undefined {
+  if (expectedCount <= 0 || items.length !== expectedCount) {
+    return undefined;
+  }
   let num = 0;
   let den = 0;
   for (const item of items) {
     if (
-      typeof item.value === "number" &&
-      Number.isFinite(item.value) &&
-      item.value > 0 &&
-      item.weight > 0
+      typeof item.value !== "number" ||
+      !Number.isFinite(item.value) ||
+      item.value <= 0 ||
+      item.weight <= 0
     ) {
-      num += item.value * item.weight;
-      den += item.weight;
+      return undefined;
     }
+    num += item.value * item.weight;
+    den += item.weight;
   }
   return den > 0 ? num / den : undefined;
 }
 
 function computeTotalBatting(
-  seasons: Array<{ season: number; stats: BattingStats }>
-): BattingStats {
+  seasons: Array<PlayerCareerSeasonEntry<BattingStats>>
+): BattingStats | null {
+  const countable = seasons.filter((s) => !s.isTeamSplit);
+  if (countable.length === 0) return null;
+
   let games = 0;
   let plateAppearances = 0;
   let atBats = 0;
@@ -208,7 +227,7 @@ function computeTotalBatting(
   const wobaPlusItems: Array<{ value?: number; weight: number }> = [];
   const wrcPlusItems: Array<{ value?: number; weight: number }> = [];
 
-  for (const { stats } of seasons) {
+  for (const { stats } of countable) {
     const pa =
       stats.plateAppearances ??
       stats.pa ??
@@ -251,7 +270,7 @@ function computeTotalBatting(
   const babipDen = atBats - strikeouts - homeRuns + sf;
   const babip = babipDen > 0 ? (hits - homeRuns) / babipDen : 0;
 
-  const first = seasons[0].stats;
+  const first = countable[0].stats;
   return {
     ...first,
     teamAbbr: "LVBP",
@@ -278,19 +297,22 @@ function computeTotalBatting(
     ops,
     iso,
     babip,
-    woba: weightedAverage(wobaItems),
-    avgPlus: weightedAverage(avgPlusItems),
-    obpPlus: weightedAverage(obpPlusItems),
-    slgPlus: weightedAverage(slgPlusItems),
-    opsPlus: weightedAverage(opsPlusItems),
-    wobaPlus: weightedAverage(wobaPlusItems),
-    wrcPlus: weightedAverage(wrcPlusItems),
+    woba: weightedAverageIfComplete(wobaItems, countable.length),
+    avgPlus: weightedAverageIfComplete(avgPlusItems, countable.length),
+    obpPlus: weightedAverageIfComplete(obpPlusItems, countable.length),
+    slgPlus: weightedAverageIfComplete(slgPlusItems, countable.length),
+    opsPlus: weightedAverageIfComplete(opsPlusItems, countable.length),
+    wobaPlus: weightedAverageIfComplete(wobaPlusItems, countable.length),
+    wrcPlus: weightedAverageIfComplete(wrcPlusItems, countable.length),
   };
 }
 
 function computeTotalPitching(
-  seasons: Array<{ season: number; stats: PitchingStats }>
-): PitchingStats {
+  seasons: Array<PlayerCareerSeasonEntry<PitchingStats>>
+): PitchingStats | null {
+  const countable = seasons.filter((s) => !s.isTeamSplit);
+  if (countable.length === 0) return null;
+
   let games = 0;
   let gamesStarted = 0;
   let totalOuts = 0;
@@ -310,7 +332,7 @@ function computeTotalPitching(
   const whipPlusItems: Array<{ value?: number; weight: number }> = [];
   const fipPlusItems: Array<{ value?: number; weight: number }> = [];
 
-  for (const { stats } of seasons) {
+  for (const { stats } of countable) {
     const outs = ipDecimalToOuts(stats.inningsPitched, stats.inningsDisplay);
     games += stats.games || 0;
     gamesStarted += stats.gamesStarted || 0;
@@ -338,7 +360,7 @@ function computeTotalPitching(
   const bbPer9 = totalOuts > 0 ? (walks * 27) / totalOuts : 0;
   const kToBb = walks > 0 ? strikeouts / walks : strikeouts;
 
-  const first = seasons[0].stats;
+  const first = countable[0].stats;
   return {
     ...first,
     teamAbbr: "LVBP",
@@ -361,11 +383,93 @@ function computeTotalPitching(
     kPer9,
     bbPer9,
     kToBb,
-    fip: weightedAverage(fipItems),
-    eraPlus: weightedAverage(eraPlusItems),
-    whipPlus: weightedAverage(whipPlusItems),
-    fipPlus: weightedAverage(fipPlusItems),
+    fip: weightedAverageIfComplete(fipItems, countable.length),
+    eraPlus: weightedAverageIfComplete(eraPlusItems, countable.length),
+    whipPlus: weightedAverageIfComplete(whipPlusItems, countable.length),
+    fipPlus: weightedAverageIfComplete(fipPlusItems, countable.length),
   };
+}
+
+function buildSeasonRowKey(
+  entry: {
+    season: number;
+    isCombined?: boolean;
+    isTeamSplit?: boolean;
+    stats: { teamId: number };
+  },
+  phase?: string
+): string {
+  const suffix = entry.isCombined
+    ? "combined"
+    : entry.isTeamSplit
+    ? `split-${entry.stats.teamId}`
+    : String(entry.stats.teamId);
+  return phase ? `${entry.season}-${phase}-${suffix}` : `${entry.season}-${suffix}`;
+}
+
+function getSeasonRowLabel(entry: {
+  season: number;
+  isTeamSplit?: boolean;
+  stats: { teamId: number; teamName?: string };
+}): string {
+  if (entry.isTeamSplit) {
+    return entry.stats.teamName || getTeam(entry.stats.teamId).name || "Club";
+  }
+  return formatSeason(entry.season);
+}
+
+function SeasonLabelCell({
+  label,
+  badge,
+  isTeamSplit,
+}: {
+  label: string;
+  badge?: string;
+  isTeamSplit?: boolean;
+}) {
+  return (
+    <td className="py-2.5 px-3 font-sans font-bold text-slate-100 whitespace-nowrap">
+      {isTeamSplit ? (
+        <span className="pl-3 text-slate-400 font-normal">↳ {label}</span>
+      ) : (
+        <span>{label}</span>
+      )}
+      {badge && !isTeamSplit && (
+        <span className="ml-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30">
+          {badge}
+        </span>
+      )}
+    </td>
+  );
+}
+
+function SeasonTeamCell({
+  teamId,
+  teamAbbr,
+  isCombined,
+  isTeamSplit,
+}: {
+  teamId: number;
+  teamAbbr?: string;
+  isCombined?: boolean;
+  isTeamSplit?: boolean;
+}) {
+  const resolvedAbbr = teamAbbr || getTeam(teamId).abbreviation;
+  return (
+    <td
+      className={`py-2.5 px-2 text-center ${
+        isTeamSplit ? "text-slate-400" : "text-slate-300 font-semibold"
+      }`}
+    >
+      {isCombined ? (
+        <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30 text-[10px] font-mono font-bold">
+          {resolvedAbbr}
+        </span>
+      ) : (
+        resolvedAbbr
+      )}
+    </td>
+  );
 }
 
 function BattingSeasonTable({
@@ -431,7 +535,7 @@ function BattingSeasonTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-[#1E2B4D]/60 font-mono text-[11px]">
-          {rows.map(({ key, label, badge, isHighlight, stats }) => {
+          {rows.map(({ key, label, badge, isHighlight, isCombined, isTeamSplit, stats }) => {
             const pa =
               stats.plateAppearances ??
               stats.pa ??
@@ -440,20 +544,20 @@ function BattingSeasonTable({
               <tr
                 key={key}
                 className={`hover:bg-[#131E3D]/50 transition-colors ${
-                  isHighlight ? "bg-[#002D62]/20" : ""
+                  isTeamSplit
+                    ? "bg-[#070B19]/30 text-slate-400"
+                    : isHighlight
+                    ? "bg-[#002D62]/20"
+                    : ""
                 }`}
               >
-                <td className="py-2.5 px-3 font-sans font-bold text-slate-100 whitespace-nowrap">
-                  <span>{label}</span>
-                  {badge && (
-                    <span className="ml-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30">
-                      {badge}
-                    </span>
-                  )}
-                </td>
-                <td className="py-2.5 px-2 text-center text-slate-300 font-semibold">
-                  {stats.teamAbbr || getTeam(stats.teamId).abbreviation}
-                </td>
+                <SeasonLabelCell label={label} badge={badge} isTeamSplit={isTeamSplit} />
+                <SeasonTeamCell
+                  teamId={stats.teamId}
+                  teamAbbr={stats.teamAbbr}
+                  isCombined={isCombined}
+                  isTeamSplit={isTeamSplit}
+                />
                 <td className="py-2.5 px-2 text-center text-slate-300">{stats.games}</td>
                 <td className="py-2.5 px-2 text-center font-semibold text-slate-100">{pa}</td>
                 {showTraditional && (
@@ -598,24 +702,24 @@ function PitchingSeasonTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-[#1E2B4D]/60 font-mono text-[11px]">
-          {rows.map(({ key, label, badge, isHighlight, stats }) => (
+          {rows.map(({ key, label, badge, isHighlight, isCombined, isTeamSplit, stats }) => (
             <tr
               key={key}
               className={`hover:bg-[#131E3D]/50 transition-colors ${
-                isHighlight ? "bg-[#002D62]/20" : ""
+                isTeamSplit
+                  ? "bg-[#070B19]/30 text-slate-400"
+                  : isHighlight
+                  ? "bg-[#002D62]/20"
+                  : ""
               }`}
             >
-              <td className="py-2.5 px-3 font-sans font-bold text-slate-100 whitespace-nowrap">
-                <span>{label}</span>
-                {badge && (
-                  <span className="ml-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#FDB827]/15 text-[#FDB827] border border-[#FDB827]/30">
-                    {badge}
-                  </span>
-                )}
-              </td>
-              <td className="py-2.5 px-2 text-center text-slate-300 font-semibold">
-                {stats.teamAbbr || getTeam(stats.teamId).abbreviation}
-              </td>
+              <SeasonLabelCell label={label} badge={badge} isTeamSplit={isTeamSplit} />
+              <SeasonTeamCell
+                teamId={stats.teamId}
+                teamAbbr={stats.teamAbbr}
+                isCombined={isCombined}
+                isTeamSplit={isTeamSplit}
+              />
               <td className="py-2.5 px-2 text-center text-slate-300">{stats.games}</td>
               <td className="py-2.5 px-2 text-center text-slate-300">{stats.gamesStarted}</td>
               <td className="py-2.5 px-2 text-center font-bold text-slate-100">{stats.inningsDisplay}</td>
@@ -705,64 +809,178 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
   const [columnView, setColumnView] = useState<ColumnView>("all");
   const [gameLogLimit, setGameLogLimit] = useState<GameLogLimit>("7");
 
+  const careerKey = `${profile.playerId}-${profile.type}`;
+  const isValidPlayerId = Number.isInteger(profile.playerId) && profile.playerId > 0;
+  const [careerState, setCareerState] = useState<{
+    key: string;
+    data: PlayerLvbpCareerResult | null;
+    doneKey: string | null;
+  }>(() => {
+    const cached = clientCareerCache.get(careerKey) ?? null;
+    return {
+      key: careerKey,
+      data: cached,
+      doneKey: cached ? careerKey : null,
+    };
+  });
+
+  useEffect(() => {
+    if (!isValidPlayerId) return;
+    if (clientCareerCache.has(careerKey)) return;
+
+    const controller = new AbortController();
+    fetch(`/api/stats/player-career?player_id=${profile.playerId}&type=${profile.type}`, {
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return (await res.json()) as PlayerLvbpCareerResult;
+      })
+      .then((payload) => {
+        if (controller.signal.aborted) return;
+        if (payload) {
+          clientCareerCache.set(careerKey, payload);
+        }
+        setCareerState({
+          key: careerKey,
+          data: payload,
+          doneKey: careerKey,
+        });
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setCareerState({
+          key: careerKey,
+          data: null,
+          doneKey: careerKey,
+        });
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [careerKey, isValidPlayerId, profile.playerId, profile.type]);
+
+  const cachedCareer = clientCareerCache.get(careerKey) ?? null;
+  const careerData =
+    cachedCareer ?? (careerState.key === careerKey ? careerState.data : null);
+  const loadingCareer =
+    isValidPlayerId && !cachedCareer && careerState.doneKey !== careerKey;
+
   const general = profile.general;
   const isPitcher = profile.type === "pitcher";
   const showAdvanced = columnView === "all" || columnView === "advanced";
 
-  const battingSeasons = useMemo(
-    () => [...(general?.seasonsBatting ?? [])].sort((a, b) => b.season - a.season),
-    [general?.seasonsBatting]
+  const battingSeasons: Array<PlayerCareerSeasonEntry<BattingStats>> = useMemo(
+    () =>
+      mergeRegularCareerSeasons(
+        general?.seasonsBatting ?? [],
+        careerData?.regularBatting ?? []
+      ),
+    [general?.seasonsBatting, careerData?.regularBatting]
   );
 
-  const pitchingSeasons = useMemo(
-    () => [...(general?.seasonsPitching ?? [])].sort((a, b) => b.season - a.season),
-    [general?.seasonsPitching]
+  const pitchingSeasons: Array<PlayerCareerSeasonEntry<PitchingStats>> = useMemo(
+    () =>
+      mergeRegularCareerSeasons(
+        general?.seasonsPitching ?? [],
+        careerData?.regularPitching ?? []
+      ),
+    [general?.seasonsPitching, careerData?.regularPitching]
   );
 
-  const postseasonBatting = useMemo(
-    () => general?.postseasonBatting ?? [],
-    [general?.postseasonBatting]
+  const postseasonBatting: Array<PlayerCareerPostseasonEntry<BattingStats>> = useMemo(
+    () =>
+      mergePostseasonCareerSeasons(
+        general?.postseasonBatting ?? [],
+        careerData?.postseasonBatting ?? []
+      ),
+    [general?.postseasonBatting, careerData?.postseasonBatting]
   );
 
-  const postseasonPitching = useMemo(
-    () => general?.postseasonPitching ?? [],
-    [general?.postseasonPitching]
+  const postseasonPitching: Array<PlayerCareerPostseasonEntry<PitchingStats>> = useMemo(
+    () =>
+      mergePostseasonCareerSeasons(
+        general?.postseasonPitching ?? [],
+        careerData?.postseasonPitching ?? []
+      ),
+    [general?.postseasonPitching, careerData?.postseasonPitching]
+  );
+
+  const countableBatting = useMemo(
+    () => battingSeasons.filter((s) => !s.isTeamSplit),
+    [battingSeasons]
+  );
+  const countablePitching = useMemo(
+    () => pitchingSeasons.filter((s) => !s.isTeamSplit),
+    [pitchingSeasons]
+  );
+  const countablePostBatting = useMemo(
+    () => postseasonBatting.filter((s) => !s.isTeamSplit),
+    [postseasonBatting]
+  );
+  const countablePostPitching = useMemo(
+    () => postseasonPitching.filter((s) => !s.isTeamSplit),
+    [postseasonPitching]
+  );
+
+  const distinctRegularBattingSeasons = useMemo(
+    () => new Set(countableBatting.map((s) => s.season)).size,
+    [countableBatting]
+  );
+  const distinctRegularPitchingSeasons = useMemo(
+    () => new Set(countablePitching.map((s) => s.season)).size,
+    [countablePitching]
+  );
+  const distinctPostBattingSeasons = useMemo(
+    () => new Set(countablePostBatting.map((s) => s.season)).size,
+    [countablePostBatting]
+  );
+  const distinctPostPitchingSeasons = useMemo(
+    () => new Set(countablePostPitching.map((s) => s.season)).size,
+    [countablePostPitching]
   );
 
   const totalBatting = useMemo(
-    () => (battingSeasons.length > 1 ? computeTotalBatting(battingSeasons) : null),
-    [battingSeasons]
+    () =>
+      distinctRegularBattingSeasons > 1 || countableBatting.length > 1
+        ? computeTotalBatting(battingSeasons)
+        : null,
+    [battingSeasons, countableBatting.length, distinctRegularBattingSeasons]
   );
 
   const totalPitching = useMemo(
-    () => (pitchingSeasons.length > 1 ? computeTotalPitching(pitchingSeasons) : null),
-    [pitchingSeasons]
+    () =>
+      distinctRegularPitchingSeasons > 1 || countablePitching.length > 1
+        ? computeTotalPitching(pitchingSeasons)
+        : null,
+    [pitchingSeasons, countablePitching.length, distinctRegularPitchingSeasons]
+  );
+
+  const careerSummaryBatting = useMemo(
+    () => totalBatting ?? computeTotalBatting(battingSeasons),
+    [totalBatting, battingSeasons]
+  );
+
+  const careerSummaryPitching = useMemo(
+    () => totalPitching ?? computeTotalPitching(pitchingSeasons),
+    [totalPitching, pitchingSeasons]
   );
 
   const totalPostseasonBatting = useMemo(
     () =>
-      postseasonBatting.length > 1
-        ? computeTotalBatting(
-            postseasonBatting.map((entry) => ({
-              season: entry.season,
-              stats: entry.stats,
-            }))
-          )
+      distinctPostBattingSeasons > 1 || countablePostBatting.length > 1
+        ? computeTotalBatting(postseasonBatting)
         : null,
-    [postseasonBatting]
+    [postseasonBatting, countablePostBatting.length, distinctPostBattingSeasons]
   );
 
   const totalPostseasonPitching = useMemo(
     () =>
-      postseasonPitching.length > 1
-        ? computeTotalPitching(
-            postseasonPitching.map((entry) => ({
-              season: entry.season,
-              stats: entry.stats,
-            }))
-          )
+      distinctPostPitchingSeasons > 1 || countablePostPitching.length > 1
+        ? computeTotalPitching(postseasonPitching)
         : null,
-    [postseasonPitching]
+    [postseasonPitching, countablePostPitching.length, distinctPostPitchingSeasons]
   );
 
   const visibleBatterLogs: PlayerBatterGameLog[] = useMemo(() => {
@@ -792,8 +1010,21 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
     : (general.batterGameLogs?.length ?? 0) > 0;
 
   if (!hasSeasonRows && !hasPostseasonRows && fieldingRows.length === 0 && !hasGameLogs) {
-    return null;
+    if (!loadingCareer) return null;
+    return (
+      <div className="rounded-xl bg-[#0D152B] border border-[#1E2B4D] px-4 py-3 flex items-center gap-2 text-xs font-mono text-slate-300">
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FDB827]" />
+        <span>Cargando historial LVBP...</span>
+      </div>
+    );
   }
+
+  const distinctRegularSeasons = isPitcher
+    ? distinctRegularPitchingSeasons
+    : distinctRegularBattingSeasons;
+  const distinctPostSeasons = isPitcher
+    ? distinctPostPitchingSeasons
+    : distinctPostBattingSeasons;
 
   return (
     <div className="space-y-4">
@@ -808,12 +1039,18 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
                   Estadísticas Generales por Temporada
                 </h3>
                 <p className="text-[11px] text-slate-400">
-                  Temporada Regular LVBP • Métricas tradicionales, avanzadas e índices ajustados
+                  Temporada Regular LVBP (Historial completo) • Métricas tradicionales, avanzadas e índices ajustados
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              {loadingCareer && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#131E3D] border border-[#1E2B4D] text-[11px] font-mono text-slate-300">
+                  <Loader2 className="w-3 h-3 animate-spin text-[#FDB827]" />
+                  Cargando historial LVBP...
+                </span>
+              )}
               <ColumnViewToggle
                 columnView={columnView}
                 onChange={setColumnView}
@@ -822,33 +1059,69 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
             </div>
           </div>
 
+          {!isPitcher && careerSummaryBatting && (
+            <div className="px-4 py-2 bg-[#0A1124] border-b border-[#1E2B4D]/80 text-[11px] font-mono text-slate-300">
+              <span className="text-[#FDB827] font-semibold">
+                De por vida LVBP ({distinctRegularSeasons} temp.)
+              </span>
+              {" • "}
+              {careerSummaryBatting.games} JJ • {careerSummaryBatting.hits} H •{" "}
+              {careerSummaryBatting.homeRuns} HR • {careerSummaryBatting.rbi} CI •{" "}
+              {formatRate3(careerSummaryBatting.avg)} AVG •{" "}
+              {formatRate3(careerSummaryBatting.ops)} OPS
+            </div>
+          )}
+
+          {isPitcher && careerSummaryPitching && (
+            <div className="px-4 py-2 bg-[#0A1124] border-b border-[#1E2B4D]/80 text-[11px] font-mono text-slate-300">
+              <span className="text-[#FDB827] font-semibold">
+                De por vida LVBP ({distinctRegularSeasons} temp.)
+              </span>
+              {" • "}
+              {careerSummaryPitching.games} JJ • {careerSummaryPitching.inningsDisplay} IP •{" "}
+              {careerSummaryPitching.strikeouts} SO •{" "}
+              {careerSummaryPitching.era.toFixed(2)} ERA •{" "}
+              {careerSummaryPitching.whip.toFixed(2)} WHIP
+            </div>
+          )}
+
           {showAdvanced && <PlusStatsLegend />}
 
           {!isPitcher ? (
             <BattingSeasonTable
-              rows={battingSeasons.map(({ season, stats }) => ({
-                key: String(season),
-                label: formatSeason(season),
-                badge: season === profile.season ? "Activa" : undefined,
-                isHighlight: season === profile.season,
-                stats,
+              rows={battingSeasons.map((entry) => ({
+                key: buildSeasonRowKey(entry),
+                label: getSeasonRowLabel(entry),
+                badge:
+                  !entry.isTeamSplit && entry.season === profile.season
+                    ? "Activa"
+                    : undefined,
+                isHighlight: !entry.isTeamSplit && entry.season === profile.season,
+                isCombined: entry.isCombined,
+                isTeamSplit: entry.isTeamSplit,
+                stats: entry.stats,
               }))}
               totalRow={totalBatting}
-              totalLabel={`Total Reg. LVBP (${battingSeasons.length} temp.)`}
+              totalLabel={`Total de por vida LVBP (${distinctRegularSeasons} temp.)`}
               columnView={columnView}
               firstColumnHeader="TEMPORADA"
             />
           ) : (
             <PitchingSeasonTable
-              rows={pitchingSeasons.map(({ season, stats }) => ({
-                key: String(season),
-                label: formatSeason(season),
-                badge: season === profile.season ? "Activa" : undefined,
-                isHighlight: season === profile.season,
-                stats,
+              rows={pitchingSeasons.map((entry) => ({
+                key: buildSeasonRowKey(entry),
+                label: getSeasonRowLabel(entry),
+                badge:
+                  !entry.isTeamSplit && entry.season === profile.season
+                    ? "Activa"
+                    : undefined,
+                isHighlight: !entry.isTeamSplit && entry.season === profile.season,
+                isCombined: entry.isCombined,
+                isTeamSplit: entry.isTeamSplit,
+                stats: entry.stats,
               }))}
               totalRow={totalPitching}
-              totalLabel={`Total Reg. LVBP (${pitchingSeasons.length} temp.)`}
+              totalLabel={`Total de por vida LVBP (${distinctRegularSeasons} temp.)`}
               columnView={columnView}
               firstColumnHeader="TEMPORADA"
             />
@@ -886,28 +1159,32 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
           {!isPitcher ? (
             <BattingSeasonTable
               rows={postseasonBatting.map((entry) => ({
-                key: `${entry.season}-${entry.phase}`,
-                label: formatSeason(entry.season),
-                badge: entry.phaseLabel,
-                isHighlight: entry.season === profile.season,
+                key: buildSeasonRowKey(entry, entry.phase),
+                label: getSeasonRowLabel(entry),
+                badge: entry.isTeamSplit ? undefined : entry.phaseLabel,
+                isHighlight: !entry.isTeamSplit && entry.season === profile.season,
+                isCombined: entry.isCombined,
+                isTeamSplit: entry.isTeamSplit,
                 stats: entry.stats,
               }))}
               totalRow={totalPostseasonBatting}
-              totalLabel="Total Postemporada"
+              totalLabel={`Total Postemporada LVBP (${distinctPostSeasons} temp.)`}
               columnView={columnView}
               firstColumnHeader="TEMP. / FASE"
             />
           ) : (
             <PitchingSeasonTable
               rows={postseasonPitching.map((entry) => ({
-                key: `${entry.season}-${entry.phase}`,
-                label: formatSeason(entry.season),
-                badge: entry.phaseLabel,
-                isHighlight: entry.season === profile.season,
+                key: buildSeasonRowKey(entry, entry.phase),
+                label: getSeasonRowLabel(entry),
+                badge: entry.isTeamSplit ? undefined : entry.phaseLabel,
+                isHighlight: !entry.isTeamSplit && entry.season === profile.season,
+                isCombined: entry.isCombined,
+                isTeamSplit: entry.isTeamSplit,
                 stats: entry.stats,
               }))}
               totalRow={totalPostseasonPitching}
-              totalLabel="Total Postemporada"
+              totalLabel={`Total Postemporada LVBP (${distinctPostSeasons} temp.)`}
               columnView={columnView}
               firstColumnHeader="TEMP. / FASE"
             />

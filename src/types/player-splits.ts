@@ -248,3 +248,35 @@ export interface PlayerSelectorItem {
   type: "batter" | "pitcher";
   subtitle: string;
 }
+
+export type CareerDataSource = "supabase" | "mlb_api";
+
+export interface PlayerCareerSeasonEntry<T> {
+  season: number;
+  stats: T;
+  source: CareerDataSource;
+  isCombined?: boolean;
+  isTeamSplit?: boolean;
+  teamCount?: number;
+}
+
+export interface PlayerCareerPostseasonEntry<T> {
+  season: number;
+  phase: "D" | "L" | "F" | "P";
+  phaseLabel: string;
+  stats: T;
+  source: CareerDataSource;
+  isCombined?: boolean;
+  isTeamSplit?: boolean;
+  teamCount?: number;
+}
+
+export interface PlayerLvbpCareerResult {
+  playerId: number;
+  type: "batter" | "pitcher";
+  regularBatting: PlayerCareerSeasonEntry<BattingStats>[];
+  regularPitching: PlayerCareerSeasonEntry<PitchingStats>[];
+  postseasonBatting: PlayerCareerPostseasonEntry<BattingStats>[];
+  postseasonPitching: PlayerCareerPostseasonEntry<PitchingStats>[];
+  fetchedAt: string;
+}
