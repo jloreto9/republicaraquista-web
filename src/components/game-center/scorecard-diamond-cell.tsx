@@ -56,7 +56,7 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
             {cell.isPitchingChange && (
               <svg
                 viewBox="0 0 84 84"
-                className="absolute inset-0 w-full h-full pointer-events-none z-10"
+                className="absolute inset-0 w-full h-full pointer-events-none"
                 aria-hidden="true"
               >
                 <polyline
@@ -237,7 +237,7 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
             {cell.isPitchingChange && (
               <div
                 title={`Cambio de lanzador: ${cell.pitchingChangeTo}`}
-                className="absolute top-[2px] left-1/2 -translate-x-1/2 px-1 rounded-b bg-red-500/25 border border-t-0 border-red-500/70 text-red-300 font-mono text-[8px] font-bold leading-tight pointer-events-none z-10"
+                className="absolute top-[2px] left-1/2 -translate-x-1/2 px-1 rounded-b bg-red-500/25 border border-t-0 border-red-500/70 text-red-300 font-mono text-[8px] font-bold leading-tight pointer-events-none"
               >
                 CL
               </div>

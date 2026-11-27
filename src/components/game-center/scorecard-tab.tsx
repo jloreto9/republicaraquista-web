@@ -263,7 +263,7 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
                   >
                     {/* Bateador Info (Sticky) */}
                     <td
-                      className={`sticky left-0 z-10 bg-[#0D152B] group-hover:bg-[#121D3B] px-4 py-2 border-r border-[#1E2B4D] shadow-[2px_0_5px_rgba(0,0,0,0.3)] ${
+                      className={`sticky left-0 z-20 bg-[#0D152B] group-hover:bg-[#121D3B] px-4 py-2 border-r border-[#1E2B4D] shadow-[2px_0_5px_rgba(0,0,0,0.3)] ${
                         isSub ? "pl-7 bg-[#0A1024]" : ""
                       }`}
                     >
