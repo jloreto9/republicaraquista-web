@@ -135,6 +135,7 @@ export interface PlayerBatterGameLog {
   bb: number;
   so: number;
   sb: number;
+  cs?: number;
   avg: string;
 }
 

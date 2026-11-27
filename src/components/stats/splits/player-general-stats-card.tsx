@@ -513,6 +513,7 @@ function BattingSeasonTable({
                 <th className="py-2.5 px-2 text-center">BB</th>
                 <th className="py-2.5 px-2 text-center">SO</th>
                 <th className="py-2.5 px-2 text-center">BR</th>
+                <th className="py-2.5 px-2 text-center" title="Atrapado Robando (Caught Stealing)">CS</th>
               </>
             )}
             <th className="py-2.5 px-2 text-center font-semibold text-slate-100">AVG</th>
@@ -572,6 +573,7 @@ function BattingSeasonTable({
                     <td className="py-2.5 px-2 text-center text-slate-400">{stats.walks}</td>
                     <td className="py-2.5 px-2 text-center text-slate-400">{stats.strikeouts}</td>
                     <td className="py-2.5 px-2 text-center text-emerald-400">{stats.stolenBases}</td>
+                    <td className="py-2.5 px-2 text-center text-rose-300/90">{stats.caughtStealing ?? 0}</td>
                   </>
                 )}
                 <td className="py-2.5 px-2 text-center font-bold text-slate-100">{formatRate3(stats.avg)}</td>
@@ -617,6 +619,7 @@ function BattingSeasonTable({
                   <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.walks}</td>
                   <td className="py-2.5 px-2 text-center text-slate-300">{totalRow.strikeouts}</td>
                   <td className="py-2.5 px-2 text-center text-emerald-400">{totalRow.stolenBases}</td>
+                  <td className="py-2.5 px-2 text-center text-rose-300/90">{totalRow.caughtStealing ?? 0}</td>
                 </>
               )}
               <td className="py-2.5 px-2 text-center text-slate-100">{formatRate3(totalRow.avg)}</td>
@@ -1328,6 +1331,7 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
                     <th className="py-2 px-2 text-center">BB</th>
                     <th className="py-2 px-2 text-center">SO</th>
                     <th className="py-2 px-2 text-center">BR</th>
+                    <th className="py-2 px-2 text-center" title="Atrapado Robando (Caught Stealing)">CS</th>
                     <th className="py-2 px-2.5 text-center font-semibold text-slate-100">AVG</th>
                   </tr>
                 </thead>
@@ -1365,6 +1369,7 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
                       <td className="py-2 px-2 text-center text-slate-400">{g.bb}</td>
                       <td className="py-2 px-2 text-center text-slate-400">{g.so}</td>
                       <td className="py-2 px-2 text-center text-emerald-400">{g.sb}</td>
+                      <td className="py-2 px-2 text-center text-rose-300/90">{g.cs ?? 0}</td>
                       <td className="py-2 px-2.5 text-center font-semibold text-slate-100">{g.avg}</td>
                     </tr>
                   ))}

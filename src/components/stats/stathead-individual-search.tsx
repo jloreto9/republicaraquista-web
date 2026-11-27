@@ -2072,6 +2072,14 @@ export function StatheadIndividualSearch({
                         <SortableHeader label="SO" field="strikeouts" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
                         <SortableHeader label="GIDP" field="gidp" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
                         <SortableHeader label="BR" field="stolenBases" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                        <SortableHeader
+                          label="CS"
+                          field="caughtStealing"
+                          sortField={sortField}
+                          sortAsc={sortAsc}
+                          onSort={handleSort}
+                          title="Atrapado Robando (Caught Stealing)"
+                        />
                       </>
                     )}
                     <SortableHeader label="AVG" field="avg" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
@@ -2230,6 +2238,22 @@ export function StatheadIndividualSearch({
                               hasPrev={hasPrev}
                               delta={hasPrev ? computeDelta(player.stolenBases, prev.stolenBases, true, 0) : undefined}
                               className="text-emerald-300"
+                            />
+                            <StatValueCell
+                              display={player.caughtStealing ?? 0}
+                              compareEnabled={compareEnabled}
+                              hasPrev={hasPrev}
+                              delta={
+                                hasPrev
+                                  ? computeDelta(
+                                      player.caughtStealing ?? 0,
+                                      prev.caughtStealing ?? 0,
+                                      false,
+                                      0
+                                    )
+                                  : undefined
+                              }
+                              className="text-rose-300/90"
                             />
                           </>
                         )}

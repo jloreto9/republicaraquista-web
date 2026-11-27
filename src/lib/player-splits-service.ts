@@ -964,6 +964,7 @@ export function buildBatterGameLogs(rows: RawGameBattingRow[]): PlayerBatterGame
       bb: row.bb || 0,
       so: row.so || 0,
       sb: row.sb || 0,
+      cs: row.cs || 0,
       avg: ab > 0 ? formatRate(h / ab) : ".000",
     });
   }

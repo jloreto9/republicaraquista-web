@@ -287,6 +287,13 @@ export function BattingTable({ stats, onSelectPlayerForSplits }: BattingTablePro
                   >
                     BR
                   </th>
+                  <th
+                    onClick={() => handleSort("caughtStealing")}
+                    className="py-3 px-2 text-center cursor-pointer hover:text-slate-200"
+                    title="Atrapado Robando (Caught Stealing)"
+                  >
+                    CS
+                  </th>
                 </>
               )}
               <th
@@ -447,6 +454,9 @@ export function BattingTable({ stats, onSelectPlayerForSplits }: BattingTablePro
                       </td>
                       <td className="py-2.5 px-2 text-center text-emerald-400">
                         {player.stolenBases}
+                      </td>
+                      <td className="py-2.5 px-2 text-center text-rose-300/90">
+                        {player.caughtStealing ?? 0}
                       </td>
                     </>
                   )}
