@@ -156,7 +156,7 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
                 <span>Outs de Campo</span>
               </div>
               <p className="text-slate-400">
-                <strong>6-3</strong> (Short a 1ra), <strong>4-3</strong> (2da a 1ra), <strong>F8</strong> (Fly al center), <strong>L6</strong> (Línea al short), <strong>DP</strong> (Doble Play). El badge circular <strong className="text-rose-400">➀, ➁, ➂</strong> marca el out de la entrada.
+                <strong>6-3</strong> (Short a 1ra), <strong>4-3</strong> (2da a 1ra), <strong>F8</strong> (Fly al center), <strong>L6</strong> (Línea al short), <strong>DP</strong> (Doble Play). El badge circular <strong className="text-rose-400">➀, ➁, ➂</strong> marca el out de la entrada, y la línea superior <strong className="text-sky-300">CL</strong> indica un cambio de lanzador.
               </p>
             </div>
           </div>
@@ -193,6 +193,28 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
             </span>
           </div>
         </div>
+
+        {/* Tira Cronológica de Lanzadores Enfrentados */}
+        {activeTeamData.pitchersUsed && activeTeamData.pitchersUsed.length > 0 && (
+          <div className="px-4 py-2 bg-[#070B19]/70 border-b border-[#1E2B4D] flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+              Lanzadores enfrentados:
+            </span>
+            {activeTeamData.pitchersUsed.map((p, idx) => (
+              <span
+                key={`${p.pitcherId}-${p.inning}-${idx}`}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[10px] border ${
+                  p.isStarter
+                    ? "bg-[#1E2B4D]/60 border-slate-700/60 text-slate-200"
+                    : "bg-sky-500/15 border-sky-400/40 text-sky-300"
+                }`}
+              >
+                <span className="font-bold">{p.inning}°</span>
+                <span>{p.isStarter ? p.pitcherName : `↳ ${p.pitcherName}`}</span>
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Contenedor de la Tabla con Scroll Horizontal Responsivo */}
         <div className="overflow-x-auto">

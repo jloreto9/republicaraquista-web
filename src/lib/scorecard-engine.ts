@@ -1,10 +1,10 @@
 import {
   GameCenterScorecard,
-  TeamScorecard,
   ScorecardBatterRow,
   ScorecardCell,
   ScorecardDiamond,
   ScorecardInningSummary,
+  ScorecardPitcherAppearance,
 } from "@/types/scorecard";
 import { GameCenterTeam } from "@/types/game-center";
 
@@ -370,6 +370,13 @@ export function buildGameScorecard(
   // Map: half-inning key ("away-1", "home-1") -> Map<runnerId, ScorecardCell>
   const activeRunnersByInning = new Map<string, Map<number, ScorecardCell>>();
 
+  // Seguimiento cronológico de lanzadores enfrentados por cada ofensiva
+  // awayPitchersFaced = lanzadores de Home; homePitchersFaced = lanzadores de Away
+  let currentHomePitcher: { id: number; name: string } | null = null;
+  let currentAwayPitcher: { id: number; name: string } | null = null;
+  const awayPitchersFaced: ScorecardPitcherAppearance[] = [];
+  const homePitchersFaced: ScorecardPitcherAppearance[] = [];
+
   // Recorrer cronológicamente todas las jugadas del encuentro
   for (const play of allRawPlays) {
     const isTopInning = Boolean(play.about?.isTopInning);
@@ -380,6 +387,7 @@ export function buildGameScorecard(
     const rawEvent = res.event || "";
     const batterId = Number(play.matchup?.batter?.id);
     const batterName = play.matchup?.batter?.fullName || "Bateador";
+    const pitcherId = Number(play.matchup?.pitcher?.id ?? 0);
     const pitcherName = play.matchup?.pitcher?.fullName || undefined;
     const desc = res.description || "Turno al bate registrado.";
     const rbi = Number(res.rbi ?? 0);
@@ -418,6 +426,59 @@ export function buildGameScorecard(
         ? `${play.count.balls}-${play.count.strikes}`
         : undefined;
 
+    // Detección de cambio de lanzador en la ofensiva activa
+    let isPitchingChange = false;
+    let pitchingChangeFrom: string | undefined;
+    let pitchingChangeTo: string | undefined;
+
+    if (pitcherId > 0 && pitcherName) {
+      if (isAwayBatting) {
+        if (!currentHomePitcher) {
+          currentHomePitcher = { id: pitcherId, name: pitcherName };
+          awayPitchersFaced.push({
+            pitcherId,
+            pitcherName,
+            inning,
+            isStarter: true,
+          });
+        } else if (currentHomePitcher.id !== pitcherId) {
+          isPitchingChange = true;
+          pitchingChangeFrom = currentHomePitcher.name;
+          pitchingChangeTo = pitcherName;
+          currentHomePitcher = { id: pitcherId, name: pitcherName };
+          awayPitchersFaced.push({
+            pitcherId,
+            pitcherName,
+            inning,
+            isStarter: false,
+            replacedPitcherName: pitchingChangeFrom,
+          });
+        }
+      } else {
+        if (!currentAwayPitcher) {
+          currentAwayPitcher = { id: pitcherId, name: pitcherName };
+          homePitchersFaced.push({
+            pitcherId,
+            pitcherName,
+            inning,
+            isStarter: true,
+          });
+        } else if (currentAwayPitcher.id !== pitcherId) {
+          isPitchingChange = true;
+          pitchingChangeFrom = currentAwayPitcher.name;
+          pitchingChangeTo = pitcherName;
+          currentAwayPitcher = { id: pitcherId, name: pitcherName };
+          homePitchersFaced.push({
+            pitcherId,
+            pitcherName,
+            inning,
+            isStarter: false,
+            replacedPitcherName: pitchingChangeFrom,
+          });
+        }
+      }
+    }
+
     const cell: ScorecardCell = {
       playId: `sc-play-${play.atBatIndex ?? play.about?.atBatIndex ?? Math.random()}`,
       atBatIndex: Number(play.atBatIndex ?? 0),
@@ -432,6 +493,9 @@ export function buildGameScorecard(
       rbi,
       diamond,
       outNumber,
+      isPitchingChange: isPitchingChange || undefined,
+      pitchingChangeFrom,
+      pitchingChangeTo,
       countText,
       isHit,
       isOut: batterIsOut,
@@ -555,6 +619,7 @@ export function buildGameScorecard(
       isLeones: awayTeam.isLeones,
       batters: awayBatters,
       inningsSummary: awayInningsSummary,
+      pitchersUsed: awayPitchersFaced,
       totals: {
         runs: awayTeam.score,
         hits: awayTeam.hits,
@@ -571,6 +636,7 @@ export function buildGameScorecard(
       isLeones: homeTeam.isLeones,
       batters: homeBatters,
       inningsSummary: homeInningsSummary,
+      pitchersUsed: homePitchersFaced,
       totals: {
         runs: homeTeam.score,
         hits: homeTeam.hits,

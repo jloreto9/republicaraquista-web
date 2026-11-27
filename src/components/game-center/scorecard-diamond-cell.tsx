@@ -47,7 +47,9 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
         return (
           <div
             key={cell.playId}
-            className="w-[84px] h-[84px] min-w-[84px] relative p-1 flex items-center justify-center hover:bg-[#1E2B4D]/40 transition-colors cursor-pointer group"
+            className={`w-[84px] h-[84px] min-w-[84px] relative p-1 flex items-center justify-center hover:bg-[#1E2B4D]/40 transition-colors cursor-pointer group ${
+              cell.isPitchingChange ? "border-t-[2.5px] border-t-sky-400" : ""
+            }`}
             onClick={() => setActiveTooltip(activeTooltip === cell ? null : cell)}
             onMouseEnter={() => setActiveTooltip(cell)}
             onMouseLeave={() => setActiveTooltip(null)}
@@ -217,6 +219,16 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
               </div>
             )}
 
+            {/* Badge de Cambio de Lanzador */}
+            {cell.isPitchingChange && (
+              <div
+                title={`Cambio de lanzador: ${cell.pitchingChangeTo}`}
+                className="absolute top-0.5 left-1/2 -translate-x-1/2 px-1 rounded-b bg-sky-500/25 border border-t-0 border-sky-400/60 text-sky-300 font-mono text-[8px] font-bold leading-tight pointer-events-none"
+              >
+                CL
+              </div>
+            )}
+
             {/* Badge de Carrera Anotada */}
             {diamond.scored && (
               <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-[#FDB827]/30 border border-[#FDB827]/60 text-[#FDB827] font-bold text-[8px] flex items-center justify-center pointer-events-none">
@@ -235,6 +247,12 @@ export function ScorecardDiamondCell({ cells }: ScorecardDiamondCellProps) {
                     {cell.eventCode}
                   </span>
                 </div>
+                {cell.isPitchingChange && cell.pitchingChangeTo && (
+                  <div className="mb-1.5 px-2 py-1 rounded-md bg-sky-500/15 border border-sky-400/40 text-[10px] text-sky-300 font-semibold">
+                    Cambio de lanzador: Entra {cell.pitchingChangeTo}
+                    {cell.pitchingChangeFrom ? ` (por ${cell.pitchingChangeFrom})` : ""}
+                  </div>
+                )}
                 <div className="text-xs font-bold text-slate-100">{cell.batterName}</div>
                 {cell.pitcherName && (
                   <div className="text-[10px] text-slate-400 mb-1">

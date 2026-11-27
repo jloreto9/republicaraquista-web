@@ -21,6 +21,9 @@ export interface ScorecardCell {
   diamond: ScorecardDiamond;
   outNumber: number | null; // 1, 2, 3 o null si no generó out en la entrada
   outEvent?: string | null; // ej: "CS 2B", "PO 1B", "FO 2B" cuando fue puesto out en las bases
+  isPitchingChange?: boolean;
+  pitchingChangeFrom?: string;
+  pitchingChangeTo?: string;
   countText?: string; // ej: "3-2"
   isHit: boolean;
   isOut: boolean;
@@ -60,6 +63,14 @@ export interface ScorecardInningSummary {
   lob: number;
 }
 
+export interface ScorecardPitcherAppearance {
+  pitcherId: number;
+  pitcherName: string;
+  inning: number;
+  isStarter: boolean;
+  replacedPitcherName?: string;
+}
+
 export interface TeamScorecard {
   teamId: number;
   teamName: string;
@@ -69,6 +80,7 @@ export interface TeamScorecard {
   isLeones: boolean;
   batters: ScorecardBatterRow[];
   inningsSummary: ScorecardInningSummary[];
+  pitchersUsed?: ScorecardPitcherAppearance[];
   totals: {
     runs: number;
     hits: number;

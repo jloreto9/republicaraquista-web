@@ -98,7 +98,10 @@ const allRawPlays = [
     about: { inning: 2, isTopInning: false },
     result: { event: "Flyout", isOut: true, rbi: 0, description: "Jhonny Pereda flies out to right field." },
     count: { balls: 2, strikes: 2, outs: 1 },
-    matchup: { batter: { id: 640902, fullName: "Jhonny Pereda" } },
+    matchup: {
+      batter: { id: 640902, fullName: "Jhonny Pereda" },
+      pitcher: { id: 683681, fullName: "Jose Gonzalez" },
+    },
     runners: [{ details: { runner: { id: 640902 }, event: "Flyout" }, movement: { start: null, end: null, isOut: true, outBase: "1B", outNumber: 1 } }],
   },
   {
@@ -106,7 +109,10 @@ const allRawPlays = [
     about: { inning: 2, isTopInning: false },
     result: { event: "Single", isOut: false, rbi: 0, description: "Kenedy Corona singles." },
     count: { balls: 2, strikes: 2, outs: 1 },
-    matchup: { batter: { id: 685744, fullName: "Kenedy Corona" } },
+    matchup: {
+      batter: { id: 685744, fullName: "Kenedy Corona" },
+      pitcher: { id: 683681, fullName: "Jose Gonzalez" },
+    },
     runners: [{ details: { runner: { id: 685744 }, event: "Single" }, movement: { start: null, end: "1B", isOut: false } }],
   },
   {
@@ -114,11 +120,26 @@ const allRawPlays = [
     about: { inning: 2, isTopInning: false },
     result: { event: "Single", isOut: false, rbi: 0, description: "Wuilfredo Antunez singles. Kenedy Corona caught stealing 2nd base." },
     count: { balls: 0, strikes: 1, outs: 2 },
-    matchup: { batter: { id: 686404, fullName: "Wuilfredo Antunez" } },
+    matchup: {
+      batter: { id: 686404, fullName: "Wuilfredo Antunez" },
+      pitcher: { id: 683681, fullName: "Jose Gonzalez" },
+    },
     runners: [
       { details: { runner: { id: 685744 }, event: "Caught Stealing 2B" }, movement: { start: "1B", end: null, isOut: true, outBase: "2B", outNumber: 2 } },
       { details: { runner: { id: 686404 }, event: "Single" }, movement: { start: null, end: "1B", isOut: false } },
     ],
+  },
+  // Baja del 4to: cambio de lanzador Jose Guedez reemplaza a Jose Gonzalez ante Corona
+  {
+    atBatIndex: 37,
+    about: { inning: 4, isTopInning: false },
+    result: { event: "Walk", isOut: false, rbi: 0, description: "Kenedy Corona walks." },
+    count: { balls: 3, strikes: 1, outs: 0 },
+    matchup: {
+      batter: { id: 685744, fullName: "Kenedy Corona" },
+      pitcher: { id: 803247, fullName: "Jose Guedez" },
+    },
+    runners: [{ details: { runner: { id: 685744 }, event: "Walk" }, movement: { start: null, end: "1B", isOut: false } }],
   },
 ];
 
@@ -131,6 +152,17 @@ assert.equal(coronaCell.diamond.reach1B, true);
 assert.equal(coronaCell.diamond.outAt, "2B");
 assert.equal(coronaCell.outNumber, 2, "Kenedy Corona debe mostrar el Out #2 tras ser sorprendido en 2B");
 assert.equal(coronaCell.outEvent, "CS 2B");
+assert.equal(coronaCell.isPitchingChange, undefined, "El abridor no debe marcar cambio de lanzador");
+
+const coronaInn4 = sc.home.batters.find((b) => b.id === 685744)?.innings[4]?.[0];
+assert.ok(coronaInn4, "Debe existir la celda de Kenedy Corona en el 4to inning");
+assert.equal(coronaInn4.isPitchingChange, true, "Debe marcar cambio de lanzador al entrar Jose Guedez");
+assert.equal(coronaInn4.pitchingChangeFrom, "Jose Gonzalez");
+assert.equal(coronaInn4.pitchingChangeTo, "Jose Guedez");
+assert.equal(sc.home.pitchersUsed?.length, 2);
+assert.equal(sc.home.pitchersUsed?.[0].isStarter, true);
+assert.equal(sc.home.pitchersUsed?.[1].isStarter, false);
+assert.equal(sc.home.pitchersUsed?.[1].inning, 4);
 
 const martinezCell = sc.away.batters.find((b) => b.id === 594021)?.innings[2]?.[0];
 const cedrolaCell = sc.away.batters.find((b) => b.id === 661411)?.innings[2]?.[0];
