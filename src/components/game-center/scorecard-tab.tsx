@@ -11,13 +11,31 @@ interface ScorecardTabProps {
   scorecard?: GameCenterScorecard;
   homeTeam: GameCenterTeam;
   awayTeam: GameCenterTeam;
+  isLive?: boolean;
+  battingTeam?: "away" | "home";
 }
 
-export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProps) {
-  // Inicializar en el equipo de Leones si está jugando, o el visitante por defecto
-  const defaultTeam = homeTeam.isLeones ? "home" : "away";
-  const [selectedTeam, setSelectedTeam] = useState<"away" | "home">(defaultTeam);
+export function ScorecardTab({
+  scorecard,
+  homeTeam,
+  awayTeam,
+  isLive = false,
+  battingTeam,
+}: ScorecardTabProps) {
+  // En vivo sigue al equipo al bate salvo selección manual del otro equipo
+  const [manualTeam, setManualTeam] = useState<"away" | "home" | null>(null);
   const [showLegend, setShowLegend] = useState<boolean>(false);
+
+  const defaultTeam = isLive && battingTeam ? battingTeam : homeTeam.isLeones ? "home" : "away";
+  const selectedTeam = manualTeam ?? defaultTeam;
+
+  const handleSelectTeam = (team: "away" | "home") => {
+    if (isLive && battingTeam && team === battingTeam) {
+      setManualTeam(null);
+    } else {
+      setManualTeam(team);
+    }
+  };
 
   if (!scorecard) {
     return (
@@ -41,7 +59,7 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-[#0D152B] border border-[#1E2B4D] shadow-xl">
         <div className="flex items-center space-x-2 w-full sm:w-auto">
           <button
-            onClick={() => setSelectedTeam("away")}
+            onClick={() => handleSelectTeam("away")}
             className={`flex-1 sm:flex-initial flex items-center space-x-3 px-4 py-2.5 rounded-xl border transition-all ${
               selectedTeam === "away"
                 ? awayTeam.isLeones
@@ -60,7 +78,14 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
               />
             </div>
             <div className="text-left">
-              <div className="text-xs font-bold leading-none">{awayTeam.name}</div>
+              <div className="text-xs font-bold leading-none flex items-center gap-1.5">
+                <span>{awayTeam.name}</span>
+                {isLive && battingTeam === "away" && (
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 font-mono text-[9px] font-bold">
+                    Al bate
+                  </span>
+                )}
+              </div>
               <div className="text-[10px] text-slate-400 font-mono mt-0.5">Visitante</div>
             </div>
             <span className="ml-2 px-2 py-0.5 rounded font-mono font-bold text-xs bg-[#070B19]/80 border border-[#1E2B4D]">
@@ -69,7 +94,7 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
           </button>
 
           <button
-            onClick={() => setSelectedTeam("home")}
+            onClick={() => handleSelectTeam("home")}
             className={`flex-1 sm:flex-initial flex items-center space-x-3 px-4 py-2.5 rounded-xl border transition-all ${
               selectedTeam === "home"
                 ? homeTeam.isLeones
@@ -88,7 +113,14 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
               />
             </div>
             <div className="text-left">
-              <div className="text-xs font-bold leading-none">{homeTeam.name}</div>
+              <div className="text-xs font-bold leading-none flex items-center gap-1.5">
+                <span>{homeTeam.name}</span>
+                {isLive && battingTeam === "home" && (
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 font-mono text-[9px] font-bold">
+                    Al bate
+                  </span>
+                )}
+              </div>
               <div className="text-[10px] text-slate-400 font-mono mt-0.5">Home Club</div>
             </div>
             <span className="ml-2 px-2 py-0.5 rounded font-mono font-bold text-xs bg-[#070B19]/80 border border-[#1E2B4D]">
@@ -223,7 +255,7 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
             <thead>
               <tr className="bg-[#070B19]/90 border-b border-[#1E2B4D] text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
                 {/* Columna Sticky de Bateadores */}
-                <th className="sticky left-0 z-20 bg-[#070B19] px-4 py-3 min-w-[240px] w-[240px] border-r border-[#1E2B4D] shadow-[2px_0_5px_rgba(0,0,0,0.3)]">
+                <th className="sticky left-0 z-10 bg-[#070B19] px-4 py-3 min-w-[240px] w-[240px] border-r border-[#1E2B4D] shadow-[2px_0_5px_rgba(0,0,0,0.3)]">
                   Orden al Bate
                 </th>
 
@@ -263,7 +295,7 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
                   >
                     {/* Bateador Info (Sticky) */}
                     <td
-                      className={`sticky left-0 z-20 bg-[#0D152B] group-hover:bg-[#121D3B] px-4 py-2 border-r border-[#1E2B4D] shadow-[2px_0_5px_rgba(0,0,0,0.3)] ${
+                      className={`sticky left-0 z-10 bg-[#0D152B] group-hover:bg-[#121D3B] px-4 py-2 border-r border-[#1E2B4D] shadow-[2px_0_5px_rgba(0,0,0,0.3)] ${
                         isSub ? "pl-7 bg-[#0A1024]" : ""
                       }`}
                     >

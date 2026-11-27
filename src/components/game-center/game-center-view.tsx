@@ -410,6 +410,14 @@ export function GameCenterView({ initialData }: GameCenterViewProps) {
           scorecard={gameData.scorecard}
           homeTeam={gameData.homeTeam}
           awayTeam={gameData.awayTeam}
+          isLive={gameData.isLive}
+          battingTeam={
+            gameData.isLive
+              ? gameData.linescore.isTopInning
+                ? "away"
+                : "home"
+              : undefined
+          }
         />
       )}
 

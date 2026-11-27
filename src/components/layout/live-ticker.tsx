@@ -127,7 +127,7 @@ export function LiveTicker() {
     <div
       role="region"
       aria-label="Marcador en vivo de la LVBP"
-      className="h-9 w-full bg-[#070B19] border-b border-[#1E2B4D]/80 flex items-center px-3 sm:px-4 overflow-x-auto no-scrollbar shrink-0 select-none z-10 antialiased transform-gpu"
+      className="h-9 w-full bg-[#070B19] border-b border-[#1E2B4D]/80 flex items-center px-3 sm:px-4 overflow-x-auto no-scrollbar shrink-0 select-none z-30 antialiased transform-gpu"
     >
       <div className="flex items-center space-x-3 shrink-0 mr-3 pr-3 border-r border-[#1E2B4D]/80">
         {hasLive ? (
