@@ -156,7 +156,7 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
                 <span>Outs de Campo</span>
               </div>
               <p className="text-slate-400">
-                <strong>6-3</strong> (Short a 1ra), <strong>4-3</strong> (2da a 1ra), <strong>F8</strong> (Fly al center), <strong>L6</strong> (Línea al short), <strong>DP</strong> (Doble Play). El badge circular <strong className="text-rose-400">➀, ➁, ➂</strong> marca el out de la entrada, y la línea superior <strong className="text-sky-300">CL</strong> indica un cambio de lanzador.
+                <strong>6-3</strong> (Short a 1ra), <strong>4-3</strong> (2da a 1ra), <strong>F8</strong> (Fly al center), <strong>L6</strong> (Línea al short), <strong>DP</strong> (Doble Play). El badge circular <strong className="text-rose-400">➀, ➁, ➂</strong> marca el out de la entrada, y el corchete rojo <strong className="text-red-400">CL</strong> indica un cambio de lanzador.
               </p>
             </div>
           </div>
@@ -206,7 +206,7 @@ export function ScorecardTab({ scorecard, homeTeam, awayTeam }: ScorecardTabProp
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[10px] border ${
                   p.isStarter
                     ? "bg-[#1E2B4D]/60 border-slate-700/60 text-slate-200"
-                    : "bg-sky-500/15 border-sky-400/40 text-sky-300"
+                    : "bg-red-500/15 border-red-500/45 text-red-300"
                 }`}
               >
                 <span className="font-bold">{p.inning}°</span>
