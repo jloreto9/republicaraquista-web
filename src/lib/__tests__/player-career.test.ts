@@ -267,9 +267,10 @@ async function runTests() {
 
   // 5. Smoke test en vivo contra MLB Stats API (sportId=17&leagueId=135)
   clearPlayerCareerCache();
-  const [tovarCareer, lealCareer] = await Promise.all([
+  const [tovarCareer, lealCareer, guerraCareer] = await Promise.all([
     getPlayerLvbpCareer(541600, "batter"),
     getPlayerLvbpCareer(612797, "pitcher"),
+    getPlayerLvbpCareer(448855, "pitcher"),
   ]);
 
   const tovarSeasons = new Set(
@@ -317,8 +318,20 @@ async function runTests() {
     );
   }
 
+  const guerraSeasons = new Set(
+    guerraCareer.regularPitching.filter((e) => !e.isTeamSplit).map((e) => e.season)
+  );
+  assert.ok(
+    guerraSeasons.size >= 14,
+    `Junior Guerra (448855) debe tener >= 14 temporadas LVBP de pitcheo (recibidas: ${guerraSeasons.size})`
+  );
+  assert.ok(
+    guerraCareer.postseasonPitching.length >= 8,
+    `Junior Guerra (448855) debe tener >= 8 entradas de postemporada LVBP (recibidas: ${guerraCareer.postseasonPitching.length})`
+  );
+
   console.log(
-    `[OK] Live MLB Stats API: Tovar=${tovarSeasons.size} temp. (${tovarCareer.postseasonBatting.length} postemp.) | Leal=${lealSeasons.size} temp.`
+    `[OK] Live MLB Stats API: Tovar=${tovarSeasons.size} temp. (${tovarCareer.postseasonBatting.length} postemp.) | Leal=${lealSeasons.size} temp. | Guerra=${guerraSeasons.size} temp. (${guerraCareer.postseasonPitching.length} postemp.)`
   );
   console.log("=== TODAS LAS PRUEBAS DE PLAYER CAREER PASARON EXITOSAMENTE ===");
 }

@@ -834,16 +834,20 @@ export function PlayerGeneralStatsCard({ profile }: PlayerGeneralStatsCardProps)
     })
       .then(async (res) => {
         if (!res.ok) return null;
-        return (await res.json()) as PlayerLvbpCareerResult;
+        const json = (await res.json()) as {
+          success?: boolean;
+          career?: PlayerLvbpCareerResult | null;
+        };
+        return json?.career ?? null;
       })
-      .then((payload) => {
+      .then((career) => {
         if (controller.signal.aborted) return;
-        if (payload) {
-          clientCareerCache.set(careerKey, payload);
+        if (career) {
+          clientCareerCache.set(careerKey, career);
         }
         setCareerState({
           key: careerKey,
-          data: payload,
+          data: career,
           doneKey: careerKey,
         });
       })
