@@ -11,6 +11,10 @@ import {
   outsToInningsDisplay,
   parseInningsStringToOuts,
 } from "../player-career-service";
+import {
+  countDistinctCareerSeasons,
+  extractHistoricalCareerPayload,
+} from "../player-career-cache";
 
 function makeMockBattingStats(overrides: Partial<BattingStats> = {}): BattingStats {
   return {
@@ -264,6 +268,42 @@ async function runTests() {
   assert.equal(combinedPitching[0].stats.inningsDisplay, "54.0");
   assert.equal(combinedPitching[0].stats.inningsPitched, 54);
   assert.equal(combinedPitching[0].stats.era, 3.0);
+
+  // 4b. Filtrado inmutable (< 2025) y conteo de temporadas para caché en Supabase
+  const filteredArchive = extractHistoricalCareerPayload({
+    playerId: 541600,
+    type: "batter",
+    regularBatting: [
+      { season: 2026, stats: makeMockBattingStats(), source: "mlb_api" },
+      { season: 2025, stats: makeMockBattingStats(), source: "mlb_api" },
+      { season: 2024, stats: makeMockBattingStats(), source: "mlb_api" },
+      { season: 2013, stats: makeMockBattingStats({ teamAbbr: "2EQ", teamId: 0 }), source: "mlb_api", isCombined: true },
+      { season: 2013, stats: makeMockBattingStats({ teamAbbr: "MAG", teamId: 696 }), source: "mlb_api", isTeamSplit: true },
+      { season: 2013, stats: makeMockBattingStats({ teamAbbr: "MAR", teamId: 697 }), source: "mlb_api", isTeamSplit: true },
+    ],
+    regularPitching: [],
+    postseasonBatting: [
+      { season: 2025, phase: "P", phaseLabel: "Postemporada", stats: makeMockBattingStats(), source: "mlb_api" },
+      { season: 2023, phase: "P", phaseLabel: "Postemporada", stats: makeMockBattingStats(), source: "mlb_api" },
+    ],
+    postseasonPitching: [],
+    fetchedAt: "2026-11-26T00:00:00.000Z",
+  });
+  assert.deepEqual(
+    filteredArchive.regularBatting.map((e) => e.season),
+    [2024, 2013, 2013, 2013],
+    "El archivo histórico de caché debe excluir temporadas >= 2025"
+  );
+  assert.deepEqual(
+    filteredArchive.postseasonBatting.map((e) => e.season),
+    [2023],
+    "La postemporada en caché debe excluir temporadas >= 2025"
+  );
+  assert.equal(
+    countDistinctCareerSeasons(filteredArchive),
+    2,
+    "countDistinctCareerSeasons debe contar 2 temporadas distintas (2024 y 2013) sin contar sub-filas"
+  );
 
   // 5. Smoke test en vivo contra MLB Stats API (sportId=17&leagueId=135)
   clearPlayerCareerCache();

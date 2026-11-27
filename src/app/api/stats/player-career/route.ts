@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPlayerLvbpCareer } from "@/lib/player-career-service";
+import { getCachedOrFetchPlayerLvbpCareer } from "@/lib/player-career-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +26,14 @@ export async function GET(request: NextRequest) {
     const typeParam = searchParams.get("type");
     const type = typeParam === "pitcher" ? "pitcher" : "batter";
 
-    const career = await getPlayerLvbpCareer(playerId, type);
+    const { career, cacheStatus } = await getCachedOrFetchPlayerLvbpCareer(playerId, type);
 
     return NextResponse.json(
       { success: true, career },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+          "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+          "X-Career-Cache": cacheStatus,
         },
       }
     );
