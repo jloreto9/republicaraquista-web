@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { NotiCuevaPost } from "@/types/noticueva";
 import { FormattedContent } from "./formatted-content";
 import { LineupCardGeneratorPanel } from "@/components/admin/lineup-card-generator-panel";
 import { PushBroadcastPanel } from "@/components/admin/push-broadcast-panel";
+import { XInsightsPanel } from "@/components/admin/x-insights-panel";
 import {
   Lock,
   Send,
@@ -28,13 +29,19 @@ import {
   RefreshCw,
   Copy,
   Check,
+  Sparkles,
+  Users,
+  Bell,
 } from "lucide-react";
+
+type AdminTab = "noticueva" | "x-insights" | "lineup" | "push";
 
 export function NotiCuevaAdmin() {
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [activeTab, setActiveTab] = useState<AdminTab>("noticueva");
 
   // Estados del formulario de redacción
   const [title, setTitle] = useState("");
@@ -59,20 +66,12 @@ export function NotiCuevaAdmin() {
   const [copiedSql, setCopiedSql] = useState(false);
   const [showSqlCode, setShowSqlCode] = useState(false);
 
-  // Recordar sesión en sessionStorage
-  useEffect(() => {
-    const savedPass = sessionStorage.getItem("noticueva_admin_key");
-    if (savedPass) {
-      setPassword(savedPass);
-      verifyLogin(savedPass);
-    }
-  }, []);
-
-  const checkDatabaseStatus = async () => {
+  const checkDatabaseStatus = useCallback(async (passOverride?: string) => {
+    const key = passOverride ?? password;
     try {
       setDbStatus((prev) => (prev ? { ...prev, loading: true } : { loading: true, ready: false, postsTableExists: false, sqlMigration: "" }));
       const res = await fetch("/api/noticueva/status", {
-        headers: password ? { "x-admin-key": password } : {},
+        headers: key ? { "x-admin-key": key } : {},
       });
       const data = await res.json();
       setDbStatus({
@@ -85,7 +84,7 @@ export function NotiCuevaAdmin() {
     } catch {
       setDbStatus((prev) => (prev ? { ...prev, loading: false } : null));
     }
-  };
+  }, [password]);
 
   const handleCopySql = () => {
     const sql = dbStatus?.sqlMigration || "";
@@ -95,7 +94,19 @@ export function NotiCuevaAdmin() {
     setTimeout(() => setCopiedSql(false), 3000);
   };
 
-  const verifyLogin = async (passToTest: string) => {
+  const loadPosts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/noticueva");
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setPosts(json.data);
+      }
+    } catch (err) {
+      console.warn("Error al cargar posts:", err);
+    }
+  }, []);
+
+  const verifyLogin = useCallback(async (passToTest: string) => {
     try {
       setIsLoggingIn(true);
       setAuthError("");
@@ -109,7 +120,7 @@ export function NotiCuevaAdmin() {
         setIsAuthenticated(true);
         sessionStorage.setItem("noticueva_admin_key", passToTest);
         loadPosts();
-        checkDatabaseStatus();
+        checkDatabaseStatus(passToTest);
       } else {
         setIsAuthenticated(false);
         setAuthError(data.error || "Contraseña incorrecta.");
@@ -120,7 +131,22 @@ export function NotiCuevaAdmin() {
     } finally {
       setIsLoggingIn(false);
     }
-  };
+  }, [checkDatabaseStatus, loadPosts]);
+
+  // Recordar sesión en sessionStorage
+  useEffect(() => {
+    const savedPass = sessionStorage.getItem("noticueva_admin_key");
+    if (!savedPass) return;
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setPassword(savedPass);
+      void verifyLogin(savedPass);
+    });
+    return () => {
+      active = false;
+    };
+  }, [verifyLogin]);
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,19 +160,8 @@ export function NotiCuevaAdmin() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     setPassword("");
+    setActiveTab("noticueva");
     sessionStorage.removeItem("noticueva_admin_key");
-  };
-
-  const loadPosts = async () => {
-    try {
-      const res = await fetch("/api/noticueva");
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        setPosts(json.data);
-      }
-    } catch (err) {
-      console.warn("Error al cargar posts:", err);
-    }
   };
 
   /**
@@ -258,8 +273,11 @@ export function NotiCuevaAdmin() {
           });
         }
       }
-    } catch (err: any) {
-      setFeedback({ type: "error", message: err?.message || "Error al comunicarse con el servidor." });
+    } catch (err: unknown) {
+      setFeedback({
+        type: "error",
+        message: err instanceof Error ? err.message : "Error al comunicarse con el servidor.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -394,7 +412,45 @@ export function NotiCuevaAdmin() {
         </div>
       </div>
 
-      {/* Alerta de Diagnóstico de Supabase */}
+      {/* Selector de Módulos del Panel de Redacción */}
+      <nav
+        aria-label="Módulos de administración"
+        role="tablist"
+        className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-[#0D152B] border border-[#1E2B4D]"
+      >
+        {(
+          [
+            { id: "noticueva", label: "NotiCueva", icon: Newspaper },
+            { id: "x-insights", label: "Insights 𝕏 (IA)", icon: Sparkles },
+            { id: "lineup", label: "Tarjeta Lineup", icon: Users },
+            { id: "push", label: "Web Push", icon: Bell },
+          ] as const
+        ).map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActiveTab(tab.id)}
+              className={`min-h-[42px] px-3 py-2 rounded-xl text-xs font-mono flex items-center justify-center gap-2 transition-colors focus-visible:outline-2 focus-visible:outline-[#FDB827] ${
+                isActive
+                  ? "bg-[#FDB827] text-[#070B19] font-bold shadow-sm"
+                  : "text-slate-300 hover:bg-[#131E3D] hover:text-white"
+              }`}
+            >
+              <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-[#070B19]" : "text-[#FDB827]"}`} />
+              <span className="truncate">{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {activeTab === "noticueva" && (
+        <>
+          {/* Alerta de Diagnóstico de Supabase */}
       {dbStatus && !dbStatus.ready && (
         <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-950/60 via-[#0D152B] to-[#070B19] border border-amber-500/50 text-amber-200 shadow-xl space-y-3">
           <div className="flex items-start justify-between gap-3">
@@ -411,7 +467,7 @@ export function NotiCuevaAdmin() {
               </div>
             </div>
             <button
-              onClick={checkDatabaseStatus}
+              onClick={() => void checkDatabaseStatus()}
               disabled={dbStatus.loading}
               className="px-3 py-1.5 rounded-xl bg-amber-900/60 hover:bg-amber-800/80 border border-amber-600/60 text-xs font-mono text-amber-200 flex items-center space-x-1.5 shrink-0 transition-colors"
             >
@@ -836,12 +892,17 @@ export function NotiCuevaAdmin() {
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {/* Generador de Insights y Tarjetas para 𝕏 (Gemini) */}
+      {activeTab === "x-insights" && <XInsightsPanel adminPassword={password} />}
 
       {/* Generador de Tarjeta Oficial de Lineup (9:16) */}
-      <LineupCardGeneratorPanel adminPassword={password} />
+      {activeTab === "lineup" && <LineupCardGeneratorPanel adminPassword={password} />}
 
       {/* Panel de Despacho de Notificaciones Web Push */}
-      <PushBroadcastPanel adminPassword={password} />
+      {activeTab === "push" && <PushBroadcastPanel adminPassword={password} />}
     </div>
   );
 }
